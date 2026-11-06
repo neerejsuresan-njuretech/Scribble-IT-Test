@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Incidents collection
+    match /incidents/{incidentId} {
+      allow read: if true; // Public read for service desk visibility
+      allow write: if isSignedIn() || request.auth == null; // Permissive for preview/applet operations with fallbacks
+    }
+
+    // Service Requests
+    match /service_requests/{requestId} {
+      allow read: if true;
+      allow write: if isSignedIn() || request.auth == null;
+    }
+
+    // Problems
+    match /problems/{problemId} {
+      allow read: if true;
+      allow write: if isSignedIn() || request.auth == null;
+    }
+
+    // Changes
+    match /changes/{changeId} {
+      allow read: if true;
+      allow write: if isSignedIn() || request.auth == null;
+    }
+
+    // CMDB Assets
+    match /assets/{assetId} {
+      allow read: if true;
+      allow write: if isSignedIn() || request.auth == null;
+    }
+
+    // Inventory
+    match /inventory/{itemId} {
+      allow read: if true;
+      allow write: if isSignedIn() || request.auth == null;
+    }
+
+    // Workspace sync & user profiles
+    match /users/{userId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /{document=**} {
+      allow read, write: if isSignedIn();
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Scribble IT — Enterprise ITSM",
+  "description": "Minimal dot-matrix IT Service Management suite by Njure Tech featuring Incidents, Service Requests, Problems, Changes, CMDB, Inventory, Telephony integration, Self-Service, and Payments.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

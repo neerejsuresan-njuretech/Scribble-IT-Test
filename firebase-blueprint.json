@@ -1,0 +1,72 @@
+{
+  "entities": {
+    "Incident": {
+      "title": "Incident",
+      "description": "ITIL Incident record representing an IT disruption or outage",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 32 },
+        "title": { "type": "string", "maxLength": 256 },
+        "description": { "type": "string", "maxLength": 4096 },
+        "status": { "type": "string", "enum": ["new", "assigned", "in_progress", "pending", "resolved", "closed"] },
+        "priority": { "type": "string", "enum": ["P1", "P2", "P3", "P4"] },
+        "category": { "type": "string", "maxLength": 64 },
+        "requesterName": { "type": "string", "maxLength": 128 },
+        "requesterEmail": { "type": "string", "maxLength": 128 },
+        "assignee": { "type": "string", "maxLength": 128 },
+        "affectedCI": { "type": "string", "maxLength": 64 },
+        "workNotes": { "type": "string", "maxLength": 4096 },
+        "customerComments": { "type": "string", "maxLength": 4096 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "title", "status", "priority", "category"]
+    },
+    "ServiceRequest": {
+      "title": "ServiceRequest",
+      "description": "ITIL Service Catalog request item (RITM)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 32 },
+        "catalogItemName": { "type": "string", "maxLength": 256 },
+        "description": { "type": "string", "maxLength": 4096 },
+        "status": { "type": "string", "enum": ["submitted", "manager_approved", "security_review", "fulfillment", "completed", "rejected"] },
+        "currentStage": { "type": "number" },
+        "cost": { "type": "number" },
+        "requesterName": { "type": "string", "maxLength": 128 },
+        "requesterEmail": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "catalogItemName", "status"]
+    },
+    "Asset": {
+      "title": "Asset",
+      "description": "CMDB Configuration Item (CI)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 32 },
+        "assetTag": { "type": "string", "maxLength": 64 },
+        "name": { "type": "string", "maxLength": 256 },
+        "type": { "type": "string", "maxLength": 64 },
+        "serialNumber": { "type": "string", "maxLength": 128 },
+        "status": { "type": "string", "enum": ["in_use", "in_stock", "maintenance", "retired"] },
+        "location": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["id", "assetTag", "name", "status"]
+    }
+  },
+  "firestore": {
+    "/incidents/{incidentId}": {
+      "schema": "Incident",
+      "description": "Collection of all ITIL incidents"
+    },
+    "/service_requests/{requestId}": {
+      "schema": "ServiceRequest",
+      "description": "Collection of all service catalog requests"
+    },
+    "/assets/{assetId}": {
+      "schema": "Asset",
+      "description": "CMDB Configuration Items"
+    }
+  }
+}
