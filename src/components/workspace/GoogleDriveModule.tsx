@@ -62,12 +62,12 @@ export const GoogleDriveModule: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-800 pb-4">
         <div>
-          <div className="text-neutral-400">GOOGLE WORKSPACE INTEGRATION // DRIVE API</div>
+          <div className="text-neutral-500 text-[10px]">NJURE TECH // GOOGLE DRIVE API</div>
           <h1 className="text-xl font-bold text-neutral-100 flex items-center gap-3">
-            <span>GOOGLE DRIVE IT DOCUMENT REPOSITORY</span>
+            <span>GOOGLE DRIVE REPOSITORY</span>
             <span className="text-xs font-normal text-emerald-400 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-              <span>DRIVE v3 ACTIVE</span>
+              <span>ACTIVE</span>
             </span>
           </h1>
         </div>

@@ -11,22 +11,11 @@ export const GoogleChatModule: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [messageText, setMessageText] = useState('');
-  const [messages, setMessages] = useState<Array<{ sender: string; text: string; time: string }>>([
-    {
-      sender: 'Scribble IT Bot',
-      text: '🤖 Automated NOC Bot: Monitoring 10GbE uplinks and Core Switch Stack B.',
-      time: '10:04 AM'
-    },
-    {
-      sender: 'Elena Rostova',
-      text: 'Datacenter technician has arrived at Rack A-04 with replacement optics.',
-      time: '10:18 AM'
-    }
-  ]);
+  const [messages, setMessages] = useState<Array<{ sender: string; text: string; time: string }>>([]);
 
   // Create war room state
   const [showWarRoomModal, setShowWarRoomModal] = useState(false);
-  const [warRoomTitle, setWarRoomTitle] = useState('War Room: P1 Core Switch Outage (INC-2048)');
+  const [warRoomTitle, setWarRoomTitle] = useState('');
 
   const fetchSpaces = async () => {
     if (!googleToken) return;
@@ -118,12 +107,12 @@ export const GoogleChatModule: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-800 pb-4">
         <div>
-          <div className="text-neutral-400">GOOGLE WORKSPACE INTEGRATION // CHAT API</div>
+          <div className="text-neutral-500 text-[10px]">NJURE TECH // GOOGLE CHAT API</div>
           <h1 className="text-xl font-bold text-neutral-100 flex items-center gap-3">
-            <span>GOOGLE CHAT INCIDENT WAR ROOMS</span>
+            <span>GOOGLE CHAT WAR ROOMS</span>
             <span className="text-xs font-normal text-emerald-400 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-              <span>SPACES API READY</span>
+              <span>ACTIVE</span>
             </span>
           </h1>
         </div>
@@ -160,33 +149,38 @@ export const GoogleChatModule: React.FC = () => {
         <div className="lg:col-span-5 space-y-4">
           <div className="border border-neutral-800 bg-neutral-950 p-4 space-y-3">
             <div className="flex items-center justify-between text-neutral-400 border-b border-neutral-800 pb-2">
-              <span className="font-bold text-neutral-200 uppercase">Chat Spaces ({spaces.length || 2})</span>
+              <span className="font-bold text-neutral-200 uppercase">Chat Spaces ({spaces.length})</span>
               <button onClick={fetchSpaces} className="hover:text-neutral-200">
                 <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
               </button>
             </div>
 
             <div className="space-y-1.5">
-              {(spaces.length > 0 ? spaces : [
-                { name: 'spaces/noc-war-room', displayName: 'NOC Incident War Room (Core Switch)', type: 'SPACE' },
-                { name: 'spaces/sre-alerts', displayName: 'SRE Production Alerts & Telemetry', type: 'SPACE' }
-              ]).map((sp, idx) => (
-                <div
-                  key={idx}
-                  onClick={() => setSelectedSpace(sp)}
-                  className={`p-3 border transition-colors cursor-pointer space-y-1 ${
-                    selectedSpace?.displayName === sp.displayName
-                      ? 'bg-neutral-900 border-neutral-700 text-neutral-100'
-                      : 'border-neutral-850 hover:bg-neutral-900/40 text-neutral-400'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 font-bold text-neutral-200 truncate">
-                    <Users className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-                    <span>{sp.displayName}</span>
-                  </div>
-                  <div className="text-[10px] text-neutral-500 truncate">{sp.name}</div>
+              {spaces.length === 0 ? (
+                <div className="p-4 text-center text-neutral-500">
+                  {googleToken
+                    ? 'No Google Chat spaces found. Create a war room space above.'
+                    : 'Connect Google Workspace to load Google Chat spaces.'}
                 </div>
-              ))}
+              ) : (
+                spaces.map((sp, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => setSelectedSpace(sp)}
+                    className={`p-3 border transition-colors cursor-pointer space-y-1 ${
+                      selectedSpace?.displayName === sp.displayName
+                        ? 'bg-neutral-900 border-neutral-700 text-neutral-100'
+                        : 'border-neutral-850 hover:bg-neutral-900/40 text-neutral-400'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 font-bold text-neutral-200 truncate">
+                      <Users className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                      <span>{sp.displayName}</span>
+                    </div>
+                    <div className="text-[10px] text-neutral-500 truncate">{sp.name}</div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
@@ -220,28 +214,34 @@ export const GoogleChatModule: React.FC = () => {
           <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
             <div className="space-y-0.5">
               <div className="font-bold text-neutral-100 text-sm">
-                {selectedSpace?.displayName || 'NOC Incident War Room (Core Switch)'}
+                {selectedSpace?.displayName || 'Select or Create a Space'}
               </div>
               <div className="text-[11px] text-neutral-500">
-                Live Google Chat Collaboration Stream
+                Google Chat Collaboration Stream
               </div>
             </div>
-            <span className="text-[10px] text-emerald-400 border border-emerald-900/60 px-2 py-0.5">
-              CONNECTED
+            <span className={`text-[10px] border px-2 py-0.5 ${googleToken ? 'text-emerald-400 border-emerald-900/60' : 'text-neutral-500 border-neutral-800'}`}>
+              {googleToken ? 'CONNECTED' : 'STANDBY'}
             </span>
           </div>
 
           {/* Message List */}
           <div className="space-y-3 min-h-[300px] max-h-[420px] overflow-y-auto p-3 bg-neutral-900/20 border border-neutral-800/80">
-            {messages.map((m, i) => (
-              <div key={i} className="p-3 border border-neutral-800/80 bg-neutral-950 space-y-1">
-                <div className="flex items-center justify-between text-neutral-400">
-                  <span className="font-bold text-neutral-200">{m.sender}</span>
-                  <span className="text-[10px] text-neutral-500">{m.time}</span>
-                </div>
-                <div className="text-neutral-300 leading-relaxed whitespace-pre-wrap">{m.text}</div>
+            {messages.length === 0 ? (
+              <div className="py-12 text-center text-neutral-500">
+                No messages in this stream yet. Send an update below or broadcast an incident alert.
               </div>
-            ))}
+            ) : (
+              messages.map((m, i) => (
+                <div key={i} className="p-3 border border-neutral-800/80 bg-neutral-950 space-y-1">
+                  <div className="flex items-center justify-between text-neutral-400">
+                    <span className="font-bold text-neutral-200">{m.sender}</span>
+                    <span className="text-[10px] text-neutral-500">{m.time}</span>
+                  </div>
+                  <div className="text-neutral-300 leading-relaxed whitespace-pre-wrap">{m.text}</div>
+                </div>
+              ))
+            )}
           </div>
 
           {/* Message Input */}

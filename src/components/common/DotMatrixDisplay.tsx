@@ -1,6 +1,6 @@
 import React from 'react';
 
-// 5x7 Dot Matrix Font Map for Nothing OS / Teenage Engineering aesthetic
+// 5x7 Dot Matrix Font Map for Njure Tech dot-matrix minimal aesthetic
 const FONT_MAP: Record<string, number[]> = {
   'A': [0x0E, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11],
   'B': [0x1E, 0x11, 0x11, 0x1E, 0x11, 0x11, 0x1E],

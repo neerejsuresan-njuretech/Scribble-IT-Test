@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useITSM } from '../../context/ITSMContext';
-import { DotMatrixText } from '../common/DotMatrixDisplay';
-import { Phone, PhoneCall, PhoneForwarded, PhoneOff, Mic, MicOff, Pause, Play, FilePlus, User, History } from 'lucide-react';
+import { Phone, PhoneCall, PhoneOff, Mic, MicOff, Pause, Play, FilePlus, History } from 'lucide-react';
 
 export const TelephonyModule: React.FC = () => {
+  const navigate = useNavigate();
   const {
     calls, activeCall, startTelephonyCall, simulateIncomingCall,
-    answerIncomingCall, endTelephonyCall, toggleHoldCall, popTicketFromCall,
-    setActiveTab
+    answerIncomingCall, endTelephonyCall, toggleHoldCall, popTicketFromCall
   } = useITSM();
 
   const [dialNumber, setDialNumber] = useState('');
@@ -37,10 +37,10 @@ export const TelephonyModule: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-800 pb-4">
         <div>
-          <div className="text-xs font-mono text-neutral-400">COMPUTER TELEPHONY INTEGRATION (CTI) // SIP VOIP DESK</div>
+          <div className="text-xs font-mono text-neutral-500 uppercase">NJURE TECH // CTI TELEPHONY</div>
           <h1 className="text-xl font-bold font-mono text-neutral-100 flex items-center gap-3">
-            <span>TELEPHONY & CALL AUTOMATION</span>
-            <span className="text-xs font-normal text-neutral-500 tabular-nums">({calls.length} Call Records)</span>
+            <span>TELEPHONY CTI</span>
+            <span className="text-xs font-normal text-neutral-500 tabular-nums">({calls.length} Calls)</span>
           </h1>
         </div>
         <button
@@ -48,7 +48,7 @@ export const TelephonyModule: React.FC = () => {
           className="px-4 py-2 text-xs font-mono tracking-wider border border-emerald-600 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/60 transition-colors flex items-center gap-2 self-start sm:self-auto"
         >
           <PhoneCall className="w-3.5 h-3.5" />
-          <span>Simulate Inbound Caller</span>
+          <span>Test Inbound Call</span>
         </button>
       </div>
 
@@ -238,45 +238,51 @@ export const TelephonyModule: React.FC = () => {
             </div>
 
             <div className="divide-y divide-neutral-800/80">
-              {calls.map(call => (
-                <div key={call.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-neutral-200">{call.callerName}</span>
-                      <span className="text-neutral-500">·</span>
-                      <span className="text-neutral-400 tabular-nums">{call.callerNumber}</span>
-                    </div>
-                    <div className="text-neutral-500 text-[11px]">
-                      {call.callerCompany} · {new Date(call.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <div className="text-neutral-300 tabular-nums font-bold">
-                        {Math.floor(call.durationSec / 60)}m {call.durationSec % 60}s
-                      </div>
-                      <div className="text-[11px] text-neutral-500 uppercase">{call.disposition || 'inquiry_resolved'}</div>
-                    </div>
-
-                    {call.relatedTicketId ? (
-                      <button
-                        onClick={() => setActiveTab('incidents')}
-                        className="px-2 py-1 text-[11px] border border-neutral-700 bg-neutral-900 text-rose-400 hover:text-rose-300"
-                      >
-                        {call.relatedTicketId}
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handlePopTicket(call.id)}
-                        className="px-2 py-1 text-[11px] border border-neutral-800 text-neutral-400 hover:text-neutral-200 hover:border-neutral-600"
-                      >
-                        + Pop Ticket
-                      </button>
-                    )}
-                  </div>
+              {calls.length === 0 ? (
+                <div className="py-8 text-center text-neutral-500 text-xs">
+                  No call detail records logged yet. Place an outbound call or test an inbound call to record a session.
                 </div>
-              ))}
+              ) : (
+                calls.map(call => (
+                  <div key={call.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-neutral-200">{call.callerName}</span>
+                        <span className="text-neutral-500">·</span>
+                        <span className="text-neutral-400 tabular-nums">{call.callerNumber}</span>
+                      </div>
+                      <div className="text-neutral-500 text-[11px]">
+                        {call.callerCompany} · {new Date(call.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <div className="text-neutral-300 tabular-nums font-bold">
+                          {Math.floor(call.durationSec / 60)}m {call.durationSec % 60}s
+                        </div>
+                        <div className="text-[11px] text-neutral-500 uppercase">{call.disposition || 'inquiry_resolved'}</div>
+                      </div>
+
+                      {call.relatedTicketId ? (
+                        <button
+                          onClick={() => navigate('/incidents')}
+                          className="px-2 py-1 text-[11px] border border-neutral-700 bg-neutral-900 text-rose-400 hover:text-rose-300"
+                        >
+                          {call.relatedTicketId}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handlePopTicket(call.id)}
+                          className="px-2 py-1 text-[11px] border border-neutral-800 text-neutral-400 hover:text-neutral-200 hover:border-neutral-600"
+                        >
+                          + Pop Ticket
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useITSM } from '../../context/ITSMContext';
 import { ChangeRequest, ChangeStatus, RiskLevel, ChangeType } from '../../types/itsm';
 import { MinimalStatus } from '../common/DotMatrixDisplay';
@@ -11,10 +12,11 @@ import {
 import { chatService, driveService } from '../../services/workspaceService';
 
 interface ChangeModuleProps {
-  onOpenCreate: () => void;
+  onOpenCreate?: () => void;
 }
 
 export const ChangeModule: React.FC<ChangeModuleProps> = ({ onOpenCreate }) => {
+  const navigate = useNavigate();
   const { changes, voteCab, updateChangeStatus, currentUser, googleToken, loginWithGoogle } = useITSM();
 
   const [selectedId, setSelectedId] = useState<string>(changes[0]?.id || '');
@@ -144,9 +146,11 @@ export const ChangeModule: React.FC<ChangeModuleProps> = ({ onOpenCreate }) => {
         </div>
 
         <div className="space-y-0.5">
-          <div className="text-neutral-500 uppercase text-[10px]">CHANGE SUCCESS RATE</div>
-          <div className="text-sm font-bold text-emerald-400 tabular-nums">99.8%</div>
-          <div className="text-[10px] text-emerald-500/80">0 backouts in last 90 days</div>
+          <div className="text-neutral-500 uppercase text-[10px]">COMPLETED CHANGES</div>
+          <div className="text-sm font-bold text-emerald-400 tabular-nums">
+            {changes.length === 0 ? '—' : `${Math.round((changes.filter(c => c.status === 'completed').length / changes.length) * 100)}%`}
+          </div>
+          <div className="text-[10px] text-neutral-400">{changes.filter(c => c.status === 'completed').length} of {changes.length} completed</div>
         </div>
       </div>
 
@@ -154,14 +158,14 @@ export const ChangeModule: React.FC<ChangeModuleProps> = ({ onOpenCreate }) => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-800 pb-3">
         <div className="space-y-0.5">
           <div className="text-neutral-500 flex items-center gap-2 text-[10px]">
-            <span>SERVICENOW NOW PLATFORM</span>
+            <span>NJURE TECH</span>
             <span aria-hidden="true">·</span>
-            <span>CHANGE ADVISORY BOARD (CAB)</span>
+            <span>CHANGE MANAGEMENT (CAB)</span>
             <span aria-hidden="true">·</span>
             <span className="text-neutral-400">TABLE: change_request</span>
           </div>
           <h1 className="text-lg font-bold text-neutral-100 flex items-center gap-2">
-            <span>REQUEST FOR CHANGE (RFC)</span>
+            <span>CHANGES (RFC)</span>
             <span className="text-xs font-normal text-neutral-500 tabular-nums">({filteredChanges.length} Records)</span>
           </h1>
         </div>
@@ -190,7 +194,7 @@ export const ChangeModule: React.FC<ChangeModuleProps> = ({ onOpenCreate }) => {
           </button>
 
           <button
-            onClick={onOpenCreate}
+            onClick={() => onOpenCreate ? onOpenCreate() : navigate('/changes/new')}
             className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold tracking-wider transition-colors flex items-center gap-1.5 text-xs"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -435,14 +439,11 @@ export const ChangeModule: React.FC<ChangeModuleProps> = ({ onOpenCreate }) => {
               <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
                 <div className="space-y-0.5">
                   <div className="font-bold text-neutral-100 uppercase tracking-wider flex items-center gap-2">
-                    <span>Change Advisory Board (CAB) Sign-Offs</span>
+                    <span>CAB Sign-Offs</span>
                     <span className="text-neutral-500">·</span>
                     <span className={isQuorumReached ? 'text-emerald-400' : 'text-amber-400'}>
                       {approvedVotes}/{totalVotes} Approved ({quorumPercent}%)
                     </span>
-                  </div>
-                  <div className="text-[11px] text-neutral-500">
-                    Enterprise Policy: All appointed infrastructure and security stakeholders must sign off before implementation.
                   </div>
                 </div>
 
@@ -555,7 +556,17 @@ export const ChangeModule: React.FC<ChangeModuleProps> = ({ onOpenCreate }) => {
               </div>
             </div>
           </div>
-        ) : null}
+        ) : (
+          <div className="flex-1 min-w-0 border border-neutral-800 bg-neutral-950 p-10 text-center space-y-3 text-neutral-500">
+            <div>No change requests recorded yet.</div>
+            <button
+              onClick={() => onOpenCreate ? onOpenCreate() : navigate('/changes/new')}
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs"
+            >
+              + New Change Request
+            </button>
+          </div>
+        )}
 
         {/* Right: The Enterprise Side-Panel Activity Stream */}
         {selectedChange && (

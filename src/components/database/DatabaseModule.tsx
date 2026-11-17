@@ -58,12 +58,12 @@ export const DatabaseModule: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-800 pb-4">
         <div>
-          <div className="text-neutral-400">ENTERPRISE SYSTEM STORAGE // PERSISTENCE & RECOVERY</div>
+          <div className="text-neutral-500 text-[10px]">NJURE TECH · CLOUD PERSISTENCE</div>
           <h1 className="text-xl font-bold text-neutral-100 flex items-center gap-3">
-            <span>DATABASE & BACKUP ENGINE</span>
+            <span>DATABASE TOPOLOGY</span>
             <span className="text-xs font-normal text-emerald-400 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-              <span>PERSISTED IN STORAGE</span>
+              <span className="w-1.5 h-1.5 bg-emerald-500 inline-block" />
+              <span>PERSISTED</span>
             </span>
           </h1>
         </div>
@@ -73,7 +73,7 @@ export const DatabaseModule: React.FC = () => {
             className="px-3.5 py-2 border border-rose-900 bg-rose-950/30 text-rose-300 hover:bg-rose-900/40 transition-colors flex items-center gap-2"
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            <span>Reset to Factory Seed</span>
+            <span>Clear All Data (Blank)</span>
           </button>
         </div>
       </div>
@@ -162,7 +162,7 @@ export const DatabaseModule: React.FC = () => {
             <span>Restore Snapshot / Migration</span>
           </div>
           <p className="text-neutral-400 leading-relaxed">
-            Paste a valid Scribble IT or FreeITSM JSON payload below to synchronize schemas and restore database state into browser storage.
+            Paste a valid Njure Tech JSON export payload below to restore database state.
           </p>
 
           <textarea

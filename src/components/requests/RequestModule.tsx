@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useITSM } from '../../context/ITSMContext';
 import { ServiceRequest, RequestStatus } from '../../types/itsm';
 import { MinimalStatus } from '../common/DotMatrixDisplay';
 import { Check, X, ShieldAlert, Package, Clock, UserCheck, Plus, CheckCircle2 } from 'lucide-react';
 
 interface RequestModuleProps {
-  onOpenCreate: () => void;
+  onOpenCreate?: () => void;
 }
 
 export const RequestModule: React.FC<RequestModuleProps> = ({ onOpenCreate }) => {
+  const navigate = useNavigate();
   const { requests, approveRequestStage, currentUser } = useITSM();
   const [selectedId, setSelectedId] = useState<string>(requests[0]?.id || '');
   const [approvalNote, setApprovalNote] = useState('');
@@ -39,19 +41,27 @@ export const RequestModule: React.FC<RequestModuleProps> = ({ onOpenCreate }) =>
       {/* Module Title */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-800 pb-4">
         <div>
-          <div className="text-xs font-mono text-neutral-400">ITIL SERVICE TRANSITION // SERVICE CATALOG REQUESTS</div>
+          <div className="text-xs font-mono text-neutral-500 uppercase">NJURE TECH // TABLE: sc_req_item</div>
           <h1 className="text-xl font-bold font-mono text-neutral-100 flex items-center gap-3">
-            <span>SERVICE REQUEST PIPELINE</span>
+            <span>SERVICE REQUESTS</span>
             <span className="text-xs font-normal text-neutral-500 tabular-nums">({requests.length} Requests)</span>
           </h1>
         </div>
-        <button
-          onClick={onOpenCreate}
-          className="px-4 py-2 text-xs font-mono tracking-wider bg-rose-600 text-white hover:bg-rose-500 transition-colors flex items-center gap-2 self-start sm:self-auto"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>New Service Request</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <button
+            onClick={() => navigate('/requests/new')}
+            className="px-3.5 py-2 text-xs font-mono border border-neutral-700 bg-neutral-900 text-neutral-200 hover:bg-neutral-800 transition-colors"
+          >
+            I Need Something Else
+          </button>
+          <button
+            onClick={() => onOpenCreate ? onOpenCreate() : navigate('/requests/new')}
+            className="px-4 py-2 text-xs font-mono tracking-wider bg-rose-600 text-white hover:bg-rose-500 transition-colors flex items-center gap-2"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>New Service Request</span>
+          </button>
+        </div>
       </div>
 
       {/* Grid: Request List on Left, Multi-Stage Approvals on Right */}
@@ -196,7 +206,17 @@ export const RequestModule: React.FC<RequestModuleProps> = ({ onOpenCreate }) =>
               </div>
             </div>
           </div>
-        ) : null}
+        ) : (
+          <div className="lg:col-span-7 border border-neutral-800 bg-neutral-950 p-10 text-center space-y-3 text-neutral-500 font-mono text-xs">
+            <div>No service requests recorded yet.</div>
+            <button
+              onClick={() => onOpenCreate ? onOpenCreate() : navigate('/requests/new')}
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold"
+            >
+              + New Service Request
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,10 +1,16 @@
 import React, { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useITSM } from '../../context/ITSMContext';
 import { Invoice } from '../../types/itsm';
 import { MinimalStatus, DotMatrixText } from '../common/DotMatrixDisplay';
 import { CreditCard, DollarSign, Plus, CheckCircle2, FileText, Printer, Shield } from 'lucide-react';
 
-export const BillingModule: React.FC = () => {
+interface BillingModuleProps {
+  onOpenCreate?: () => void;
+}
+
+export const BillingModule: React.FC<BillingModuleProps> = ({ onOpenCreate }) => {
+  const navigate = useNavigate();
   const { invoices, payInvoice, createInvoice, role, currentUser } = useITSM();
   const [selectedId, setSelectedId] = useState<string>(invoices[0]?.id || '');
   const [showCheckout, setShowCheckout] = useState(false);
@@ -56,15 +62,15 @@ export const BillingModule: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-800 pb-4">
         <div>
-          <div className="text-xs font-mono text-neutral-400">FINANCIAL MANAGEMENT // INVOICES & MSP BILLING</div>
+          <div className="text-xs font-mono text-neutral-500 uppercase">NJURE TECH // TABLE: billing_invoice</div>
           <h1 className="text-xl font-bold font-mono text-neutral-100 flex items-center gap-3">
-            <span>INVOICE & PAYMENT GATEWAY</span>
+            <span>INVOICES & SETTLEMENTS</span>
             <span className="text-xs font-normal text-neutral-500 tabular-nums">({invoices.length} Invoices)</span>
           </h1>
         </div>
         {role === 'admin' && (
           <button
-            onClick={() => setShowCreateModal(true)}
+            onClick={() => onOpenCreate ? onOpenCreate() : navigate('/billing/new')}
             className="px-4 py-2 text-xs font-mono tracking-wider bg-rose-600 text-white hover:bg-rose-500 transition-colors flex items-center gap-2 self-start sm:self-auto"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -77,37 +83,43 @@ export const BillingModule: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left List */}
         <div className="lg:col-span-5 border border-neutral-800 divide-y divide-neutral-800 bg-neutral-950 max-h-[750px] overflow-y-auto">
-          {invoices.map(inv => {
-            const isSelected = selectedInvoice?.id === inv.id;
-            return (
-              <div
-                key={inv.id}
-                onClick={() => setSelectedId(inv.id)}
-                className={`p-4 transition-colors cursor-pointer space-y-2 ${
-                  isSelected ? 'bg-neutral-900 border-l-2 border-l-rose-500' : 'hover:bg-neutral-900/50'
-                }`}
-              >
-                <div className="flex items-center justify-between text-xs font-mono">
-                  <span className="font-bold text-neutral-200">{inv.id}</span>
-                  <MinimalStatus
-                    status={inv.status}
-                    variant={inv.status === 'paid' ? 'emerald' : inv.status === 'pending' ? 'amber' : 'red'}
-                  />
-                </div>
+          {invoices.length === 0 ? (
+            <div className="p-8 text-center text-xs font-mono text-neutral-500">
+              No invoices in ledger.
+            </div>
+          ) : (
+            invoices.map(inv => {
+              const isSelected = selectedInvoice?.id === inv.id;
+              return (
+                <div
+                  key={inv.id}
+                  onClick={() => setSelectedId(inv.id)}
+                  className={`p-4 transition-colors cursor-pointer space-y-2 ${
+                    isSelected ? 'bg-neutral-900 border-l-2 border-l-rose-500' : 'hover:bg-neutral-900/50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-xs font-mono">
+                    <span className="font-bold text-neutral-200">{inv.id}</span>
+                    <MinimalStatus
+                      status={inv.status}
+                      variant={inv.status === 'paid' ? 'emerald' : inv.status === 'pending' ? 'amber' : 'red'}
+                    />
+                  </div>
 
-                <div className="text-xs font-medium text-neutral-200 line-clamp-1">
-                  {inv.organization}
-                </div>
+                  <div className="text-xs font-medium text-neutral-200 line-clamp-1">
+                    {inv.organization}
+                  </div>
 
-                <div className="flex items-center justify-between text-[11px] font-mono text-neutral-500 pt-1">
-                  <span>{inv.customerName}</span>
-                  <span className="tabular-nums font-bold text-neutral-200 text-sm">
-                    ${inv.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </span>
+                  <div className="flex items-center justify-between text-[11px] font-mono text-neutral-500 pt-1">
+                    <span>{inv.customerName}</span>
+                    <span className="tabular-nums font-bold text-neutral-200 text-sm">
+                      ${inv.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
 
         {/* Right Detail: Dot Matrix Printable Invoice Preview */}
@@ -195,13 +207,29 @@ export const BillingModule: React.FC = () => {
             {/* Dot-matrix printed receipt footer */}
             <div className="p-4 border border-dashed border-neutral-800 bg-neutral-900/10 space-y-2 text-[11px] text-neutral-500">
               <div className="flex justify-between">
-                <span>SCRIBBLE IT // PAYMENT RECEIPT ENGINE</span>
-                <span>SECURE CRYPTO SIGNED</span>
+                <span>NJURE TECH · PAYMENT RECEIPT ENGINE</span>
+                <span>VERIFIED SETTLEMENT</span>
               </div>
               <div>{selectedInvoice.notes}</div>
             </div>
           </div>
-        ) : null}
+        ) : (
+          <div className="lg:col-span-7 border border-neutral-800 bg-neutral-950 p-10 text-center space-y-3 font-mono text-xs">
+            <div className="text-neutral-300 font-bold uppercase">No Invoices Recorded</div>
+            <div className="text-neutral-500">
+              Generate an invoice to manage client settlements and receipts.
+            </div>
+            {role === 'admin' && (
+              <button
+                onClick={() => onOpenCreate ? onOpenCreate() : navigate('/billing/new')}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold inline-flex items-center gap-2"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Generate Invoice</span>
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Checkout Modal Simulation */}
@@ -240,7 +268,7 @@ export const BillingModule: React.FC = () => {
               </div>
             </div>
 
-            {/* Payment form mock input */}
+            {/* Payment input */}
             <div className="space-y-3 p-3 bg-neutral-900/40 border border-neutral-800/80">
               {selectedPaymentMethod === 'credit_card' ? (
                 <>
@@ -248,8 +276,7 @@ export const BillingModule: React.FC = () => {
                     <label className="text-neutral-500 block mb-1">Card Number</label>
                     <input
                       type="text"
-                      readOnly
-                      value="•••• •••• •••• 4242"
+                      placeholder="•••• •••• •••• ••••"
                       className="w-full bg-neutral-900 border border-neutral-700 text-neutral-300 px-3 py-1.5 focus:outline-none"
                     />
                   </div>
@@ -258,8 +285,7 @@ export const BillingModule: React.FC = () => {
                       <label className="text-neutral-500 block mb-1">Expiry</label>
                       <input
                         type="text"
-                        readOnly
-                        value="12 / 28"
+                        placeholder="MM / YY"
                         className="w-full bg-neutral-900 border border-neutral-700 text-neutral-300 px-3 py-1.5 focus:outline-none"
                       />
                     </div>
@@ -267,25 +293,27 @@ export const BillingModule: React.FC = () => {
                       <label className="text-neutral-500 block mb-1">CVC</label>
                       <input
                         type="text"
-                        readOnly
-                        value="•••"
+                        placeholder="•••"
                         className="w-full bg-neutral-900 border border-neutral-700 text-neutral-300 px-3 py-1.5 focus:outline-none"
                       />
                     </div>
                   </div>
                 </>
               ) : selectedPaymentMethod === 'wire_ach' ? (
-                <div className="space-y-1 text-neutral-400">
-                  <div>Routing Number: <span className="text-neutral-200">021000021</span></div>
-                  <div>Account Number: <span className="text-neutral-200">9912048128</span></div>
-                  <div>Bank: <span className="text-neutral-200">Silicon Valley B2B Clearing</span></div>
+                <div className="space-y-2">
+                  <label className="text-neutral-500 block">Wire / ACH Transfer Reference</label>
+                  <input
+                    type="text"
+                    placeholder="Enter bank transfer reference ID..."
+                    className="w-full bg-neutral-900 border border-neutral-700 text-neutral-300 px-3 py-1.5 focus:outline-none"
+                  />
                 </div>
               ) : (
                 <div>
                   <label className="text-neutral-500 block mb-1">Purchase Order (PO) Number</label>
                   <input
                     type="text"
-                    defaultValue="PO-2024-9104"
+                    placeholder="Enter PO number..."
                     className="w-full bg-neutral-900 border border-neutral-700 text-neutral-300 px-3 py-1.5 focus:outline-none"
                   />
                 </div>

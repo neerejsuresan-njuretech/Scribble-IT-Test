@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useITSM } from '../../context/ITSMContext';
 import { Problem, ProblemStatus } from '../../types/itsm';
 import { MinimalStatus } from '../common/DotMatrixDisplay';
 import { AlertCircle, BookOpen, Link as LinkIcon, Plus, CheckCircle2, ShieldAlert } from 'lucide-react';
 
 interface ProblemModuleProps {
-  onOpenCreate: () => void;
+  onOpenCreate?: () => void;
 }
 
 export const ProblemModule: React.FC<ProblemModuleProps> = ({ onOpenCreate }) => {
+  const navigate = useNavigate();
   const { problems, updateProblem, setActiveTab } = useITSM();
   const [selectedId, setSelectedId] = useState<string>(problems[0]?.id || '');
   const [activeTabSub, setActiveTabSub] = useState<'all' | 'kedb'>('all');
@@ -24,10 +26,10 @@ export const ProblemModule: React.FC<ProblemModuleProps> = ({ onOpenCreate }) =>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-800 pb-4">
         <div>
-          <div className="text-xs font-mono text-neutral-400">ITIL SERVICE OPERATION // PROBLEM MANAGEMENT & KEDB</div>
+          <div className="text-xs font-mono text-neutral-500 uppercase">NJURE TECH // TABLE: problem</div>
           <h1 className="text-xl font-bold font-mono text-neutral-100 flex items-center gap-3">
-            <span>ROOT CAUSE & KNOWN ERRORS</span>
-            <span className="text-xs font-normal text-neutral-500 tabular-nums">({problems.length} Problems Tracked)</span>
+            <span>PROBLEMS & KEDB</span>
+            <span className="text-xs font-normal text-neutral-500 tabular-nums">({problems.length} Records)</span>
           </h1>
         </div>
         <div className="flex items-center gap-3">
@@ -46,7 +48,7 @@ export const ProblemModule: React.FC<ProblemModuleProps> = ({ onOpenCreate }) =>
             </button>
           </div>
           <button
-            onClick={onOpenCreate}
+            onClick={() => onOpenCreate ? onOpenCreate() : navigate('/problems/new')}
             className="px-4 py-2 text-xs font-mono tracking-wider bg-rose-600 text-white hover:bg-rose-500 transition-colors flex items-center gap-2"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -201,7 +203,17 @@ export const ProblemModule: React.FC<ProblemModuleProps> = ({ onOpenCreate }) =>
               </div>
             </div>
           </div>
-        ) : null}
+        ) : (
+          <div className="lg:col-span-7 border border-neutral-800 bg-neutral-950 p-10 text-center space-y-3 text-neutral-500 font-mono text-xs">
+            <div>No problem records logged yet.</div>
+            <button
+              onClick={() => onOpenCreate ? onOpenCreate() : navigate('/problems/new')}
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold"
+            >
+              + Log Problem RCA
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -2,6 +2,7 @@ import { Incident, ServiceRequest, Problem, ChangeRequest, Asset, InventoryItem,
 
 export const INITIAL_INCIDENTS: Incident[] = [
   {
+    tenantId: 'tenant-njure',
     id: 'INC-2048',
     title: 'Core Distribution Switch Stack B flapping on 10GbE Uplink',
     description: 'BGP sessions to upstream transit carrier dropped 3 times in 15 minutes. Packet loss on VLAN 100 (DevOps staging) peaking at 28%. Automatic failover triggered.',
@@ -36,6 +37,7 @@ export const INITIAL_INCIDENTS: Incident[] = [
     ]
   },
   {
+    tenantId: 'tenant-njure',
     id: 'INC-2047',
     title: 'PostgreSQL Read-Replica lag exceeding replication window (620s)',
     description: 'Analytics queries causing heavy I/O lock contention on storage volume NVMe array, causing 10-minute replication drift for customer reporting dashboards.',
@@ -63,6 +65,7 @@ export const INITIAL_INCIDENTS: Incident[] = [
     ]
   },
   {
+    tenantId: 'tenant-njure',
     id: 'INC-2046',
     title: 'Okta SSO Certificate Expiry Warning on Jira/Confluence connector',
     description: 'SAML IdP signing certificate expires in 72 hours. Users may face authentication rejections if rollover metadata is not applied before Friday 00:00 UTC.',
@@ -89,6 +92,7 @@ export const INITIAL_INCIDENTS: Incident[] = [
     ]
   },
   {
+    tenantId: 'tenant-njure',
     id: 'INC-2045',
     title: 'VoIP PBX SIP Trunk sporadic 408 Request Timeout on Extension 4402',
     description: 'Customer service desk incoming calls from UK toll-free number dropping intermittently after 2 rings. SIP signaling trace shows SIP ALG active on edge firewall.',
@@ -126,6 +130,7 @@ export const INITIAL_INCIDENTS: Incident[] = [
 
 export const INITIAL_REQUESTS: ServiceRequest[] = [
   {
+    tenantId: 'tenant-njure',
     id: 'REQ-3021',
     catalogItemId: 'CAT-HW-01',
     catalogItemName: 'Developer Workstation Upgrade (MacBook Pro M3 Max)',
@@ -145,6 +150,7 @@ export const INITIAL_REQUESTS: ServiceRequest[] = [
     createdAt: new Date(Date.now() - 24 * 3600 * 1000).toISOString()
   },
   {
+    tenantId: 'tenant-njure',
     id: 'REQ-3020',
     catalogItemId: 'CAT-ACC-03',
     catalogItemName: 'Production AWS VPC Peering & Bastion Access',
@@ -163,6 +169,7 @@ export const INITIAL_REQUESTS: ServiceRequest[] = [
     createdAt: new Date(Date.now() - 14 * 3600 * 1000).toISOString()
   },
   {
+    tenantId: 'tenant-njure',
     id: 'REQ-3019',
     catalogItemId: 'CAT-HW-04',
     catalogItemName: 'Dual 27-inch 4K USB-C Hub Display Setup',
@@ -185,6 +192,7 @@ export const INITIAL_REQUESTS: ServiceRequest[] = [
 
 export const INITIAL_PROBLEMS: Problem[] = [
   {
+    tenantId: 'tenant-njure',
     id: 'PRB-0089',
     title: 'Repeated SFP+ Transceiver Overheating in Rack A-04 Top-of-Rack Switch',
     description: 'Consecutive incident reports (INC-2048, INC-1982) regarding optical packet loss in chassis 2. Ambient hot-aisle exhaust temperature measured at 38°C.',
@@ -201,6 +209,7 @@ export const INITIAL_PROBLEMS: Problem[] = [
     updatedAt: new Date(Date.now() - 6 * 3600 * 1000).toISOString()
   },
   {
+    tenantId: 'tenant-njure',
     id: 'PRB-0088',
     title: 'Memory Leak in Node.js Microservice telemetry worker pool',
     description: 'Worker instances steadily consume 2GB heap over 48 hours without releasing buffer allocations during heavy Webhook event bursts.',
@@ -219,6 +228,7 @@ export const INITIAL_PROBLEMS: Problem[] = [
 
 export const INITIAL_CHANGES: ChangeRequest[] = [
   {
+    tenantId: 'tenant-njure',
     id: 'CHG-0512',
     title: 'Emergency Top-of-Rack Baffle Installation & Switch Firmware 17.09 Rollover',
     type: 'emergency',
@@ -266,6 +276,7 @@ export const INITIAL_CHANGES: ChangeRequest[] = [
     ]
   },
   {
+    tenantId: 'tenant-njure',
     id: 'CHG-0511',
     title: 'Migrate Enterprise VPN Endpoint to WireGuard Multi-Gateway Mesh',
     type: 'normal',
@@ -298,6 +309,7 @@ export const INITIAL_CHANGES: ChangeRequest[] = [
 
 export const INITIAL_ASSETS: Asset[] = [
   {
+    tenantId: 'tenant-njure',
     id: 'AST-4011',
     assetTag: 'NJURE-SW-CORE-02',
     name: 'Cisco Catalyst 9300 48-Port 10G Switch',
@@ -315,6 +327,7 @@ export const INITIAL_ASSETS: Asset[] = [
     qrCodeData: 'https://scribble.njuretech.io/asset/AST-4011'
   },
   {
+    tenantId: 'tenant-njure',
     id: 'AST-1002',
     assetTag: 'NJURE-SRV-DB-REP',
     name: 'Dell PowerEdge R750 2U Rackmount Server',
@@ -332,6 +345,7 @@ export const INITIAL_ASSETS: Asset[] = [
     qrCodeData: 'https://scribble.njuretech.io/asset/AST-1002'
   },
   {
+    tenantId: 'tenant-njure',
     id: 'AST-5023',
     assetTag: 'NJURE-MBP-882',
     name: 'MacBook Pro 16" Space Black M3 Max',
@@ -351,6 +365,7 @@ export const INITIAL_ASSETS: Asset[] = [
     qrCodeData: 'https://scribble.njuretech.io/asset/AST-5023'
   },
   {
+    tenantId: 'tenant-njure',
     id: 'AST-9014',
     assetTag: 'NJURE-SEC-KEY-09',
     name: 'Scribble Dot-Matrix Hardware FIDO2 Security Token',
@@ -369,6 +384,7 @@ export const INITIAL_ASSETS: Asset[] = [
     qrCodeData: 'https://scribble.njuretech.io/asset/AST-9014'
   },
   {
+    tenantId: 'tenant-njure',
     id: 'AST-3301',
     assetTag: 'NJURE-DISP-4K-12',
     name: 'Dell UltraSharp 27" 4K USB-C Hub Monitor',
@@ -388,6 +404,7 @@ export const INITIAL_ASSETS: Asset[] = [
 
 export const INITIAL_INVENTORY: InventoryItem[] = [
   {
+    tenantId: 'tenant-njure',
     id: 'INV-401',
     sku: 'CAB-CAT6A-BLU-3M',
     name: 'Cat6A Shielded RJ45 Patch Cable (3-meter, Low Smoke Zero Halogen)',
@@ -399,6 +416,7 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
     lastRestocked: '2024-10-15'
   },
   {
+    tenantId: 'tenant-njure',
     id: 'INV-402',
     sku: 'OPT-SFP-10G-SR',
     name: '10GBASE-SR SFP+ 850nm 300m Optical Transceiver',
@@ -410,6 +428,7 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
     lastRestocked: '2024-09-02'
   },
   {
+    tenantId: 'tenant-njure',
     id: 'INV-403',
     sku: 'RAM-DDR5-ECC-32GB',
     name: 'Samsung 32GB DDR5-4800 Registered ECC Server DIMM',
@@ -421,6 +440,7 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
     lastRestocked: '2024-10-28'
   },
   {
+    tenantId: 'tenant-njure',
     id: 'INV-404',
     sku: 'ACC-USBC-DOCK-11',
     name: 'Thunderbolt 4 Multi-Port Dual Display Charging Dock',
@@ -432,6 +452,7 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
     lastRestocked: '2024-10-01'
   },
   {
+    tenantId: 'tenant-njure',
     id: 'INV-405',
     sku: 'SEC-YUBI-5C-NFC',
     name: 'FIDO2 / WebAuthn Hardware Authenticator Key',
@@ -446,6 +467,7 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
 
 export const INITIAL_CALLS: TelephonyCall[] = [
   {
+    tenantId: 'tenant-njure',
     id: 'CALL-9021',
     callerNumber: '+1 (415) 890-2341',
     callerName: 'Marcus Vance',
@@ -464,6 +486,7 @@ export const INITIAL_CALLS: TelephonyCall[] = [
     disposition: 'incident_logged'
   },
   {
+    tenantId: 'tenant-njure',
     id: 'CALL-9020',
     callerNumber: '+44 20 7946 0912',
     callerName: 'Sarah Lin',
@@ -484,6 +507,7 @@ export const INITIAL_CALLS: TelephonyCall[] = [
 
 export const INITIAL_INVOICES: Invoice[] = [
   {
+    tenantId: 'tenant-njure',
     id: 'INV-9024',
     customerName: 'Marcus Vance',
     customerEmail: 'm.vance@njuretech.io',
@@ -500,6 +524,7 @@ export const INITIAL_INVOICES: Invoice[] = [
     notes: 'SLA priority guarantee included under Gold Managed Services agreement.'
   },
   {
+    tenantId: 'tenant-njure',
     id: 'INV-9023',
     customerName: 'Aiden Wong',
     customerEmail: 'a.wong@njuretech.io',
@@ -517,6 +542,7 @@ export const INITIAL_INVOICES: Invoice[] = [
     notes: 'Internal PO-2024-8841 approved by Claire Sterling.'
   },
   {
+    tenantId: 'tenant-njure',
     id: 'INV-9022',
     customerName: 'Global Cloud Systems UK',
     customerEmail: 'accounts@gcloud-uk.com',

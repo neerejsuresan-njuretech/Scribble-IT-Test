@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useITSM } from '../../context/ITSMContext';
 import { Asset, AssetStatus, AssetType } from '../../types/itsm';
 import { MinimalStatus, DotMatrixText } from '../common/DotMatrixDisplay';
-import { Server, Laptop, Shield, Cpu, Monitor, Plus, QrCode, Search, Check, Tag } from 'lucide-react';
+import { Server, Laptop, Shield, Cpu, Monitor, Plus, Search, Mouse, Package, Box, Smartphone } from 'lucide-react';
 
 interface AssetModuleProps {
-  onOpenCreate: () => void;
+  onOpenCreate?: () => void;
 }
 
 export const AssetModule: React.FC<AssetModuleProps> = ({ onOpenCreate }) => {
+  const navigate = useNavigate();
   const { assets, updateAssetStatus, role } = useITSM();
   const [selectedId, setSelectedId] = useState<string>(assets[0]?.id || '');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -30,10 +32,15 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ onOpenCreate }) => {
     switch (type) {
       case 'server': return <Server className="w-4 h-4 text-neutral-300" />;
       case 'laptop': return <Laptop className="w-4 h-4 text-neutral-300" />;
+      case 'workstation': return <Laptop className="w-4 h-4 text-neutral-300" />;
       case 'networking': return <Cpu className="w-4 h-4 text-neutral-300" />;
       case 'security_key': return <Shield className="w-4 h-4 text-neutral-300" />;
       case 'monitor': return <Monitor className="w-4 h-4 text-neutral-300" />;
-      default: return <Server className="w-4 h-4 text-neutral-300" />;
+      case 'mobile': return <Smartphone className="w-4 h-4 text-neutral-300" />;
+      case 'peripherals': return <Mouse className="w-4 h-4 text-neutral-300" />;
+      case 'consumables': return <Package className="w-4 h-4 text-neutral-300" />;
+      case 'others': return <Box className="w-4 h-4 text-neutral-300" />;
+      default: return <Box className="w-4 h-4 text-neutral-300" />;
     }
   };
 
@@ -42,15 +49,15 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ onOpenCreate }) => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-800 pb-4">
         <div>
-          <div className="text-xs font-mono text-neutral-400">CONFIGURATION MANAGEMENT DATABASE (CMDB) // IT ASSETS</div>
+          <div className="text-xs font-mono text-neutral-500 uppercase">NJURE TECH // TABLE: cmdb_ci</div>
           <h1 className="text-xl font-bold font-mono text-neutral-100 flex items-center gap-3">
-            <span>ENTERPRISE ASSET REPOSITORY</span>
+            <span>CMDB ASSETS</span>
             <span className="text-xs font-normal text-neutral-500 tabular-nums">({filteredAssets.length} Tracked CIs)</span>
           </h1>
         </div>
         {role === 'admin' && (
           <button
-            onClick={onOpenCreate}
+            onClick={() => onOpenCreate ? onOpenCreate() : navigate('/assets/new')}
             className="px-4 py-2 text-xs font-mono tracking-wider bg-rose-600 text-white hover:bg-rose-500 transition-colors flex items-center gap-2 self-start sm:self-auto"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -72,12 +79,12 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ onOpenCreate }) => {
           />
         </div>
 
-        <div className="flex items-center gap-1 border border-neutral-800 bg-neutral-900/60 p-0.5">
-          {['all', 'laptop', 'server', 'networking', 'security_key'].map(t => (
+        <div className="flex flex-wrap items-center gap-1 border border-neutral-800 bg-neutral-900/60 p-0.5">
+          {['all', 'laptop', 'workstation', 'server', 'networking', 'monitor', 'security_key', 'peripherals', 'consumables', 'others'].map(t => (
             <button
               key={t}
               onClick={() => setTypeFilter(t)}
-              className={`px-2.5 py-1 uppercase tracking-wider transition-colors ${
+              className={`px-2.5 py-1 uppercase tracking-wider transition-colors whitespace-nowrap ${
                 typeFilter === t ? 'bg-neutral-800 text-neutral-100' : 'text-neutral-400 hover:text-neutral-200'
               }`}
             >
@@ -169,17 +176,17 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ onOpenCreate }) => {
               <div className="p-4 border border-neutral-800 bg-neutral-900/30 flex flex-col sm:flex-row items-center gap-4">
                 <div className="w-24 h-24 shrink-0 bg-neutral-950 border border-neutral-800 overflow-hidden">
                   <img
-                    src="/src/assets/images/scribble_hardware_token_1793899657390.jpg"
-                    alt="Scribble Hardware Security Token"
+                    src="/src/assets/images/njure_security_token_1794469351579.jpg"
+                    alt="Njure Tech Security Hardware Token"
                     referrerPolicy="no-referrer"
                     className="w-full h-full object-cover"
                   />
                 </div>
                 <div className="space-y-1 text-xs font-mono">
-                  <div className="text-neutral-200 font-bold">Njure Tech Dot-Matrix Security Hardware</div>
-                  <p className="text-neutral-400">
-                    Transparent polycarbonate enclosure with integrated dot-matrix status LCD. Provisioned for zero-trust single sign-on authentication.
-                  </p>
+                  <div className="text-neutral-200 font-bold">Njure Tech Security Key Token</div>
+                  <div className="text-neutral-500 text-[11px]">
+                    FIDO2 / WebAuthn zero-trust hardware authentication token.
+                  </div>
                 </div>
               </div>
             )}
@@ -245,7 +252,17 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ onOpenCreate }) => {
               </div>
             </div>
           </div>
-        ) : null}
+        ) : (
+          <div className="lg:col-span-7 border border-neutral-800 bg-neutral-950 p-10 text-center space-y-3 text-neutral-500 font-mono text-xs">
+            <div>No CMDB assets registered yet.</div>
+            <button
+              onClick={() => onOpenCreate ? onOpenCreate() : navigate('/assets/new')}
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold"
+            >
+              + Register Asset
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
