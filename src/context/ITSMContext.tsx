@@ -6,11 +6,12 @@ import {
   TaskItem, TaskColumn, ProjectItem, ProjectStage, KnowledgeArticle,
   ContractRecord, DomainRecord, ServiceStatusComponent, ComponentHealth,
   MorningCheckRun, MorningCheckItem, CalendarEvent, WarRoomSession,
-  LmsCourse, WikiPage, ProcessMap, CustomFormDefinition, CmdbRelation,
+  LmsCourse, WikiPage, ProcessMap, ProcessNodeType, CustomFormDefinition, CmdbRelation,
   AuditLogEntry, AuthPortalType, AuthAccount, AuthSession,
   ManagedDeviceTrust, WorkflowDefinition, TicketWorkflowRule,
   IamPolicy, IamPermissionScope, CustomPortalKey, PortalBrandConfig,
-  WorkflowRunStepTrace, ToastMessage
+  WorkflowRunStepTrace, ToastMessage, ThemeMode,
+  TelephonyProviderConfig, TelephonyProviderType
 } from '../types/itsm';
 import {
   DEFAULT_BLANK_TENANT,
@@ -172,7 +173,9 @@ interface ITSMContextType {
   updateWikiPage: (id: string, content: string) => void;
 
   createProcessMap: (proc: Partial<ProcessMap>) => ProcessMap;
-  addProcessNode: (mapId: string, label: string, type: 'action' | 'decision' | 'approval', roleLabel: string) => void;
+  updateProcessMap: (id: string, updates: Partial<ProcessMap>) => void;
+  deleteProcessMap: (id: string) => void;
+  addProcessNode: (mapId: string, label: string, type: Exclude<ProcessNodeType, 'start' | 'end'>, roleLabel: string) => void;
 
   createCustomForm: (form: Partial<CustomFormDefinition>) => CustomFormDefinition;
   toggleFormPublish: (id: string) => void;
@@ -189,8 +192,11 @@ interface ITSMContextType {
   toggleTicketWorkflow: (id: string) => void;
   deleteTicketWorkflow: (id: string) => void;
 
-  // Telephony CTI
-  startTelephonyCall: (number: string, name?: string) => void;
+  // Telephony CTI & Multi-Provider Bridge
+  telephonyConfig: TelephonyProviderConfig;
+  updateTelephonyConfig: (updates: Partial<TelephonyProviderConfig>) => void;
+  startTelephonyCall: (number: string, name?: string, providerMeta?: { providerType?: TelephonyProviderType; providerLabel?: string; initialNote?: string }) => TelephonyCall;
+  appendCallNote: (callId: string, note: string) => void;
   simulateIncomingCall: () => void;
   answerIncomingCall: () => void;
   endTelephonyCall: () => void;
@@ -206,6 +212,11 @@ interface ITSMContextType {
   showToast: (toast: Omit<ToastMessage, 'id' | 'createdAt'>) => string;
   dismissToast: (id: string) => void;
   clearToasts: () => void;
+
+  // Theme (Dot-Matrix Dark / Light Mode)
+  theme: ThemeMode;
+  setTheme: (mode: ThemeMode) => void;
+  toggleTheme: () => void;
 
   // Data backup & reset
   resetDatabase: () => void;
@@ -358,6 +369,38 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setAuthSession({ ...authSession, role: nextRole, portalType });
   };
   const [activeTab, setActiveTab] = useState<string>('dashboard');
+
+  // Theme Mode (Dot-Matrix Dark / Light) synced with root <html> class
+  const [theme, setThemeState] = useState<ThemeMode>(() => {
+    const saved = loadState<string>('THEME', 'dark');
+    return saved === 'light' ? 'light' : 'dark';
+  });
+
+  const setTheme = useCallback((mode: ThemeMode) => {
+    setThemeState(mode);
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setThemeState(prev => (prev === 'dark' ? 'light' : 'dark'));
+  }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'light') {
+      root.classList.remove('dark');
+      root.classList.add('light');
+      root.style.colorScheme = 'light';
+    } else {
+      root.classList.remove('light');
+      root.classList.add('dark');
+      root.style.colorScheme = 'dark';
+    }
+    try {
+      localStorage.setItem(`${STORAGE_KEY}_THEME`, JSON.stringify(theme));
+    } catch {
+      // ignore storage quota errors
+    }
+  }, [theme]);
 
   // Global Toast Notification System
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -723,6 +766,9 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [allAuditLogs, setAllAuditLogs] = useState<AuditLogEntry[]>(() => loadState('AUDIT', []));
   const [allWorkflows, setAllWorkflows] = useState<WorkflowDefinition[]>(() => loadState('WORKFLOWS', []));
   const [allTicketWorkflows, setAllTicketWorkflows] = useState<TicketWorkflowRule[]>(() => loadState('TICKET_WORKFLOWS', []));
+  const [telephonyConfigsByTenant, setTelephonyConfigsByTenant] = useState<Record<string, TelephonyProviderConfig>>(() =>
+    loadState('TELEPHONY_CONFIGS', {})
+  );
 
   const [activeCall, setActiveCall] = useState<TelephonyCall | null>(null);
 
@@ -759,6 +805,27 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [allIamPolicies, activeTenant.id]
   );
 
+  const telephonyConfig = useMemo<TelephonyProviderConfig>(() => {
+    const existing = telephonyConfigsByTenant[activeTenant.id];
+    if (existing) return existing;
+    return {
+      providerType: 'amazon_connect',
+      providerLabel: 'Amazon Connect CCP',
+      amazonConnectInstanceAlias: '',
+      amazonConnectRegion: 'us-east-1',
+      amazonConnectCcpUrl: '',
+      sipWssUrl: '',
+      sipDomain: activeTenant.domain,
+      sipExtension: '4401',
+      stunServer: 'stun:stun.l.google.com:19302',
+      personalMobileEnabled: true,
+      personalMobileNumber: currentUser.phone || '',
+      personalMobileCountryCode: '+1',
+      personalMobileBridgeMode: 'native_dialer',
+      autoPopTicketOnInbound: false,
+    };
+  }, [telephonyConfigsByTenant, activeTenant.id, activeTenant.domain, currentUser.phone]);
+
   // Persist to localStorage
   useEffect(() => {
     try {
@@ -794,6 +861,7 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem(`${STORAGE_KEY}_AUDIT`, JSON.stringify(allAuditLogs));
       localStorage.setItem(`${STORAGE_KEY}_WORKFLOWS`, JSON.stringify(allWorkflows));
       localStorage.setItem(`${STORAGE_KEY}_TICKET_WORKFLOWS`, JSON.stringify(allTicketWorkflows));
+      localStorage.setItem(`${STORAGE_KEY}_TELEPHONY_CONFIGS`, JSON.stringify(telephonyConfigsByTenant));
     } catch (e) {
       console.warn('LocalStorage save warning:', e);
     }
@@ -804,7 +872,7 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     allProjects, allKb, allContracts, allDomains, allStatusComponents,
     allMorningChecks, allCalendarEvents, allWarRooms, allLmsCourses,
     allWikiPages, allProcessMaps, allCustomForms, allCmdbRelations, allAuditLogs,
-    allWorkflows, allTicketWorkflows
+    allWorkflows, allTicketWorkflows, telephonyConfigsByTenant
   ]);
 
   // Helper: Tenant-Scoped Audit Log
@@ -1042,8 +1110,9 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     const slaHours = matchedRule?.overrideSlaHours || activeTenant.slaTargets[prio] || 24;
-    const resolvedAssignee = data.assignee || matchedRule?.assignToQueue || activeTenant.preferenceTemplate.defaultQueue;
-    const resolvedStatus: IncidentStatus = data.status || (matchedRule ? 'assigned' : 'new');
+    const resolvedGroup = data.assignmentGroup || matchedRule?.assignToQueue || activeTenant.preferenceTemplate.defaultQueue;
+    const resolvedAssignee = data.assignee || resolvedGroup;
+    const resolvedStatus: IncidentStatus = data.status || (matchedRule || data.assignmentGroup ? 'assigned' : 'new');
 
     const initialLog = [
       {
@@ -1051,7 +1120,7 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         timestamp: now,
         author: currentUser.name,
         action: 'Record Created',
-        note: `Registered in tenant [${activeTenant.slug}] (${slaHours}h SLA).`
+        note: `Registered in tenant [${activeTenant.slug}] · Routed to "${resolvedGroup}" (${slaHours}h SLA).`
       }
     ];
 
@@ -1079,6 +1148,7 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
       requesterName: data.requesterName || currentUser.name,
       requesterEmail: data.requesterEmail || currentUser.email,
       assignee: resolvedAssignee,
+      assignmentGroup: resolvedGroup,
       affectedCI: data.affectedCI,
       slaDeadline: data.slaDeadline || new Date(Date.now() + slaHours * 3600 * 1000).toISOString(),
       slaBreached: false,
@@ -1089,8 +1159,8 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
       activityLog: initialLog
     };
     setAllIncidents(prev => [newInc, ...prev]);
-    recordAudit('Incidents', 'CREATE', id, `${newInc.priority} ${newInc.title}`);
-    showToast({ variant: 'success', title: `Incident Created: ${id}`, description: `${newInc.priority} · ${newInc.title}` });
+    recordAudit('Incidents', 'CREATE', id, `${newInc.priority} ${newInc.title} -> ${resolvedGroup}`);
+    showToast({ variant: 'success', title: `Incident Created: ${id}`, description: `${newInc.priority} · ${resolvedGroup} · ${newInc.title}` });
 
     try {
       setDoc(doc(db, 'incidents', id), newInc).catch(() => {});
@@ -1798,39 +1868,138 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Process Mapper
   const createProcessMap = (proc: Partial<ProcessMap>): ProcessMap => {
+    const scope = proc.recordScope || 'incident';
+    const openLabel =
+      scope === 'request'
+        ? 'Service Request Opened'
+        : scope === 'change'
+        ? 'Change RFC Opened'
+        : 'Incident Opened';
+    const closeLabel =
+      scope === 'request'
+        ? 'Close Request'
+        : scope === 'change'
+        ? 'Close Change'
+        : 'Close Incident';
+
     const newMap: ProcessMap = {
       id: `PROC-${Math.floor(10 + Math.random() * 89)}`,
       tenantId: activeTenant.id,
-      title: proc.title || 'Standard ITIL Workflow',
+      title: proc.title || `${scope === 'request' ? 'Service Request' : 'Incident'} Lifecycle Flow`,
+      recordScope: scope,
       owner: currentUser.name,
       linkedKbId: proc.linkedKbId,
       updatedAt: new Date().toISOString().split('T')[0],
       nodes: proc.nodes || [
-        { id: 'n-start', label: 'Trigger Event', type: 'start', role: 'Portal', x: 40, y: 80 },
-        { id: 'n-end', label: 'Close Record', type: 'end', role: 'Service Desk', x: 280, y: 80 }
+        {
+          id: 'n-start',
+          label: openLabel,
+          type: 'start',
+          role: 'Portal / Intake',
+          moduleId: scope === 'request' ? 'requests' : scope === 'change' ? 'changes' : 'incidents',
+          slaHours: 1,
+          description: 'Triggered immediately when a new record opens.',
+          x: 48,
+          y: 120,
+        },
+        {
+          id: 'n-end',
+          label: closeLabel,
+          type: 'end',
+          role: 'Service Desk',
+          moduleId: scope === 'request' ? 'requests' : scope === 'change' ? 'changes' : 'incidents',
+          slaHours: 4,
+          description: 'Final resolution verification and record closure.',
+          x: 448,
+          y: 120,
+        },
       ],
-      edges: proc.edges || [{ from: 'n-start', to: 'n-end' }]
+      edges: proc.edges || [{ from: 'n-start', to: 'n-end', condition: 'Next' }],
     };
     setAllProcessMaps(prev => [newMap, ...prev]);
     showToast({ variant: 'success', title: `Process Map Created: ${newMap.id}`, description: newMap.title });
     return newMap;
   };
 
-  const addProcessNode = (mapId: string, label: string, type: 'action' | 'decision' | 'approval', roleLabel: string) => {
-    setAllProcessMaps(prev => prev.map(m => {
-      if (m.id !== mapId) return m;
-      const newId = `n-${Date.now()}`;
-      const lastNode = m.nodes[m.nodes.length - 1];
-      const x = (lastNode?.x || 40) + 190;
-      const y = m.nodes.length % 2 === 0 ? 50 : 120;
-      return {
-        ...m,
-        updatedAt: new Date().toISOString().split('T')[0],
-        nodes: [...m.nodes, { id: newId, label, type, role: roleLabel, x, y }],
-        edges: lastNode ? [...m.edges, { from: lastNode.id, to: newId }] : m.edges
-      };
-    }));
-    showToast({ variant: 'success', title: 'Process Node Added', description: `${label} (${type})` });
+  const updateProcessMap = (id: string, updates: Partial<ProcessMap>) => {
+    setAllProcessMaps(prev =>
+      prev.map(m =>
+        m.id === id
+          ? {
+              ...m,
+              ...updates,
+              updatedAt: new Date().toISOString().split('T')[0],
+            }
+          : m
+      )
+    );
+  };
+
+  const deleteProcessMap = (id: string) => {
+    setAllProcessMaps(prev => prev.filter(m => m.id !== id));
+    showToast({ variant: 'info', title: `Process Map Deleted: ${id}` });
+  };
+
+  const addProcessNode = (
+    mapId: string,
+    label: string,
+    type: Exclude<ProcessNodeType, 'start' | 'end'>,
+    roleLabel: string
+  ) => {
+    setAllProcessMaps(prev =>
+      prev.map(m => {
+        if (m.id !== mapId) return m;
+        const newId = `n-${Date.now()}`;
+        const endNode = m.nodes.find(n => n.type === 'end');
+
+        if (endNode) {
+          // Insert directly BEFORE the Close Record (end) node so open -> ... -> new step -> close always holds
+          const incomingToEnd = m.edges.filter(e => e.to === endNode.id);
+          const predecessor =
+            incomingToEnd.length > 0
+              ? m.nodes.find(n => n.id === incomingToEnd[incomingToEnd.length - 1].from)
+              : m.nodes[m.nodes.length - 2] || m.nodes[0];
+
+          const newX = Math.max((predecessor?.x ?? 48) + 256, endNode.x);
+          const newY = predecessor?.y ?? endNode.y;
+          const shiftedEnd = { ...endNode, x: newX + 256 };
+
+          const nextNodes = m.nodes
+            .map(n => (n.id === endNode.id ? shiftedEnd : n))
+            .concat({
+              id: newId,
+              label,
+              type,
+              role: roleLabel,
+              slaHours: type === 'approval' ? 8 : 4,
+              x: newX,
+              y: newY,
+            });
+
+          const nextEdges = m.edges
+            .map(e => (predecessor && e.from === predecessor.id && e.to === endNode.id ? { ...e, to: newId } : e))
+            .concat({ from: newId, to: endNode.id, condition: type === 'approval' ? 'Approved' : 'Next' });
+
+          return {
+            ...m,
+            updatedAt: new Date().toISOString().split('T')[0],
+            nodes: nextNodes,
+            edges: nextEdges,
+          };
+        }
+
+        const lastNode = m.nodes[m.nodes.length - 1];
+        const x = (lastNode?.x || 48) + 256;
+        const y = lastNode?.y ?? 120;
+        return {
+          ...m,
+          updatedAt: new Date().toISOString().split('T')[0],
+          nodes: [...m.nodes, { id: newId, label, type, role: roleLabel, slaHours: 4, x, y }],
+          edges: lastNode ? [...m.edges, { from: lastNode.id, to: newId }] : m.edges,
+        };
+      })
+    );
+    showToast({ variant: 'success', title: 'Step Inserted Before Close', description: `${label} (${type})` });
   };
 
   // Custom Forms
@@ -2015,8 +2184,31 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     showToast({ variant: 'info', title: `Routing Rule Deleted: ${id}` });
   };
 
-  // Telephony CTI
-  const startTelephonyCall = (number: string, name?: string) => {
+  // Telephony CTI & Multi-Provider Config
+  const updateTelephonyConfig = (updates: Partial<TelephonyProviderConfig>) => {
+    setTelephonyConfigsByTenant(prev => ({
+      ...prev,
+      [activeTenant.id]: {
+        ...telephonyConfig,
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      },
+    }));
+    recordAudit('Telephony', 'UPDATE_PROVIDER', activeTenant.id, updates.providerLabel || telephonyConfig.providerLabel);
+    showToast({
+      variant: 'success',
+      title: 'Telephony Configuration Saved',
+      description: `${updates.providerLabel || telephonyConfig.providerLabel} active for ${activeTenant.name}`,
+    });
+  };
+
+  const startTelephonyCall = (
+    number: string,
+    name?: string,
+    providerMeta?: { providerType?: TelephonyProviderType; providerLabel?: string; initialNote?: string }
+  ): TelephonyCall => {
+    const pType = providerMeta?.providerType || telephonyConfig.providerType;
+    const pLabel = providerMeta?.providerLabel || telephonyConfig.providerLabel;
     const newCall: TelephonyCall = {
       id: `CALL-${Math.floor(9100 + Math.random() * 800)}`,
       tenantId: activeTenant.id,
@@ -2027,10 +2219,28 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
       status: 'active',
       startTime: new Date().toISOString(),
       durationSec: 0,
-      liveTranscript: [`System: Call established with ${number} via SIP Gateway`, `Agent: "Hello, ${activeTenant.name} Service Desk speaking."`]
+      providerType: pType,
+      providerLabel: pLabel,
+      liveTranscript: [
+        `System: Call session opened for ${number} via ${pLabel}`,
+        ...(providerMeta?.initialNote ? [providerMeta.initialNote] : []),
+      ],
     };
     setActiveCall(newCall);
     setAllCalls(prev => [newCall, ...prev]);
+    return newCall;
+  };
+
+  const appendCallNote = (callId: string, note: string) => {
+    const clean = note.trim();
+    if (!clean) return;
+    const formatted = `[${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}] ${currentUser.name}: ${clean}`;
+    setActiveCall(prev =>
+      prev && prev.id === callId ? { ...prev, liveTranscript: [...prev.liveTranscript, formatted] } : prev
+    );
+    setAllCalls(prev =>
+      prev.map(c => (c.id === callId ? { ...c, liveTranscript: [...c.liveTranscript, formatted] } : c))
+    );
   };
 
   const simulateIncomingCall = () => {
@@ -2044,7 +2254,9 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
       status: 'ringing',
       startTime: new Date().toISOString(),
       durationSec: 0,
-      liveTranscript: [`Incoming SIP INVITE received (${activeTenant.domain})`]
+      providerType: telephonyConfig.providerType,
+      providerLabel: telephonyConfig.providerLabel,
+      liveTranscript: [`Incoming call signal received via ${telephonyConfig.providerLabel} (${activeTenant.domain})`],
     };
     setActiveCall(call);
   };
@@ -2207,13 +2419,14 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createWarRoom, postWarRoomMessage, toggleWarRoomChecklist, closeWarRoom,
         toggleLmsLesson, completeLmsQuiz,
         createWikiPage, updateWikiPage,
-        createProcessMap, addProcessNode,
+        createProcessMap, updateProcessMap, deleteProcessMap, addProcessNode,
         createCustomForm, toggleFormPublish, submitCustomFormToRequest,
         createWorkflow, updateWorkflow, toggleWorkflowStatus, runWorkflowExecution, deleteWorkflow,
         createTicketWorkflow, toggleTicketWorkflow, deleteTicketWorkflow,
-        startTelephonyCall, simulateIncomingCall, answerIncomingCall, endTelephonyCall, toggleHoldCall, popTicketFromCall,
+        telephonyConfig, updateTelephonyConfig, startTelephonyCall, appendCallNote, simulateIncomingCall, answerIncomingCall, endTelephonyCall, toggleHoldCall, popTicketFromCall,
         payInvoice, createInvoice,
         toasts, showToast, dismissToast, clearToasts,
+        theme, setTheme, toggleTheme,
         resetDatabase, exportDatabaseJSON, importDatabaseJSON
       }}
     >

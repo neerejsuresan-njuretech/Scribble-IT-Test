@@ -9,7 +9,7 @@ import {
   Eye, Radio, ClipboardCheck, Activity, Calendar, KanbanSquare,
   FolderKanban, GitFork, KeyRound, FileSpreadsheet, Globe,
   BookOpen, Library, Workflow, FormInput, GraduationCap,
-  BarChart3, Building2, SlidersHorizontal, GitCommitHorizontal, Shield
+  BarChart3, Building2, SlidersHorizontal, GitCommitHorizontal, Shield, X
 } from 'lucide-react';
 
 interface ServiceNowNavigatorProps {
@@ -131,24 +131,42 @@ export const ServiceNowNavigator: React.FC<ServiceNowNavigatorProps> = ({ isOpen
   if (!isOpen) return null;
 
   return (
-    <aside className="w-72 bg-neutral-950 border-r border-neutral-800 flex flex-col shrink-0 font-mono text-xs h-[calc(100vh-3.5rem)] sticky top-14 z-30 select-none">
-      {/* Navigator Filter Input */}
-      <div className="p-3 border-b border-neutral-800 bg-neutral-900/40 space-y-1.5">
-        <div className="flex items-center justify-between text-[10px] text-neutral-500">
-          <span className="truncate">{activeTenant.name}</span>
-          <span className="text-neutral-400 shrink-0">{activeTenant.plan}</span>
+    <>
+      {/* Mobile & Tablet Backdrop (< xl) */}
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 xl:hidden"
+        onClick={onCloseMobile}
+        aria-hidden="true"
+      />
+
+      <aside className="fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] xl:static xl:sticky xl:top-14 xl:h-[calc(100vh-3.5rem)] xl:z-30 bg-neutral-950 border-r border-neutral-800 flex flex-col shrink-0 font-sans text-xs select-none shadow-2xl xl:shadow-none">
+        {/* Navigator Filter Input */}
+        <div className="p-3 border-b border-neutral-800 bg-neutral-900/40 space-y-2">
+          <div className="flex items-center justify-between gap-2 text-[10px] text-neutral-500">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="truncate font-bold text-neutral-200">{activeTenant.name}</span>
+              <span className="text-neutral-500 shrink-0">· {activeTenant.plan}</span>
+            </div>
+            <button
+              type="button"
+              onClick={onCloseMobile}
+              className="xl:hidden min-h-[36px] min-w-[36px] -mr-1 flex items-center justify-center text-neutral-400 hover:text-white border border-neutral-800 bg-neutral-950"
+              aria-label="Close module navigator"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-500" />
+            <input
+              type="text"
+              value={filterText}
+              onChange={e => setFilterText(e.target.value)}
+              placeholder="Filter 30+ modules..."
+              className="w-full min-h-[38px] xl:min-h-0 bg-neutral-900 border border-neutral-700 text-neutral-200 pl-8 pr-3 py-1.5 text-xs focus:border-neutral-500 focus:outline-none placeholder:text-neutral-500"
+            />
+          </div>
         </div>
-        <div className="relative">
-          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-500" />
-          <input
-            type="text"
-            value={filterText}
-            onChange={e => setFilterText(e.target.value)}
-            placeholder="Filter 30+ modules..."
-            className="w-full bg-neutral-900 border border-neutral-700 text-neutral-200 pl-8 pr-3 py-1.5 text-xs focus:border-neutral-500 focus:outline-none placeholder:text-neutral-500"
-          />
-        </div>
-      </div>
 
       {/* Nav Tree Content */}
       <div className="flex-1 overflow-y-auto divide-y divide-neutral-900/80 p-2 space-y-3">
@@ -199,7 +217,7 @@ export const ServiceNowNavigator: React.FC<ServiceNowNavigatorProps> = ({ isOpen
                         <Link
                           to={item.path}
                           onClick={onCloseMobile}
-                          className="flex-1 px-2.5 py-1.5 flex items-center justify-between truncate"
+                          className="flex-1 min-h-[40px] xl:min-h-0 px-2.5 py-2 xl:py-1.5 flex items-center justify-between truncate"
                         >
                           <div className="flex items-center gap-2 truncate">
                             <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-rose-400' : 'text-neutral-500'}`} />
@@ -219,7 +237,7 @@ export const ServiceNowNavigator: React.FC<ServiceNowNavigatorProps> = ({ isOpen
                             to={item.newPath}
                             onClick={onCloseMobile}
                             title={`Create new ${item.label.toLowerCase()}`}
-                            className={`p-1.5 mr-1 border transition-colors ${
+                            className={`p-2 xl:p-1.5 mr-1 border transition-colors ${
                               isNewActive
                                 ? 'bg-rose-600 border-rose-500 text-white'
                                 : 'border-neutral-800 bg-neutral-900/40 text-neutral-500 hover:text-white hover:border-neutral-600'
@@ -244,6 +262,7 @@ export const ServiceNowNavigator: React.FC<ServiceNowNavigatorProps> = ({ isOpen
         <span>NJURE TECH</span>
       </div>
     </aside>
+    </>
   );
 };
 

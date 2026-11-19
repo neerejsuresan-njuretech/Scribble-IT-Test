@@ -12,7 +12,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ onOpenCrea
   const navigate = useNavigate();
   const {
     activeTenant, incidents, requests, changes, assets, inventory,
-    activeCall, simulateIncomingCall
+    activeCall, simulateIncomingCall, theme
   } = useITSM();
 
   const p1p2Count = incidents.filter(i => (i.priority === 'P1' || i.priority === 'P2') && i.status !== 'resolved' && i.status !== 'closed').length;
@@ -23,35 +23,41 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ onOpenCrea
   return (
     <div className="space-y-6">
       {/* Top Banner / Dot-Matrix Display */}
-      <div className="p-5 border border-neutral-800 bg-neutral-900/40 relative overflow-hidden">
+      <div className="p-6 border border-neutral-800 bg-neutral-900/40 rounded-md relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2 text-xs font-mono text-neutral-400">
-              <span className="font-bold text-neutral-300">NJURE TECH</span>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-xs text-neutral-400 font-medium">
+              <span className="font-semibold text-neutral-200">Njure Tech</span>
               <span aria-hidden="true">·</span>
-              <span>{activeTenant.name.toUpperCase()}</span>
+              <span>{activeTenant.name}</span>
               <span aria-hidden="true">·</span>
-              <span>{activeTenant.region}</span>
+              <span className="font-mono text-[11px]">{activeTenant.region}</span>
             </div>
             <div>
-              <DotMatrixText text="SCRIBBLE IT" size="lg" activeColor="#ffffff" dimColor="#262626" glow />
+              <DotMatrixText
+                text="SCRIBBLE IT"
+                size="lg"
+                activeColor={theme === 'dark' ? '#ffffff' : '#0f172a'}
+                dimColor={theme === 'dark' ? '#262626' : '#cbd5e1'}
+                glow={theme === 'dark'}
+              />
             </div>
-            <div className="text-xs text-neutral-500 font-mono">
-              SERVICE DESK OPERATIONS · {incidents.length} INCIDENTS · {assets.length} ASSETS
+            <div className="text-xs text-neutral-500 font-mono tabular-nums">
+              Enterprise Service Operations · {incidents.length} Incidents · {assets.length} Assets
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={simulateIncomingCall}
-              className="px-3 py-2 text-xs font-mono tracking-wider border border-neutral-700 bg-neutral-900 text-neutral-200 hover:bg-neutral-800 hover:border-neutral-500 transition-colors flex items-center gap-2 whitespace-nowrap"
+              className="px-3.5 py-2 text-xs font-medium rounded border border-neutral-700 bg-neutral-900 text-neutral-200 hover:bg-neutral-800 hover:border-neutral-500 transition-colors flex items-center gap-2 whitespace-nowrap"
             >
               <Phone className="w-3.5 h-3.5 text-emerald-400" />
               <span>Test Inbound Call</span>
             </button>
             <button
               onClick={() => onOpenCreate ? onOpenCreate('incident') : navigate('/incidents/new')}
-              className="px-4 py-2 text-xs font-mono tracking-wider bg-rose-600 text-white hover:bg-rose-500 transition-colors flex items-center gap-2 whitespace-nowrap"
+              className="px-4 py-2 text-xs font-semibold rounded bg-rose-600 text-white hover:bg-rose-500 transition-colors flex items-center gap-2 whitespace-nowrap"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>New Incident</span>

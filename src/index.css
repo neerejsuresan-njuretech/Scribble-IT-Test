@@ -4,23 +4,41 @@
 @layer base {
   :root {
     --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-    --font-display: 'Space Grotesk', system-ui, sans-serif;
+    --font-display: 'Space Grotesk', 'Plus Jakarta Sans', system-ui, sans-serif;
     --font-mono: 'Space Mono', 'JetBrains Mono', monospace;
   }
-  
+
   body {
     font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
+  html.light body {
+    background-color: #f1f5f9;
+    color: #0f172a;
+  }
+
+  button, input, select, textarea {
+    border-radius: 0.375rem;
   }
 }
 
-/* Njure Tech Dot Matrix aesthetic patterns */
+/* Inverted Dot-Matrix Architectural Grid Patterns */
 .dot-matrix-bg {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-color: #09090b;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.085) 1px, transparent 1px);
   background-size: 16px 16px;
 }
 
-.light .dot-matrix-bg {
-  background-image: radial-gradient(rgba(0, 0, 0, 0.08) 1px, transparent 1px);
+html.light .dot-matrix-bg {
+  background-color: #f1f5f9;
+  background-image: radial-gradient(rgba(15, 23, 42, 0.14) 1px, transparent 1px);
 }
 
 .dot-matrix-dense {
@@ -28,8 +46,225 @@
   background-size: 8px 8px;
 }
 
-.light .dot-matrix-dense {
-  background-image: radial-gradient(rgba(0, 0, 0, 0.12) 1px, transparent 1px);
+html.light .dot-matrix-dense {
+  background-image: radial-gradient(rgba(15, 23, 42, 0.18) 1px, transparent 1px);
+}
+
+/* Corporate Typography Balance: keep prose & UI labels crisp sans-serif while preserving monospace on tabular metrics/code */
+body :where(div, section, form, header, aside, main, footer, table, p, span, label, button, a).font-mono:not(pre):not(code):not(.tabular-nums):not(.font-mono-strict) {
+  font-family: var(--font-sans);
+}
+
+body :where(pre, code, kbd, .tabular-nums, .font-mono-strict) {
+  font-family: var(--font-mono);
+}
+
+/* Corporate Enterprise Light Mode Surface Hierarchy */
+html.light header,
+html.light aside,
+html.light footer,
+html.light nav {
+  background-color: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+html.light .bg-neutral-950 {
+  background-color: #ffffff;
+}
+html.light .dot-matrix-bg.bg-neutral-950 {
+  background-color: #f1f5f9;
+}
+html.light .bg-neutral-950\/95 {
+  background-color: rgba(255, 255, 255, 0.98);
+}
+html.light .bg-neutral-950\/90 {
+  background-color: rgba(255, 255, 255, 0.96);
+}
+html.light .bg-neutral-900,
+html.light .bg-neutral-900\/90,
+html.light .bg-neutral-900\/80,
+html.light .bg-neutral-900\/70,
+html.light .bg-neutral-900\/60,
+html.light .bg-neutral-900\/50,
+html.light .bg-neutral-900\/40,
+html.light .bg-neutral-900\/30,
+html.light .bg-neutral-900\/20,
+html.light .bg-neutral-900\/10 {
+  background-color: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+html.light main .bg-neutral-900\/60,
+html.light main .bg-neutral-900\/40,
+html.light main .bg-neutral-900\/30,
+html.light main .bg-neutral-900\/20 {
+  background-color: #f8fafc;
+}
+html.light .bg-neutral-800 {
+  background-color: #e2e8f0;
+}
+html.light .bg-neutral-800\/40 {
+  background-color: rgba(226, 232, 240, 0.7);
+}
+html.light .bg-black {
+  background-color: #ffffff;
+}
+html.light .bg-black\/80,
+html.light .bg-black\/60 {
+  background-color: rgba(15, 23, 42, 0.42);
+}
+
+/* Crisp Corporate Hairline Borders & Dividers */
+html.light .border-neutral-900 {
+  border-color: #e2e8f0;
+}
+html.light .border-neutral-800,
+html.light .border-neutral-800\/80,
+html.light .border-neutral-800\/60 {
+  border-color: #e2e8f0;
+}
+html.light .border-neutral-700 {
+  border-color: #cbd5e1;
+}
+html.light .border-neutral-600 {
+  border-color: #94a3b8;
+}
+
+html.light .divide-neutral-900 > :not(:last-child) {
+  border-color: #e2e8f0;
+}
+html.light .divide-neutral-800 > :not(:last-child) {
+  border-color: #e2e8f0;
+}
+
+/* Deep Corporate Slate Ink Hierarchy */
+html.light .text-neutral-100 {
+  color: #0f172a;
+}
+html.light .text-neutral-200 {
+  color: #1e293b;
+}
+html.light .text-neutral-300 {
+  color: #334155;
+}
+html.light .text-neutral-400 {
+  color: #475569;
+}
+html.light .text-neutral-500 {
+  color: #64748b;
+}
+html.light .text-neutral-600 {
+  color: #475569;
+}
+html.light .text-white:not([class*="bg-rose-"]):not([class*="bg-emerald-"]):not([class*="bg-sky-"]):not([class*="bg-amber-"]):not([class*="bg-indigo-"]):not([class*="bg-red-"]):not([class*="bg-green-"]):not([class*="bg-blue-"]):not([class*="bg-purple-"]) {
+  color: #0f172a;
+}
+
+/* Subtle Corporate Interactive Hover States */
+html.light .hover\:bg-neutral-900:hover,
+html.light .hover\:bg-neutral-900\/80:hover,
+html.light .hover\:bg-neutral-900\/50:hover,
+html.light .hover\:bg-neutral-900\/40:hover {
+  background-color: #f1f5f9;
+}
+html.light .hover\:bg-neutral-800:hover {
+  background-color: #e2e8f0;
+}
+html.light .hover\:text-neutral-200:hover,
+html.light .hover\:text-white:hover:not([class*="bg-rose-"]):not([class*="bg-emerald-"]):not([class*="bg-sky-"]):not([class*="bg-amber-"]):not([class*="bg-indigo-"]):not([class*="bg-red-"]) {
+  color: #0f172a;
+}
+html.light .hover\:border-neutral-600:hover,
+html.light .hover\:border-neutral-500:hover {
+  border-color: #94a3b8;
+}
+
+/* Inverted Light-Surface Status Pills & Callouts */
+html.light .bg-rose-950\/40,
+html.light .bg-rose-950\/30,
+html.light .bg-rose-950\/20 {
+  background-color: #fff1f2;
+}
+html.light .bg-emerald-950\/60,
+html.light .bg-emerald-950\/40,
+html.light .bg-emerald-950\/30,
+html.light .bg-emerald-950\/20 {
+  background-color: #ecfdf5;
+}
+html.light .bg-sky-950\/60,
+html.light .bg-sky-950\/50,
+html.light .bg-sky-950\/40,
+html.light .bg-sky-950\/30,
+html.light .bg-sky-950\/20,
+html.light .bg-sky-950\/15 {
+  background-color: #f0f9ff;
+}
+html.light .bg-amber-950\/40,
+html.light .bg-amber-950\/30,
+html.light .bg-amber-950\/20 {
+  background-color: #fffbeb;
+}
+html.light .bg-indigo-950\/40 {
+  background-color: #eef2ff;
+}
+
+html.light .border-sky-900\/70,
+html.light .border-sky-900\/60,
+html.light .border-sky-800,
+html.light .border-sky-700\/80 {
+  border-color: #bae6fd;
+}
+html.light .border-emerald-800,
+html.light .border-emerald-700\/80 {
+  border-color: #a7f3d0;
+}
+html.light .border-rose-800,
+html.light .border-rose-700\/80 {
+  border-color: #fecdd3;
+}
+html.light .border-amber-800,
+html.light .border-amber-700\/80 {
+  border-color: #fde68a;
+}
+
+html.light .text-rose-300,
+html.light .text-rose-400 {
+  color: #be123c;
+}
+html.light .text-emerald-300,
+html.light .text-emerald-400 {
+  color: #047857;
+}
+html.light .text-sky-200,
+html.light .text-sky-300,
+html.light .text-sky-400 {
+  color: #0369a1;
+}
+html.light .text-amber-200,
+html.light .text-amber-300,
+html.light .text-amber-400 {
+  color: #b45309;
+}
+html.light .text-indigo-300,
+html.light .text-indigo-400 {
+  color: #4338ca;
+}
+
+html.light input,
+html.light select,
+html.light textarea {
+  background-color: #ffffff;
+  color: #0f172a;
+}
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #94a3b8;
+}
+
+/* Elevated shadows on dropdowns, dialogs, and toast notifications in light mode */
+html.light .shadow-2xl,
+html.light .shadow-xl {
+  box-shadow: 0 12px 32px -8px rgba(15, 23, 42, 0.14), 0 4px 12px -4px rgba(15, 23, 42, 0.06);
 }
 
 /* Custom scrollbar for high density data grids */

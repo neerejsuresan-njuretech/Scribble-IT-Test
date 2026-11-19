@@ -39,7 +39,7 @@ export const ToastViewport: React.FC = () => {
     <div
       aria-live="polite"
       aria-label="Notifications"
-      className="fixed bottom-12 right-4 z-50 w-full max-w-sm space-y-2 pointer-events-none font-mono text-xs"
+      className="fixed bottom-16 left-3 right-3 sm:left-auto sm:right-4 md:bottom-12 z-50 sm:w-full sm:max-w-sm space-y-2 pointer-events-none font-mono text-xs"
     >
       {toasts.map(toast => {
         const cfg = VARIANT_STYLES[toast.variant];

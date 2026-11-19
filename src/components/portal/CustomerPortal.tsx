@@ -115,7 +115,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onOpenNewTicket 
               <span className="text-neutral-200">{currentUser.name}</span>
             </div>
             <div>
-              <DotMatrixText text={endUserBrand.portalName.toUpperCase()} size="md" activeColor="#ffffff" dimColor="#262626" />
+              <DotMatrixText text={endUserBrand.portalName.toUpperCase()} size="md" />
             </div>
             <div className="text-xs text-neutral-400">
               {activeTenant.preferenceTemplate.portalBannerTitle}

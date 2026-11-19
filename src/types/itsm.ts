@@ -180,6 +180,7 @@ export interface Incident {
   requesterName: string;
   requesterEmail: string;
   assignee: string;
+  assignmentGroup?: string;
   affectedCI?: string;
   slaDeadline: string;
   slaBreached: boolean;
@@ -520,13 +521,26 @@ export interface WikiPage {
   content: string;
 }
 
+export type ProcessNodeType =
+  | 'start'
+  | 'action'
+  | 'decision'
+  | 'approval'
+  | 'notification'
+  | 'automation'
+  | 'end';
+
 export interface ProcessNode {
   id: string;
   label: string;
-  type: 'start' | 'action' | 'decision' | 'approval' | 'end';
+  type: ProcessNodeType;
   role: string;
   x: number;
   y: number;
+  slaHours?: number;
+  moduleId?: FreeITSMModuleId | 'all';
+  description?: string;
+  approverGroup?: string;
 }
 
 export interface ProcessEdge {
@@ -539,6 +553,7 @@ export interface ProcessMap {
   id: string;
   tenantId: string;
   title: string;
+  recordScope?: 'incident' | 'request' | 'change' | 'general';
   owner: string;
   linkedKbId?: string;
   nodes: ProcessNode[];
@@ -576,6 +591,42 @@ export interface AuditLogEntry {
   detail: string;
 }
 
+export type TelephonyProviderType =
+  | 'amazon_connect'
+  | 'twilio'
+  | 'sip_webrtc'
+  | 'ringcentral'
+  | 'genesys'
+  | 'custom_provider'
+  | 'personal_mobile';
+
+export interface TelephonyProviderConfig {
+  providerType: TelephonyProviderType;
+  providerLabel: string;
+  // Amazon Connect CCP settings
+  amazonConnectInstanceAlias?: string;
+  amazonConnectRegion?: string;
+  amazonConnectCcpUrl?: string;
+  amazonConnectQueueArn?: string;
+  // Generic SIP / WebRTC settings
+  sipWssUrl?: string;
+  sipDomain?: string;
+  sipExtension?: string;
+  stunServer?: string;
+  // Generic / Custom Provider / RingCentral / Genesys / Twilio webhook
+  customCtiEmbedUrl?: string;
+  outboundWebhookUrl?: string;
+  callerIdNumber?: string;
+  // Personal Mobile Number as Telephony System
+  personalMobileEnabled?: boolean;
+  personalMobileNumber?: string;
+  personalMobileCountryCode?: string;
+  personalMobileBridgeMode?: 'native_dialer' | 'qr_handoff' | 'carrier_two_leg';
+  forwardToDeskNumber?: string;
+  autoPopTicketOnInbound?: boolean;
+  updatedAt?: string;
+}
+
 export interface TelephonyCall {
   id: string;
   tenantId: string;
@@ -588,6 +639,8 @@ export interface TelephonyCall {
   durationSec: number;
   liveTranscript: string[];
   relatedTicketId?: string;
+  providerType?: TelephonyProviderType;
+  providerLabel?: string;
   disposition?: 'incident_logged' | 'inquiry_resolved' | 'escalated' | 'voicemail';
 }
 
@@ -709,5 +762,7 @@ export interface ToastMessage {
   durationMs?: number;
   createdAt: string;
 }
+
+export type ThemeMode = 'dark' | 'light';
 
 

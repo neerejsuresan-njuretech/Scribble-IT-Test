@@ -1,10 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { ITSMProvider, useITSM } from './context/ITSMContext';
 import { ServiceNowHeader } from './components/common/ServiceNowHeader';
 import { ServiceNowNavigator } from './components/common/ServiceNowNavigator';
 import { ToastViewport } from './components/common/ToastViewport';
 import { FreeITSMModuleId } from './types/itsm';
+import {
+  Eye,
+  AlertTriangle,
+  Package,
+  BookOpen,
+  LayoutGrid,
+  Activity,
+  PlusCircle,
+  Shield,
+} from 'lucide-react';
 
 // Core ITSM Modules
 import { OverviewDashboard } from './components/dashboard/OverviewDashboard';
@@ -59,7 +69,8 @@ import { ReportsAuditPage } from './pages/freeitsm/ReportsAuditPage';
 import { WorkflowManagementPage } from './pages/workflows/WorkflowManagementPage';
 import { TicketWorkflowPage } from './pages/workflows/TicketWorkflowPage';
 
-// Multi-Portal Authentication Pages
+// Public Pre-Login Website & Multi-Portal Authentication Pages
+import { LandingWebsitePage } from './pages/public/LandingWebsitePage';
 import { PortalGatewayPage } from './pages/auth/PortalGatewayPage';
 import { AdminLoginPage } from './pages/auth/AdminLoginPage';
 import { EmployeeLoginPage } from './pages/auth/EmployeeLoginPage';
@@ -148,7 +159,20 @@ const IamAccessGate: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 function MainApp() {
   const { authSession, role, activeTenant, isModuleEnabled, getPortalBranding } = useITSM();
   const location = useLocation();
-  const [isNavigatorOpen, setIsNavigatorOpen] = useState(true);
+  const [isNavigatorOpen, setIsNavigatorOpen] = useState<boolean>(() =>
+    typeof window !== 'undefined' ? window.innerWidth >= 1280 : true
+  );
+
+  // Close mobile/tablet overlay drawer automatically on navigation
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 1280) {
+      setIsNavigatorOpen(false);
+    }
+  }, [location.pathname]);
+
+  if (location.pathname === '/welcome') {
+    return <LandingWebsitePage />;
+  }
 
   if (location.pathname.startsWith('/login')) {
     return (
@@ -166,6 +190,8 @@ function MainApp() {
   if (!authSession?.isAuthenticated) {
     return (
       <Routes>
+        <Route path="/" element={<LandingWebsitePage />} />
+        <Route path="/home" element={<LandingWebsitePage />} />
         <Route path="/tenants" element={<Navigate to="/login/admin" replace />} />
         <Route path="/system/modules" element={<Navigate to="/login/admin" replace />} />
         <Route path="/database" element={<Navigate to="/login/admin" replace />} />
@@ -176,7 +202,7 @@ function MainApp() {
         <Route path="/incidents/*" element={<Navigate to="/login/employee" replace />} />
         <Route path="/workflows" element={<Navigate to="/login/employee" replace />} />
         <Route path="/ticket-workflows" element={<Navigate to="/login/employee" replace />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );
   }
@@ -229,18 +255,18 @@ function MainApp() {
         </div>
       )}
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-x-clip">
         {role !== 'customer' && (
           <ServiceNowNavigator
             isOpen={isNavigatorOpen}
             onCloseMobile={() => {
-              if (window.innerWidth < 768) setIsNavigatorOpen(false);
+              if (window.innerWidth < 1280) setIsNavigatorOpen(false);
             }}
           />
         )}
 
-        <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-5 max-w-full">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-1 min-w-0 overflow-y-auto px-3 sm:px-5 lg:px-6 xl:px-8 py-4 sm:py-5 pb-20 md:pb-6 max-w-full">
+          <div className="max-w-[1600px] mx-auto">
             {role === 'customer' ? (
               <Routes>
                 <Route path="/portal" element={<CustomerPortal />} />
@@ -321,26 +347,96 @@ function MainApp() {
       </div>
 
       {/* Platform Footer — Always preserves Powered by Scribble IT even when tenant customizes portal name */}
-      <footer className="border-t border-neutral-900 bg-neutral-950/90 py-2.5 px-4 z-20">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] font-mono text-neutral-500">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-neutral-200 font-bold">{activeBrand.portalName}</span>
+      <footer className="border-t border-neutral-900 bg-neutral-950/90 py-2.5 px-4 mb-14 md:mb-0 z-20">
+        <div className="max-w-[1600px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] font-sans text-neutral-500">
+          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+            <span className="text-neutral-200 font-semibold">{activeBrand.portalName}</span>
             <span aria-hidden="true">·</span>
             <span>{activeTenant.name}</span>
             {activeTenant.companyCode && (
               <>
                 <span aria-hidden="true">·</span>
-                <span>{activeTenant.companyCode}</span>
+                <span className="font-mono">{activeTenant.companyCode}</span>
               </>
             )}
           </div>
           <div className="flex items-center gap-3 text-neutral-400">
-            <span className="text-neutral-300 font-bold">Powered by Scribble IT</span>
+            <span className="text-neutral-300 font-semibold">Powered by Scribble IT</span>
             <span aria-hidden="true">·</span>
             <span>Njure Tech</span>
           </div>
         </div>
       </footer>
+
+      {/* Mobile Thumb-Zone Bottom Navigation Bar (< md) */}
+      <nav
+        aria-label="Mobile Primary Navigation"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 h-14 bg-neutral-950/95 backdrop-blur-md border-t border-neutral-800 px-1"
+      >
+        {role === 'customer' ? (
+          <div className="grid grid-cols-4 h-full">
+            {[
+              { path: '/portal', label: 'Portal', Icon: LayoutGrid },
+              { path: '/portal/new', label: 'Report', Icon: PlusCircle },
+              { path: '/status', label: 'Status', Icon: Activity },
+              { path: '/knowledge', label: 'KB', Icon: BookOpen },
+            ].map(item => {
+              const active = location.pathname === item.path;
+              const Icon = item.Icon;
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`min-h-[44px] flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors ${
+                    active ? 'text-rose-400' : 'text-neutral-400 hover:text-neutral-200'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="grid grid-cols-5 h-full">
+            {[
+              {
+                path: authSession?.portalType === 'iam' ? '/iam' : '/watchtower',
+                label: authSession?.portalType === 'iam' ? 'IAM' : 'Watch',
+                Icon: authSession?.portalType === 'iam' ? Shield : Eye,
+              },
+              { path: '/incidents', label: 'Incidents', Icon: AlertTriangle },
+              { path: '/requests', label: 'Requests', Icon: Package },
+              { path: '/knowledge', label: 'KB', Icon: BookOpen },
+            ].map(item => {
+              const active = location.pathname.startsWith(item.path);
+              const Icon = item.Icon;
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`min-h-[44px] flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors ${
+                    active ? 'text-rose-400' : 'text-neutral-400 hover:text-neutral-200'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => setIsNavigatorOpen(prev => !prev)}
+              className={`min-h-[44px] flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors ${
+                isNavigatorOpen ? 'text-sky-400' : 'text-neutral-400 hover:text-neutral-200'
+              }`}
+            >
+              <LayoutGrid className="w-4 h-4" />
+              <span>Modules</span>
+            </button>
+          </div>
+        )}
+      </nav>
     </div>
   );
 }

@@ -7,9 +7,10 @@ import { ActivityStreamPanel } from '../common/ActivityStreamPanel';
 import {
   ShieldCheck, Plus, Check, X, Calendar, AlertTriangle, FileCode,
   MessageSquare, HardDrive, Download, Search, CheckCircle2, Clock,
-  Layers, ArrowRight, ShieldAlert, Cpu, Sparkles
+  Layers, ArrowRight, ShieldAlert, Cpu, Sparkles, RefreshCw
 } from 'lucide-react';
 import { chatService, driveService } from '../../services/workspaceService';
+import { aiService, type ChangeAssessResponse } from '../../services/aiService';
 
 interface ChangeModuleProps {
   onOpenCreate?: () => void;
@@ -17,7 +18,7 @@ interface ChangeModuleProps {
 
 export const ChangeModule: React.FC<ChangeModuleProps> = ({ onOpenCreate }) => {
   const navigate = useNavigate();
-  const { changes, voteCab, updateChangeStatus, currentUser, googleToken, loginWithGoogle } = useITSM();
+  const { changes, voteCab, updateChangeStatus, currentUser, googleToken, loginWithGoogle, showToast } = useITSM();
 
   const [selectedId, setSelectedId] = useState<string>(changes[0]?.id || '');
   const [searchQuery, setSearchQuery] = useState('');
@@ -31,6 +32,8 @@ export const ChangeModule: React.FC<ChangeModuleProps> = ({ onOpenCreate }) => {
   // Notice & Vote note
   const [voteNote, setVoteNote] = useState('');
   const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const [isAssessingCab, setIsAssessingCab] = useState(false);
+  const [cabAssessmentById, setCabAssessmentById] = useState<Record<string, ChangeAssessResponse>>({});
 
   const selectedChange = changes.find(c => c.id === selectedId) || changes[0];
 
@@ -51,6 +54,33 @@ export const ChangeModule: React.FC<ChangeModuleProps> = ({ onOpenCreate }) => {
     setVoteNote('');
     setActionNotice(`CAB vote "${vote.toUpperCase()}" submitted for ${member}.`);
     setTimeout(() => setActionNotice(null), 3000);
+  };
+
+  const handleAssessCabRisk = async () => {
+    if (!selectedChange || isAssessingCab) return;
+    setIsAssessingCab(true);
+    try {
+      const result = await aiService.assessChange({
+        id: selectedChange.id,
+        title: selectedChange.title,
+        type: selectedChange.type,
+        reason: selectedChange.reason,
+        implementationPlan: selectedChange.implementationPlan,
+        rollbackPlan: selectedChange.rollbackPlan,
+        testPlan: selectedChange.testPlan
+      });
+      setCabAssessmentById(prev => ({ ...prev, [selectedChange.id]: result }));
+      showToast({
+        variant: 'success',
+        title: `CAB Risk Assessment Ready: ${selectedChange.id}`,
+        description: `Readiness ${result.readinessScore}% · Risk ${result.assessedRisk.toUpperCase()}`
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'CAB AI assessment failed.';
+      showToast({ variant: 'error', title: 'AI CAB Review Failed', description: msg });
+    } finally {
+      setIsAssessingCab(false);
+    }
   };
 
   // Google Chat CAB Review Room integration
@@ -447,13 +477,63 @@ export const ChangeModule: React.FC<ChangeModuleProps> = ({ onOpenCreate }) => {
                   </div>
                 </div>
 
-                {isQuorumReached && (
-                  <div className="px-2.5 py-1 bg-emerald-950/60 border border-emerald-800 text-emerald-300 font-bold flex items-center gap-1.5 text-[11px]">
-                    <Check className="w-3.5 h-3.5" />
-                    <span>CAB Quorum Authorized</span>
-                  </div>
-                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={isAssessingCab}
+                    onClick={handleAssessCabRisk}
+                    className="px-3 py-1 border border-sky-700 bg-sky-950/40 hover:bg-sky-900/60 disabled:opacity-50 text-sky-300 font-bold flex items-center gap-1.5 text-[11px]"
+                  >
+                    {isAssessingCab ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                    <span>{isAssessingCab ? 'Evaluating RFC...' : 'AI CAB Risk Review'}</span>
+                  </button>
+                  {isQuorumReached && (
+                    <div className="px-2.5 py-1 bg-emerald-950/60 border border-emerald-800 text-emerald-300 font-bold flex items-center gap-1.5 text-[11px]">
+                      <Check className="w-3.5 h-3.5" />
+                      <span>CAB Quorum Authorized</span>
+                    </div>
+                  )}
+                </div>
               </div>
+
+              {cabAssessmentById[selectedChange.id] && (() => {
+                const cabAi = cabAssessmentById[selectedChange.id];
+                return (
+                  <div className="p-4 border border-sky-900/70 bg-sky-950/20 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-800 pb-2">
+                      <div className="text-[11px] font-bold text-sky-400 uppercase flex items-center gap-2">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>AI CAB READINESS: {cabAi.readinessScore}% · ASSESSED RISK: {cabAi.assessedRisk.toUpperCase()}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setVoteNote(cabAi.recommendedCabGuidance)}
+                        className="px-2.5 py-1 border border-emerald-700 bg-emerald-950/40 text-emerald-300 font-bold hover:bg-emerald-900/60 text-[10px]"
+                      >
+                        Use Guidance in Vote Note
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px]">
+                      <div>
+                        <div className="text-[10px] text-neutral-500 uppercase mb-1">Key Risk Findings</div>
+                        <ul className="space-y-1 text-neutral-300 list-disc pl-4">
+                          {cabAi.riskFindings.map((r, idx) => <li key={idx}>{r}</li>)}
+                        </ul>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-neutral-500 uppercase mb-1">Missing Safeguards / Controls</div>
+                        <ul className="space-y-1 text-amber-300 list-disc pl-4">
+                          {cabAi.missingControls.map((m, idx) => <li key={idx}>{m}</li>)}
+                        </ul>
+                      </div>
+                    </div>
+                    <div className="text-[11px] text-neutral-200 border-t border-neutral-800 pt-2">
+                      <span className="text-neutral-500 uppercase font-bold">CAB Recommendation: </span>
+                      <span>{cabAi.recommendedCabGuidance}</span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Quorum Progress Bar */}
               <div className="w-full bg-neutral-950 h-2 border border-neutral-800 overflow-hidden">

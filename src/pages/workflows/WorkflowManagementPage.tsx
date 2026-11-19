@@ -2,10 +2,17 @@ import React, { useState, useMemo } from 'react';
 import { useITSM } from '../../context/ITSMContext';
 import {
   FreeITSMModuleId,
+  ProcessEdge,
+  ProcessNode,
+  ProcessNodeType,
   WorkflowDefinition,
   WorkflowStage,
   WorkflowTriggerConfig
 } from '../../types/itsm';
+import {
+  FigmaWireframeCanvas,
+  WIREFRAME_NODE_PALETTE
+} from '../../components/workflows/FigmaWireframeCanvas';
 import {
   ALL_WORKFLOW_MODULES,
   WorkflowActionDef,
@@ -30,7 +37,10 @@ import {
   GitBranch,
   Search,
   X,
-  Clock
+  Clock,
+  Flag,
+  LayoutGrid,
+  List
 } from 'lucide-react';
 
 const MODULE_GROUPS = [
@@ -107,6 +117,11 @@ export const WorkflowManagementPage: React.FC = () => {
   const [pickerModuleFilter, setPickerModuleFilter] = useState<FreeITSMModuleId | 'all' | 'ALL_MODULES'>('ALL_MODULES');
   const [pickerSearch, setPickerSearch] = useState('');
 
+  // Figma Wireframe Designer Mode (default) vs Power Automate Step List
+  const [designerView, setDesignerView] = useState<'wireframe' | 'list'>('wireframe');
+  const [selectedWireframeNodeId, setSelectedWireframeNodeId] = useState<string | null>(null);
+  const [wireframeCoords, setWireframeCoords] = useState<Record<string, { x: number; y: number }>>({});
+
   // Selected workflow in library inspector
   const [selectedId, setSelectedId] = useState<string>(workflows[0]?.id || '');
   const selected = workflows.find(w => w.id === selectedId) || workflows[0];
@@ -159,6 +174,126 @@ export const WorkflowManagementPage: React.FC = () => {
     }
     return results;
   }, [pickerModuleFilter, pickerSearch]);
+
+  // Build live Figma Wireframe nodes & edges from Trigger + Pre-Close Stages + Close Gate
+  const wireframeGraph = useMemo<{ nodes: ProcessNode[]; edges: ProcessEdge[] }>(() => {
+    const startLabel =
+      triggerModuleId === 'requests'
+        ? 'Service Request Opened'
+        : triggerModuleId === 'incidents'
+        ? 'Incident Opened'
+        : `${getModuleLabel(triggerModuleId)} Opened`;
+    const closeLabel =
+      triggerModuleId === 'requests'
+        ? 'Close Request'
+        : triggerModuleId === 'incidents'
+        ? 'Close Incident'
+        : 'Close / Complete Record';
+
+    const mapStageType = (st: WorkflowStage['stepType']): ProcessNodeType => {
+      if (st === 'approval') return 'approval';
+      if (st === 'condition') return 'decision';
+      if (st === 'notification') return 'notification';
+      if (st === 'automation' || st === 'delay') return 'automation';
+      return 'action';
+    };
+
+    const nodes: ProcessNode[] = [
+      {
+        id: 'wf-trigger-open',
+        label: startLabel,
+        type: 'start',
+        role: selectedTriggerDef?.label || 'Trigger',
+        moduleId: triggerModuleId,
+        slaHours: 1,
+        x: wireframeCoords['wf-trigger-open']?.x ?? 48,
+        y: wireframeCoords['wf-trigger-open']?.y ?? 128,
+      },
+      ...stages.map((st, idx) => ({
+        id: st.id,
+        label: st.name || st.actionLabel || `Step ${idx + 1}`,
+        type: mapStageType(st.stepType),
+        role: st.assigneeRole || getModuleLabel(st.moduleId || 'all'),
+        moduleId: st.moduleId || 'all',
+        slaHours: st.slaHours,
+        x: wireframeCoords[st.id]?.x ?? 48 + (idx + 1) * 272,
+        y: wireframeCoords[st.id]?.y ?? 128,
+      })),
+      {
+        id: 'wf-close-gate',
+        label: closeLabel,
+        type: 'end',
+        role: 'Resolution & Closure',
+        moduleId: triggerModuleId,
+        slaHours: 1,
+        x: wireframeCoords['wf-close-gate']?.x ?? 48 + (stages.length + 1) * 272,
+        y: wireframeCoords['wf-close-gate']?.y ?? 128,
+      },
+    ];
+
+    const edges: ProcessEdge[] = [];
+    for (let i = 0; i < nodes.length - 1; i++) {
+      const from = nodes[i];
+      const to = nodes[i + 1];
+      const stageMeta = stages.find(s => s.id === to.id);
+      const cond =
+        stageMeta?.branch === 'if_yes'
+          ? 'If Yes'
+          : stageMeta?.branch === 'if_no'
+          ? 'If No'
+          : from.type === 'approval'
+          ? 'Approved'
+          : to.type === 'end'
+          ? 'Before Close'
+          : 'Next';
+      edges.push({ from: from.id, to: to.id, condition: cond });
+    }
+
+    return { nodes, edges };
+  }, [triggerModuleId, selectedTriggerDef, stages, wireframeCoords]);
+
+  const insertQuickWireframeStep = (
+    insertAfterStageIdx: number,
+    nodeType: Exclude<ProcessNodeType, 'start' | 'end'>
+  ) => {
+    const palette = WIREFRAME_NODE_PALETTE.find(p => p.type === nodeType) || WIREFRAME_NODE_PALETTE[0];
+    const stepTypeMap: Record<Exclude<ProcessNodeType, 'start' | 'end'>, WorkflowStage['stepType']> = {
+      action: 'task',
+      approval: 'approval',
+      decision: 'condition',
+      notification: 'notification',
+      automation: 'automation',
+    };
+    const newId = `STP-${Date.now().toString().slice(-5)}-${Math.floor(Math.random() * 90 + 10)}`;
+    const newStep: WorkflowStage = {
+      id: newId,
+      name: palette.defaultTitle,
+      stepType: stepTypeMap[nodeType],
+      moduleId: triggerModuleId === 'requests' ? 'requests' : triggerModuleId === 'incidents' ? 'incidents' : 'all',
+      actionKey:
+        nodeType === 'approval'
+          ? 'approval_gate'
+          : nodeType === 'decision'
+          ? 'condition_branch'
+          : nodeType === 'notification'
+          ? 'send_notification'
+          : undefined,
+      actionLabel: palette.defaultTitle,
+      assigneeRole: palette.defaultRole,
+      slaHours: palette.defaultSla,
+      branch: 'main',
+      config: {},
+    };
+    setStages(prev => {
+      const next = [...prev];
+      const targetIdx = Math.max(0, Math.min(next.length, insertAfterStageIdx + 1));
+      next.splice(targetIdx, 0, newStep);
+      return next;
+    });
+    setExpandedStepIds(prev => ({ ...prev, [newId]: true }));
+    setSelectedWireframeNodeId(newId);
+    setWireframeCoords({});
+  };
 
   const openNewWorkflowDesigner = () => {
     setEditingWorkflowId(null);
@@ -548,13 +683,42 @@ export const WorkflowManagementPage: React.FC = () => {
       {/* Power Automate-Style Workflow Creator / Editor */}
       {showDesigner && (
         <form onSubmit={handleSaveWorkflow} className="border border-neutral-700 bg-neutral-900/30 p-5 space-y-6">
-          {/* Flow Properties Bar */}
+          {/* Flow Properties Bar + Designer View Toggle */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-800 pb-3">
-            <div className="text-neutral-100 font-bold uppercase tracking-wider">
-              {editingWorkflowId ? `Edit Flow · ${editingWorkflowId}` : 'Power Automate-Style Flow Designer'}
+            <div>
+              <div className="text-neutral-100 font-bold uppercase tracking-wider">
+                {editingWorkflowId ? `Edit Flow · ${editingWorkflowId}` : 'Lifecycle Workflow Designer (Open → Pre-Close → Close)'}
+              </div>
+              <div className="text-[11px] text-neutral-500 tabular-nums mt-0.5">
+                1 Open Trigger · {stages.length} Pre-Close Step{stages.length === 1 ? '' : 's'} · 1 Close Gate
+              </div>
             </div>
-            <div className="text-[11px] text-neutral-500 tabular-nums">
-              1 Trigger · {stages.length} Configured Step{stages.length === 1 ? '' : 's'}
+
+            <div className="flex items-center border border-neutral-700 bg-neutral-950 p-0.5 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setDesignerView('wireframe')}
+                className={`min-h-[34px] px-3 py-1 flex items-center gap-1.5 text-[11px] font-bold transition-colors whitespace-nowrap ${
+                  designerView === 'wireframe'
+                    ? 'bg-sky-950/60 border border-sky-700/80 text-sky-300'
+                    : 'text-neutral-400 hover:text-neutral-200 border border-transparent'
+                }`}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>Figma Wireframe</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDesignerView('list')}
+                className={`min-h-[34px] px-3 py-1 flex items-center gap-1.5 text-[11px] font-bold transition-colors whitespace-nowrap ${
+                  designerView === 'list'
+                    ? 'bg-neutral-800 border border-neutral-600 text-neutral-100'
+                    : 'text-neutral-400 hover:text-neutral-200 border border-transparent'
+                }`}
+              >
+                <List className="w-3.5 h-3.5" />
+                <span>Step List</span>
+              </button>
             </div>
           </div>
 
@@ -565,7 +729,7 @@ export const WorkflowManagementPage: React.FC = () => {
                 required
                 value={name}
                 onChange={e => setName(e.target.value)}
-                placeholder="e.g. P1 Security Incident Auto-Escalation & War Room"
+                placeholder="e.g. Incident / Request Pre-Close Approval & Action Flow"
                 className="w-full bg-neutral-950 border border-neutral-700 px-3 py-2 text-neutral-100"
               />
             </div>
@@ -592,7 +756,42 @@ export const WorkflowManagementPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Vertical Flow Canvas */}
+          {/* Interactive Figma Wireframe Canvas View */}
+          {designerView === 'wireframe' && (
+            <div className="space-y-4">
+              <FigmaWireframeCanvas
+                nodes={wireframeGraph.nodes}
+                edges={wireframeGraph.edges}
+                selectedNodeId={selectedWireframeNodeId}
+                onSelectNode={nodeId => {
+                  setSelectedWireframeNodeId(nodeId);
+                  if (nodeId && stages.some(s => s.id === nodeId)) {
+                    setExpandedStepIds(prev => ({ ...prev, [nodeId]: true }));
+                  }
+                }}
+                onChangeGraph={updatedNodes => {
+                  const nextCoords: Record<string, { x: number; y: number }> = {};
+                  updatedNodes.forEach(n => {
+                    nextCoords[n.id] = { x: n.x, y: n.y };
+                  });
+                  setWireframeCoords(nextCoords);
+                }}
+                onInsertBetweenEdge={(edgeIdx, nodeType) => {
+                  // edgeIdx 0 is between Trigger and Stage 0 -> insertAfter -1; edgeIdx k -> insertAfter k-1
+                  insertQuickWireframeStep(edgeIdx - 1, nodeType);
+                }}
+                onQuickAddBeforeClose={nodeType => {
+                  insertQuickWireframeStep(stages.length - 1, nodeType);
+                }}
+                frameTitle={`${name || 'New Lifecycle Workflow'} · ${getModuleLabel(triggerModuleId)}`}
+              />
+              <div className="text-[11px] text-neutral-400">
+                Configure trigger criteria and selected pre-close steps below, or click <strong className="text-sky-300">+</strong> on any connector wire above to insert an Action, Approval, Condition, Notification, or Automation before Close.
+              </div>
+            </div>
+          )}
+
+          {/* Vertical Flow Canvas / Step Configuration Cards */}
           <div className="flex flex-col items-center py-2">
             {/* STEP 0: TRIGGER NODE */}
             <div className="w-full max-w-3xl border border-sky-700/70 bg-neutral-950 p-4 space-y-4">
@@ -947,14 +1146,38 @@ export const WorkflowManagementPage: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Connector between steps / bottom "+ New step" */}
+                  {/* Connector between steps / bottom "+ Insert before Close" */}
                   {renderAddStepConnector(
                     idx,
-                    idx === stages.length - 1 ? '+ New step' : 'Insert step'
+                    idx === stages.length - 1 ? '+ Add Action / Approval Before Close' : 'Insert step'
                   )}
                 </React.Fragment>
               );
             })}
+
+            {/* ANCHORED CLOSE RECORD GATE */}
+            <div className="w-full max-w-3xl border border-rose-700/70 bg-neutral-950 p-3.5 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="w-6 h-6 bg-rose-600/20 border border-rose-600 text-rose-400 flex items-center justify-center shrink-0">
+                  <Flag className="w-3.5 h-3.5" />
+                </span>
+                <div className="min-w-0">
+                  <div className="text-[10px] text-rose-400 font-bold uppercase">
+                    Lifecycle Completion Gate
+                  </div>
+                  <div className="font-bold text-neutral-100 truncate">
+                    {triggerModuleId === 'requests'
+                      ? 'Close Service Request'
+                      : triggerModuleId === 'incidents'
+                      ? 'Resolve & Close Incident'
+                      : 'Complete & Close Record'}
+                  </div>
+                </div>
+              </div>
+              <span className="text-[10px] text-neutral-500 uppercase shrink-0">
+                Executes After All Pre-Close Steps
+              </span>
+            </div>
           </div>
 
           <div className="flex justify-end gap-2 border-t border-neutral-800 pt-4">

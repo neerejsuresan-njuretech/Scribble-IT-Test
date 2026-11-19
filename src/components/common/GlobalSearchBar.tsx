@@ -12,7 +12,15 @@ interface SearchResultItem {
   path: string;
 }
 
-export const GlobalSearchBar: React.FC = () => {
+interface GlobalSearchBarProps {
+  variant?: 'inline' | 'mobile-overlay';
+  onResultSelected?: () => void;
+}
+
+export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
+  variant = 'inline',
+  onResultSelected,
+}) => {
   const navigate = useNavigate();
   const {
     role,
@@ -163,6 +171,7 @@ export const GlobalSearchBar: React.FC = () => {
   const handleSelectResult = (item: SearchResultItem) => {
     setIsOpen(false);
     setQuery('');
+    onResultSelected?.();
     navigate(item.path);
   };
 
@@ -193,6 +202,7 @@ export const GlobalSearchBar: React.FC = () => {
     else navigate('/incidents');
 
     setIsOpen(false);
+    onResultSelected?.();
   };
 
   const renderGroupIcon = (group: SearchResultItem['group']) => {
@@ -215,12 +225,18 @@ export const GlobalSearchBar: React.FC = () => {
     'Problems & Changes'
   ];
 
+  const isMobileOverlay = variant === 'mobile-overlay';
+
   return (
-    <div ref={containerRef} className="hidden md:block flex-1 max-w-lg mx-2 relative">
+    <div
+      ref={containerRef}
+      className={isMobileOverlay ? 'w-full relative' : 'hidden md:block flex-1 max-w-lg mx-2 relative'}
+    >
       <form onSubmit={handleSubmit} className="relative">
         <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
         <input
           type="text"
+          autoFocus={isMobileOverlay}
           value={query}
           onFocus={() => setIsOpen(true)}
           onChange={e => {
@@ -228,20 +244,25 @@ export const GlobalSearchBar: React.FC = () => {
             setIsOpen(true);
           }}
           onKeyDown={e => {
-            if (e.key === 'Escape') setIsOpen(false);
+            if (e.key === 'Escape') {
+              setIsOpen(false);
+              onResultSelected?.();
+            }
           }}
           placeholder={
             role === 'customer'
               ? 'Search my tickets, requests & assigned devices...'
               : 'Search incidents, assets, tickets, CIs, workflows...'
           }
-          className="w-full bg-neutral-900/90 border border-neutral-800 text-neutral-200 pl-8 pr-8 py-2 text-xs focus:border-neutral-600 focus:outline-none placeholder:text-neutral-500"
+          className={`w-full bg-neutral-900/90 border border-neutral-800 text-neutral-200 pl-8 pr-9 text-xs focus:border-neutral-600 focus:outline-none placeholder:text-neutral-500 ${
+            isMobileOverlay ? 'py-2.5 min-h-[44px]' : 'py-2'
+          }`}
         />
         {query && (
           <button
             type="button"
             onClick={() => setQuery('')}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-200"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-200 p-1"
             title="Clear search"
           >
             <X className="w-3.5 h-3.5" />

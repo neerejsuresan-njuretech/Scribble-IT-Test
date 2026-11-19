@@ -14,6 +14,7 @@ interface ActivityStreamPanelProps {
   activityLog: ActivityEntry[];
   isOpen: boolean;
   onToggle: () => void;
+  embedded?: boolean;
   className?: string;
 }
 
@@ -24,6 +25,7 @@ export const ActivityStreamPanel: React.FC<ActivityStreamPanelProps> = ({
   activityLog,
   isOpen,
   onToggle,
+  embedded = false,
   className = ''
 }) => {
   const { addRecordActivity, currentUser } = useITSM();
@@ -98,11 +100,11 @@ export const ActivityStreamPanel: React.FC<ActivityStreamPanelProps> = ({
   const countComments = activityLog.filter(a => a.type === 'comment' || a.action?.includes('Customer Comment')).length;
   const countFieldChanges = activityLog.filter(a => a.type === 'field_change' || a.fieldChanges || a.action?.includes('Status') || a.action?.includes('State')).length;
 
-  if (!isOpen) {
+  if (!isOpen && !embedded) {
     return (
       <button
         onClick={onToggle}
-        className="fixed right-0 top-1/2 -translate-y-1/2 z-30 bg-neutral-900 border border-neutral-700 text-neutral-300 hover:text-white hover:bg-neutral-800 p-2 font-mono text-xs flex flex-col items-center gap-2 shadow-2xl transition-all"
+        className="hidden xl:flex fixed right-0 top-1/2 -translate-y-1/2 z-30 bg-neutral-900 border border-neutral-700 text-neutral-300 hover:text-white hover:bg-neutral-800 p-2 font-mono text-xs flex-col items-center gap-2 shadow-2xl transition-all"
         title="Open Activity Stream Side-Panel"
       >
         <ChevronLeft className="w-4 h-4 text-rose-500" />
@@ -115,38 +117,44 @@ export const ActivityStreamPanel: React.FC<ActivityStreamPanelProps> = ({
 
   return (
     <aside
-      className={`w-96 shrink-0 bg-neutral-950 border-l border-neutral-800 flex flex-col font-mono text-xs h-[calc(100vh-3.5rem)] sticky top-14 z-30 shadow-2xl ${className}`}
+      className={
+        embedded
+          ? `w-full h-full min-h-0 bg-neutral-950 flex flex-col font-mono text-xs ${className}`
+          : `w-full lg:w-96 shrink-0 bg-neutral-950 border border-neutral-800 lg:border-t-0 lg:border-r-0 lg:border-b-0 lg:border-l flex flex-col font-mono text-xs lg:h-[calc(100vh-3.5rem)] lg:sticky lg:top-14 z-30 shadow-2xl ${className}`
+      }
       aria-label="Activity Stream Side Panel"
     >
       {/* Panel Header */}
-      <div className="p-3.5 border-b border-neutral-800 bg-neutral-900/60 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <MessageSquare className="w-4 h-4 text-rose-500" />
-          <div>
-            <div className="font-bold text-neutral-100 flex items-center gap-1.5">
-              <span>STREAM</span>
-              <span className="text-neutral-500">·</span>
-              <span className="text-neutral-200">{recordId}</span>
-            </div>
-            <div className="text-[10px] text-neutral-500 truncate max-w-[200px]">
-              {recordTitle}
+      {!embedded && (
+        <div className="p-3.5 border-b border-neutral-800 bg-neutral-900/60 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-rose-500" />
+            <div>
+              <div className="font-bold text-neutral-100 flex items-center gap-1.5">
+                <span>STREAM</span>
+                <span className="text-neutral-500">·</span>
+                <span className="text-neutral-200">{recordId}</span>
+              </div>
+              <div className="text-[10px] text-neutral-500 truncate max-w-[200px]">
+                {recordTitle}
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] text-emerald-400 font-bold px-1.5 py-0.5 border border-emerald-900/60 bg-emerald-950/40">
-            LIVE
-          </span>
-          <button
-            onClick={onToggle}
-            className="p-1 text-neutral-500 hover:text-neutral-200 transition-colors"
-            title="Collapse Activity Stream"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-emerald-400 font-bold px-1.5 py-0.5 border border-emerald-900/60 bg-emerald-950/40">
+              LIVE
+            </span>
+            <button
+              onClick={onToggle}
+              className="p-1.5 text-neutral-500 hover:text-neutral-200 transition-colors"
+              title="Collapse Activity Stream"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {postNotice && (
         <div className="px-3 py-1.5 bg-emerald-950/40 border-b border-emerald-900/60 text-emerald-300 text-[11px] flex items-center gap-1.5">

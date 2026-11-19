@@ -1,4 +1,5 @@
 import React from 'react';
+import { useITSM } from '../../context/ITSMContext';
 
 // 5x7 Dot Matrix Font Map for Njure Tech dot-matrix minimal aesthetic
 const FONT_MAP: Record<string, number[]> = {
@@ -58,14 +59,28 @@ interface DotMatrixTextProps {
 export const DotMatrixText: React.FC<DotMatrixTextProps> = ({
   text,
   size = 'md',
-  activeColor = 'currentColor',
-  dimColor = 'rgba(120, 120, 120, 0.12)',
+  activeColor,
+  dimColor,
   glow = false,
   className = ''
 }) => {
+  const { theme } = useITSM();
+  const isLight = theme === 'light';
+
+  // Invert dot-matrix display colors cleanly in light mode
+  const resolvedActiveColor =
+    isLight && (!activeColor || activeColor === '#ffffff' || activeColor === '#fff' || activeColor === 'currentColor')
+      ? '#0f172a'
+      : activeColor || (isLight ? '#0f172a' : '#f8fafc');
+
+  const resolvedDimColor =
+    isLight && (!dimColor || dimColor === '#262626' || dimColor === 'rgba(120, 120, 120, 0.12)')
+      ? 'rgba(15, 23, 42, 0.13)'
+      : dimColor || (isLight ? 'rgba(15, 23, 42, 0.13)' : 'rgba(255, 255, 255, 0.1)');
+
+  const useGlow = glow && !isLight;
   const chars = text.toUpperCase().split('');
-  
-  // pixel size in svg units
+
   const dotRadius = size === 'xs' ? 1.1 : size === 'sm' ? 1.3 : size === 'md' ? 1.6 : 2.2;
   const colSpacing = size === 'xs' ? 3.2 : size === 'sm' ? 3.8 : size === 'md' ? 4.5 : 6;
   const rowSpacing = size === 'xs' ? 3.2 : size === 'sm' ? 3.8 : size === 'md' ? 4.5 : 6;
@@ -82,7 +97,7 @@ export const DotMatrixText: React.FC<DotMatrixTextProps> = ({
         className="w-auto block"
         aria-label={text}
       >
-        {glow && (
+        {useGlow && (
           <defs>
             <filter id={`glow-${size}`} x="-20%" y="-20%" width="140%" height="140%">
               <feGaussianBlur stdDeviation="0.8" result="blur" />
@@ -109,8 +124,8 @@ export const DotMatrixText: React.FC<DotMatrixTextProps> = ({
                       cx={cx}
                       cy={cy}
                       r={dotRadius}
-                      fill={bit ? activeColor : dimColor}
-                      filter={glow && bit ? `url(#glow-${size})` : undefined}
+                      fill={bit ? resolvedActiveColor : resolvedDimColor}
+                      filter={useGlow && bit ? `url(#glow-${size})` : undefined}
                     />
                   );
                 }
@@ -147,7 +162,7 @@ export const MinimalStatus: React.FC<{
 
   return (
     <div className={`inline-flex items-center gap-1.5 text-xs font-mono tracking-wider uppercase ${colorMap[variant]}`}>
-      <span className={`w-1.5 h-1.5 rounded-none ${dotColor[variant]}`} />
+      <span className={`w-1.5 h-1.5 rounded-xs ${dotColor[variant]}`} />
       <span>{status.replace(/_/g, ' ')}</span>
     </div>
   );

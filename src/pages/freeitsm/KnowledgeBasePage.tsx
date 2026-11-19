@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useITSM } from '../../context/ITSMContext';
-import { BookOpen, Plus, Search, ThumbsUp } from 'lucide-react';
+import { BookOpen, Plus, Search, ThumbsUp, Sparkles, RefreshCw } from 'lucide-react';
+import { aiService } from '../../services/aiService';
 
 export const KnowledgeBasePage: React.FC = () => {
-  const { activeTenant, kbArticles, createKbArticle, voteKbHelpful } = useITSM();
+  const { activeTenant, kbArticles, createKbArticle, voteKbHelpful, showToast } = useITSM();
   const [search, setSearch] = useState('');
   const [visFilter, setVisFilter] = useState<'all' | 'public' | 'internal'>('all');
   const [selectedId, setSelectedId] = useState<string>(kbArticles[0]?.id || '');
@@ -13,6 +14,29 @@ export const KnowledgeBasePage: React.FC = () => {
   const [category, setCategory] = useState('Operations');
   const [visibility, setVisibility] = useState<'public' | 'internal'>('public');
   const [content, setContent] = useState('');
+  const [aiTopic, setAiTopic] = useState('');
+  const [isDraftingAi, setIsDraftingAi] = useState(false);
+
+  const handleAiDraftKb = async () => {
+    const topic = (aiTopic || title).trim();
+    if (!topic) {
+      showToast({ variant: 'warning', title: 'Topic Required', description: 'Enter a topic or article title for AI drafting.' });
+      return;
+    }
+    setIsDraftingAi(true);
+    try {
+      const draft = await aiService.draftKbArticle({ topic, category });
+      setTitle(draft.title);
+      setCategory(draft.category);
+      setContent(draft.content);
+      showToast({ variant: 'success', title: 'AI Runbook Drafted', description: `Populated "${draft.title}"` });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to draft KB article.';
+      showToast({ variant: 'error', title: 'AI Draft Failed', description: msg });
+    } finally {
+      setIsDraftingAi(false);
+    }
+  };
 
   const filtered = kbArticles.filter(k => {
     const matchesSearch = k.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -56,6 +80,24 @@ export const KnowledgeBasePage: React.FC = () => {
 
       {showNew && (
         <form onSubmit={handlePublish} className="p-5 border border-neutral-700 bg-neutral-900/50 space-y-4">
+          <div className="p-3 border border-sky-900/60 bg-sky-950/20 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <input
+              type="text"
+              value={aiTopic}
+              onChange={e => setAiTopic(e.target.value)}
+              placeholder="AI Draft Prompt: e.g. Step-by-step SOP for rotating expired TLS certificates on Nginx"
+              className="flex-1 bg-neutral-950 border border-neutral-700 px-3 py-1.5 text-neutral-100"
+            />
+            <button
+              type="button"
+              disabled={isDraftingAi}
+              onClick={handleAiDraftKb}
+              className="px-3.5 py-1.5 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-bold flex items-center justify-center gap-1.5 shrink-0"
+            >
+              {isDraftingAi ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+              <span>{isDraftingAi ? 'Drafting...' : 'AI Draft Runbook'}</span>
+            </button>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="sm:col-span-2">
               <label className="block text-neutral-400 mb-1">Article Title *</label>
