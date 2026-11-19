@@ -41,6 +41,7 @@ export const ServiceNowHeader: React.FC<ServiceNowHeaderProps> = ({
     getPortalBranding,
     theme,
     toggleTheme,
+    cloudSyncStatus,
   } = useITSM();
 
   const [showRoleMenu, setShowRoleMenu] = useState(false);
@@ -119,7 +120,16 @@ export const ServiceNowHeader: React.FC<ServiceNowHeaderProps> = ({
                 className="px-2.5 py-1.5 border border-neutral-800 bg-neutral-900/90 hover:border-neutral-600 text-neutral-200 flex items-center gap-1.5 text-[11px] whitespace-nowrap transition-colors"
                 title="Switch active isolated tenant workspace"
               >
-                <Building2 className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                {activeTenant.companyLogoDataUrl || activeTenant.portalBranding?.employees?.logoDataUrl ? (
+                  <img
+                    src={activeTenant.companyLogoDataUrl || activeTenant.portalBranding?.employees?.logoDataUrl}
+                    alt={activeTenant.name}
+                    referrerPolicy="no-referrer"
+                    className="w-4 h-4 object-contain shrink-0"
+                  />
+                ) : (
+                  <Building2 className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                )}
                 <span className="font-bold max-w-[110px] lg:max-w-[140px] truncate">
                   {activeTenant.name}
                 </span>
@@ -136,6 +146,10 @@ export const ServiceNowHeader: React.FC<ServiceNowHeaderProps> = ({
                   <div className="max-h-64 overflow-y-auto divide-y divide-neutral-900">
                     {tenants.map(t => {
                       const isCurrent = t.id === activeTenant.id;
+                      const tenantLogo =
+                        t.companyLogoDataUrl ||
+                        t.portalBranding?.employees?.logoDataUrl ||
+                        t.portalBranding?.enduser?.logoDataUrl;
                       return (
                         <button
                           key={t.id}
@@ -150,10 +164,22 @@ export const ServiceNowHeader: React.FC<ServiceNowHeaderProps> = ({
                               : 'text-neutral-400 hover:bg-neutral-900 hover:text-neutral-200'
                           }`}
                         >
-                          <div className="min-w-0">
-                            <div className="truncate">{t.name}</div>
-                            <div className="text-[10px] text-neutral-500 font-normal truncate">
-                              {t.domain} · {t.plan} · {t.region}
+                          <div className="flex items-center gap-2 min-w-0">
+                            {tenantLogo ? (
+                              <img
+                                src={tenantLogo}
+                                alt={t.name}
+                                referrerPolicy="no-referrer"
+                                className="w-5 h-5 object-contain border border-neutral-800 bg-neutral-900 p-0.5 shrink-0"
+                              />
+                            ) : (
+                              <Building2 className="w-4 h-4 text-neutral-500 shrink-0" />
+                            )}
+                            <div className="min-w-0">
+                              <div className="truncate">{t.name}</div>
+                              <div className="text-[10px] text-neutral-500 font-normal truncate">
+                                {t.domain} · {t.plan} · {t.region}
+                              </div>
                             </div>
                           </div>
                           {isCurrent && (
@@ -263,17 +289,37 @@ export const ServiceNowHeader: React.FC<ServiceNowHeaderProps> = ({
                 ) : (
                   <User className="w-3.5 h-3.5 text-neutral-400" />
                 )}
-                <div className="hidden xl:block text-left text-[11px] leading-tight">
-                  <div className="text-neutral-200 font-bold truncate max-w-[110px]">
+                <Link
+                  to={role === 'admin' ? '/database' : '/tenants'}
+                  className="hidden xl:block text-left text-[11px] leading-tight hover:opacity-85"
+                  title="View centralized cloud database sync status"
+                >
+                  <div className="text-neutral-200 font-bold truncate max-w-[115px]">
                     {googleUser.displayName || googleUser.email}
                   </div>
-                  <div className="text-[10px] text-emerald-400">Workspace Active</div>
-                </div>
+                  <div
+                    className={`text-[10px] ${
+                      cloudSyncStatus === 'error'
+                        ? 'text-rose-400'
+                        : cloudSyncStatus === 'syncing' || cloudSyncStatus === 'connecting'
+                        ? 'text-amber-400'
+                        : 'text-emerald-400'
+                    }`}
+                  >
+                    {cloudSyncStatus === 'syncing'
+                      ? 'Cloud Syncing...'
+                      : cloudSyncStatus === 'connecting'
+                      ? 'Connecting DB...'
+                      : cloudSyncStatus === 'error'
+                      ? 'Sync Attention'
+                      : 'Cloud DB Synced'}
+                  </div>
+                </Link>
                 <button
                   type="button"
                   onClick={logoutGoogle}
                   className="text-neutral-500 hover:text-neutral-200 ml-1"
-                  title="Disconnect Google Account"
+                  title="Disconnect Google Cloud Sync"
                 >
                   <LogOut className="w-3.5 h-3.5" />
                 </button>

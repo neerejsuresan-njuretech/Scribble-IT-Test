@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useITSM } from '../../context/ITSMContext';
 import { AuthPortalType, IamPermissionScope, Role } from '../../types/itsm';
-import { Shield, Plus, UserPlus, Building2, KeyRound, Trash2, Power, Check, Lock } from 'lucide-react';
+import { Shield, Plus, UserPlus, Building2, KeyRound, Trash2, Power, Check, Lock, ChevronLeft, ChevronRight, Phone } from 'lucide-react';
 
 const ALL_SCOPES: { id: IamPermissionScope; label: string }[] = [
   { id: 'incidents:read', label: 'Incidents Read' },
@@ -34,6 +34,13 @@ export const IamPortalPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'identities' | 'policies' | 'companies'>('identities');
   const [searchFilter, setSearchFilter] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | Role>('all');
+  const [companyFilter, setCompanyFilter] = useState<string>('all');
+  const [identityPage, setIdentityPage] = useState<number>(1);
+  const [policySearch, setPolicySearch] = useState<string>('');
+  const [policyPage, setPolicyPage] = useState<number>(1);
+  const [expandedCompanies, setExpandedCompanies] = useState<Record<string, boolean>>({});
+  const IDENTITIES_PER_PAGE = 25;
+  const POLICIES_PER_PAGE = 16;
 
   // Create Identity Form
   const [showCreateId, setShowCreateId] = useState(false);
@@ -126,25 +133,68 @@ export const IamPortalPage: React.FC = () => {
     updateIamIdentity(accountId, { policyIds: next });
   };
 
-  const filteredAccounts = authAccounts.filter(acc => {
-    if (roleFilter !== 'all' && acc.role !== roleFilter) return false;
-    if (!searchFilter.trim()) return true;
+  const filteredAccounts = useMemo(() => {
     const q = searchFilter.trim().toLowerCase();
-    return (
-      acc.id.toLowerCase().includes(q) ||
-      acc.name.toLowerCase().includes(q) ||
-      acc.email.toLowerCase().includes(q) ||
-      (acc.companyId || '').toLowerCase().includes(q)
-    );
-  });
+    return authAccounts.filter(acc => {
+      if (roleFilter !== 'all' && acc.role !== roleFilter) return false;
+      if (companyFilter !== 'all' && (acc.companyId || 'UNASSIGNED') !== companyFilter) return false;
+      if (!q) return true;
+      return (
+        acc.id.toLowerCase().includes(q) ||
+        acc.name.toLowerCase().includes(q) ||
+        acc.email.toLowerCase().includes(q) ||
+        (acc.phone || '').toLowerCase().includes(q) ||
+        (acc.department || '').toLowerCase().includes(q) ||
+        (acc.companyId || '').toLowerCase().includes(q)
+      );
+    });
+  }, [authAccounts, roleFilter, companyFilter, searchFilter]);
 
-  const companyGroups = Array.from(
-    new Set(authAccounts.map(a => a.companyId || 'UNASSIGNED'))
-  ).map(cid => ({
-    companyId: cid,
-    accounts: authAccounts.filter(a => (a.companyId || 'UNASSIGNED') === cid),
-    tenant: tenants.find(t => t.companyCode === cid || authAccounts.some(a => a.companyId === cid && a.tenantId === t.id))
-  }));
+  const totalIdentityPages = Math.max(1, Math.ceil(filteredAccounts.length / IDENTITIES_PER_PAGE));
+  const safeIdentityPage = Math.min(identityPage, totalIdentityPages);
+  const pagedAccounts = useMemo(
+    () =>
+      filteredAccounts.slice(
+        (safeIdentityPage - 1) * IDENTITIES_PER_PAGE,
+        safeIdentityPage * IDENTITIES_PER_PAGE
+      ),
+    [filteredAccounts, safeIdentityPage]
+  );
+
+  const filteredPolicies = useMemo(() => {
+    const q = policySearch.trim().toLowerCase();
+    if (!q) return iamPolicies;
+    return iamPolicies.filter(
+      p =>
+        p.id.toLowerCase().includes(q) ||
+        p.name.toLowerCase().includes(q) ||
+        p.description.toLowerCase().includes(q) ||
+        p.permissions.some(sc => sc.toLowerCase().includes(q))
+    );
+  }, [iamPolicies, policySearch]);
+
+  const totalPolicyPages = Math.max(1, Math.ceil(filteredPolicies.length / POLICIES_PER_PAGE));
+  const safePolicyPage = Math.min(policyPage, totalPolicyPages);
+  const pagedPolicies = useMemo(
+    () =>
+      filteredPolicies.slice(
+        (safePolicyPage - 1) * POLICIES_PER_PAGE,
+        safePolicyPage * POLICIES_PER_PAGE
+      ),
+    [filteredPolicies, safePolicyPage]
+  );
+
+  const companyGroups = useMemo(
+    () =>
+      Array.from(new Set(authAccounts.map(a => a.companyId || 'UNASSIGNED'))).map(cid => ({
+        companyId: cid,
+        accounts: authAccounts.filter(a => (a.companyId || 'UNASSIGNED') === cid),
+        tenant: tenants.find(
+          t => t.companyCode === cid || authAccounts.some(a => a.companyId === cid && a.tenantId === t.id)
+        ),
+      })),
+    [authAccounts, tenants]
+  );
 
   return (
     <div className="space-y-6 font-mono text-xs">
@@ -420,26 +470,49 @@ export const IamPortalPage: React.FC = () => {
           )}
 
           {/* Filter Bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
             <input
               type="text"
               value={searchFilter}
-              onChange={e => setSearchFilter(e.target.value)}
-              placeholder="Filter by ID, name, email, or Company ID..."
+              onChange={e => {
+                setSearchFilter(e.target.value);
+                setIdentityPage(1);
+              }}
+              placeholder="Filter 500+ profiles by ID, name, email, phone, department, or Company ID..."
               className="flex-1 bg-neutral-950 border border-neutral-800 px-3 py-2 text-neutral-100 focus:border-neutral-600 focus:outline-none"
             />
-            <div className="flex items-center gap-1 border border-neutral-800 p-1 bg-neutral-950">
-              {(['all', 'admin', 'technician', 'customer'] as const).map(rf => (
-                <button
-                  key={rf}
-                  onClick={() => setRoleFilter(rf)}
-                  className={`px-2.5 py-1 text-[11px] uppercase font-bold ${
-                    roleFilter === rf ? 'bg-neutral-800 text-white' : 'text-neutral-500 hover:text-neutral-200'
-                  }`}
-                >
-                  {rf}
-                </button>
-              ))}
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={companyFilter}
+                onChange={e => {
+                  setCompanyFilter(e.target.value);
+                  setIdentityPage(1);
+                }}
+                className="bg-neutral-950 border border-neutral-800 px-2.5 py-2 text-[11px] text-neutral-200 focus:outline-none"
+              >
+                <option value="all">All Companies ({companyGroups.length})</option>
+                {companyGroups.map(g => (
+                  <option key={g.companyId} value={g.companyId}>
+                    {g.tenant ? `${g.tenant.name} (${g.accounts.length})` : `${g.companyId} (${g.accounts.length})`}
+                  </option>
+                ))}
+              </select>
+              <div className="flex items-center gap-1 border border-neutral-800 p-1 bg-neutral-950">
+                {(['all', 'admin', 'technician', 'customer'] as const).map(rf => (
+                  <button
+                    key={rf}
+                    onClick={() => {
+                      setRoleFilter(rf);
+                      setIdentityPage(1);
+                    }}
+                    className={`px-2.5 py-1 text-[11px] uppercase font-bold ${
+                      roleFilter === rf ? 'bg-neutral-800 text-white' : 'text-neutral-500 hover:text-neutral-200'
+                    }`}
+                  >
+                    {rf}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -457,16 +530,30 @@ export const IamPortalPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-900">
-                {filteredAccounts.map(acc => {
+                {pagedAccounts.map(acc => {
                   const isSuspended = acc.status === 'suspended';
                   const assignedPolObjs = iamPolicies.filter(p => (acc.policyIds || []).includes(p.id));
                   return (
                     <React.Fragment key={acc.id}>
                       <tr className="hover:bg-neutral-900/30">
                         <td className="py-3 px-4">
-                          <div className="font-bold text-neutral-100">{acc.name}</div>
-                          <div className="text-[11px] text-neutral-500">
-                            <span className="text-rose-400">{acc.id}</span> · {acc.email}
+                          <div className="font-bold text-neutral-100">
+                            {acc.name}
+                            {acc.jobTitle && <span className="text-neutral-500 font-normal"> · {acc.jobTitle}</span>}
+                          </div>
+                          <div className="text-[11px] text-neutral-500 flex flex-wrap items-center gap-1.5">
+                            <span className="text-rose-400">{acc.id}</span>
+                            <span>·</span>
+                            <span>{acc.email}</span>
+                            {acc.phone && (
+                              <>
+                                <span>·</span>
+                                <span className="inline-flex items-center gap-1 text-neutral-400 tabular-nums">
+                                  <Phone className="w-2.5 h-2.5" />
+                                  {acc.phone}
+                                </span>
+                              </>
+                            )}
                           </div>
                         </td>
                         <td className="py-3 px-4">
@@ -574,6 +661,41 @@ export const IamPortalPage: React.FC = () => {
               </tbody>
             </table>
           </div>
+
+          {/* Identities Pagination Controls */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-neutral-800 bg-neutral-950 px-4 py-3 text-[11px]">
+            <div className="text-neutral-400 tabular-nums">
+              Showing{' '}
+              <span className="text-neutral-100 font-bold">
+                {filteredAccounts.length === 0 ? 0 : (safeIdentityPage - 1) * IDENTITIES_PER_PAGE + 1}–
+                {Math.min(safeIdentityPage * IDENTITIES_PER_PAGE, filteredAccounts.length)}
+              </span>{' '}
+              of <span className="text-neutral-100 font-bold">{filteredAccounts.length}</span> matching identities
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={safeIdentityPage <= 1}
+                onClick={() => setIdentityPage(p => Math.max(1, p - 1))}
+                className="px-2.5 py-1.5 border border-neutral-800 bg-neutral-900 text-neutral-200 disabled:opacity-40 hover:bg-neutral-800 flex items-center gap-1"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Prev</span>
+              </button>
+              <span className="text-neutral-300 tabular-nums px-2">
+                Page {safeIdentityPage} / {totalIdentityPages}
+              </span>
+              <button
+                type="button"
+                disabled={safeIdentityPage >= totalIdentityPages}
+                onClick={() => setIdentityPage(p => Math.min(totalIdentityPages, p + 1))}
+                className="px-2.5 py-1.5 border border-neutral-800 bg-neutral-900 text-neutral-200 disabled:opacity-40 hover:bg-neutral-800 flex items-center gap-1"
+              >
+                <span>Next</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -670,8 +792,24 @@ export const IamPortalPage: React.FC = () => {
             </form>
           )}
 
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <input
+              type="text"
+              value={policySearch}
+              onChange={e => {
+                setPolicySearch(e.target.value);
+                setPolicyPage(1);
+              }}
+              placeholder={`Search ${iamPolicies.length} IAM access policies by code, title, or scope...`}
+              className="flex-1 bg-neutral-950 border border-neutral-800 px-3 py-2 text-neutral-100 focus:border-neutral-600 focus:outline-none"
+            />
+            <span className="text-[11px] text-neutral-400 tabular-nums shrink-0">
+              {filteredPolicies.length} policies matching
+            </span>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {iamPolicies.map(pol => (
+            {pagedPolicies.map(pol => (
               <div key={pol.id} className="border border-neutral-800 bg-neutral-950 p-5 space-y-3">
                 <div className="flex items-start justify-between gap-2">
                   <div>
@@ -709,34 +847,86 @@ export const IamPortalPage: React.FC = () => {
               </div>
             ))}
           </div>
+
+          {totalPolicyPages > 1 && (
+            <div className="flex items-center justify-between border border-neutral-800 bg-neutral-950 px-4 py-3 text-[11px]">
+              <span className="text-neutral-400 tabular-nums">
+                Page {safePolicyPage} of {totalPolicyPages} ({filteredPolicies.length} policies)
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={safePolicyPage <= 1}
+                  onClick={() => setPolicyPage(p => Math.max(1, p - 1))}
+                  className="px-2.5 py-1.5 border border-neutral-800 bg-neutral-900 text-neutral-200 disabled:opacity-40 hover:bg-neutral-800"
+                >
+                  Prev
+                </button>
+                <button
+                  type="button"
+                  disabled={safePolicyPage >= totalPolicyPages}
+                  onClick={() => setPolicyPage(p => Math.min(totalPolicyPages, p + 1))}
+                  className="px-2.5 py-1.5 border border-neutral-800 bg-neutral-900 text-neutral-200 disabled:opacity-40 hover:bg-neutral-800"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {/* TAB 3: COMPANY ID REGISTRY */}
       {activeTab === 'companies' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {companyGroups.map(grp => (
-            <div key={grp.companyId} className="border border-neutral-800 bg-neutral-950 p-5 space-y-3">
-              <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
-                <div className="flex items-center gap-2 font-bold text-neutral-100">
-                  <Building2 className="w-4 h-4 text-rose-500" />
-                  <span>{grp.companyId}</span>
-                </div>
-                <span className="text-neutral-500 tabular-nums">{grp.accounts.length} IDs</span>
-              </div>
-              <div className="text-[11px] text-neutral-400">
-                Tenant Mapping: {grp.tenant ? `${grp.tenant.name} (${grp.tenant.domain})` : 'Custom External Company'}
-              </div>
-              <div className="space-y-1.5 pt-1">
-                {grp.accounts.map(acc => (
-                  <div key={acc.id} className="flex items-center justify-between text-[11px] py-1 border-b border-neutral-900">
-                    <span className="text-neutral-200 truncate">{acc.name} ({acc.id})</span>
-                    <span className="text-neutral-500 uppercase shrink-0">{acc.role}</span>
+          {companyGroups.map(grp => {
+            const expanded = Boolean(expandedCompanies[grp.companyId]);
+            const visibleAccounts = expanded ? grp.accounts : grp.accounts.slice(0, 8);
+            return (
+              <div key={grp.companyId} className="border border-neutral-800 bg-neutral-950 p-5 space-y-3">
+                <div className="flex items-center justify-between border-b border-neutral-800 pb-2.5 gap-2">
+                  <div className="flex items-center gap-2.5 font-bold text-neutral-100 min-w-0">
+                    {grp.tenant?.companyLogoDataUrl ? (
+                      <img
+                        src={grp.tenant.companyLogoDataUrl}
+                        alt={grp.tenant.name}
+                        className="w-7 h-7 object-contain border border-neutral-800 bg-neutral-900 p-0.5 shrink-0"
+                      />
+                    ) : (
+                      <Building2 className="w-4 h-4 text-rose-500 shrink-0" />
+                    )}
+                    <span className="truncate">{grp.companyId}</span>
                   </div>
-                ))}
+                  <span className="text-neutral-500 tabular-nums shrink-0">{grp.accounts.length} IDs</span>
+                </div>
+                <div className="text-[11px] text-neutral-400">
+                  Tenant Mapping: {grp.tenant ? `${grp.tenant.name} (${grp.tenant.domain})` : 'Custom External Company'}
+                </div>
+                <div className="space-y-1.5 pt-1 max-h-64 overflow-y-auto pr-1">
+                  {visibleAccounts.map(acc => (
+                    <div key={acc.id} className="flex items-center justify-between text-[11px] py-1 border-b border-neutral-900 gap-2">
+                      <span className="text-neutral-200 truncate">{acc.name} ({acc.id})</span>
+                      <span className="text-neutral-500 uppercase shrink-0">{acc.role}</span>
+                    </div>
+                  ))}
+                </div>
+                {grp.accounts.length > 8 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExpandedCompanies(prev => ({
+                        ...prev,
+                        [grp.companyId]: !prev[grp.companyId],
+                      }))
+                    }
+                    className="w-full py-1.5 border border-neutral-800 bg-neutral-900/60 hover:bg-neutral-800 text-neutral-300 text-[11px] font-semibold"
+                  >
+                    {expanded ? 'Show Less' : `View All ${grp.accounts.length} Users`}
+                  </button>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

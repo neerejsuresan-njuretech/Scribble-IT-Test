@@ -32,12 +32,26 @@ import {
   Send,
   PhoneForwarded,
   Activity,
+  Search,
+  Users,
 } from 'lucide-react';
 import { useITSM } from '../../context/ITSMContext';
 import type { TelephonyProviderConfig, TelephonyProviderType } from '../../types/itsm';
 import { apiUrl, parseApiJson } from '../../utils/apiClient';
 
 type TelephonyTab = 'dialer' | 'ccp' | 'mobile' | 'providers';
+
+const COUNTRY_DIAL_CODES = [
+  { code: '+1', label: 'US / CA (+1)' },
+  { code: '+44', label: 'UK (+44)' },
+  { code: '+91', label: 'IN (+91)' },
+  { code: '+61', label: 'AU (+61)' },
+  { code: '+49', label: 'DE (+49)' },
+  { code: '+65', label: 'SG (+65)' },
+  { code: '+971', label: 'AE (+971)' },
+  { code: '+46', label: 'SE (+46)' },
+  { code: '+81', label: 'JP (+81)' },
+];
 
 interface ServerTelephonyStatus {
   twilioConfigured: boolean;
@@ -158,6 +172,9 @@ export const TelephonyModule: React.FC = () => {
   const navigate = useNavigate();
   const {
     activeTenant,
+    tenants,
+    authAccounts,
+    incidents,
     calls,
     activeCall,
     telephonyConfig,
@@ -177,6 +194,7 @@ export const TelephonyModule: React.FC = () => {
   // Softphone state
   const [dialNumber, setDialNumber] = useState('');
   const [callerNameInput, setCallerNameInput] = useState('');
+  const [directoryQuery, setDirectoryQuery] = useState('');
   const [isMuted, setIsMuted] = useState(false);
   const [dtmfMuted, setDtmfMuted] = useState(false);
   const [showInCallKeypad, setShowInCallKeypad] = useState(false);
@@ -201,10 +219,11 @@ export const TelephonyModule: React.FC = () => {
   const [copiedOrigin, setCopiedOrigin] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
-  // QR code data URLs
+  // QR code data URLs (dialer, personal mobile target, and GSM forwarding code)
   const [dialerQrUrl, setDialerQrUrl] = useState<string | null>(null);
   const [mobileTestNumber, setMobileTestNumber] = useState('+14155550192');
   const [mobileQrUrl, setMobileQrUrl] = useState<string | null>(null);
+  const [gsmQrCode, setGsmQrCode] = useState<{ label: string; code: string; url: string } | null>(null);
 
   // Browser microphone check (Web Audio API)
   const [micTesting, setMicTesting] = useState(false);
@@ -236,7 +255,7 @@ export const TelephonyModule: React.FC = () => {
     };
   }, []);
 
-  // Live active call duration ticker
+  // Live active call duration ticker + Web Audio incoming ringtone cadence
   useEffect(() => {
     if (!activeCall) {
       setLiveSeconds(0);
@@ -244,12 +263,103 @@ export const TelephonyModule: React.FC = () => {
       return;
     }
     setLiveSeconds(activeCall.durationSec);
+    if (activeCall.status === 'ringing' && !dtmfMuted) {
+      const playRingBurst = () => {
+        try {
+          const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+          if (!AudioCtx) return;
+          if (!dtmfCtxRef.current || dtmfCtxRef.current.state === 'closed') {
+            dtmfCtxRef.current = new AudioCtx();
+          }
+          const ctx = dtmfCtxRef.current;
+          if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+          const now = ctx.currentTime;
+          const gain = ctx.createGain();
+          gain.gain.setValueAtTime(0.05, now);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
+          gain.connect(ctx.destination);
+          [440, 480].forEach(freq => {
+            const osc = ctx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now);
+            osc.connect(gain);
+            osc.start(now);
+            osc.stop(now + 0.55);
+          });
+        } catch {
+          // Audio blocked until user gesture
+        }
+      };
+      playRingBurst();
+      const ringInterval = window.setInterval(playRingBurst, 1800);
+      return () => window.clearInterval(ringInterval);
+    }
     if (activeCall.status !== 'active') return;
     const timer = window.setInterval(() => {
       setLiveSeconds(prev => prev + 1);
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [activeCall?.id, activeCall?.status]);
+  }, [activeCall?.id, activeCall?.status, dtmfMuted]);
+
+  // Directory Quick-Dial & Caller ID lookup across 524+ IAM User Profiles
+  const directoryContacts = useMemo(() => {
+    const q = directoryQuery.trim().toLowerCase();
+    const withPhones = authAccounts.filter(a => Boolean(a.phone));
+    const filtered = q
+      ? withPhones.filter(
+          a =>
+            a.name.toLowerCase().includes(q) ||
+            a.email.toLowerCase().includes(q) ||
+            (a.phone || '').toLowerCase().includes(q) ||
+            a.department.toLowerCase().includes(q) ||
+            (a.companyId || '').toLowerCase().includes(q)
+        )
+      : withPhones.filter(a => a.tenantId === activeTenant.id);
+    return (filtered.length > 0 ? filtered : withPhones).slice(0, 8);
+  }, [authAccounts, directoryQuery, activeTenant.id]);
+
+  // Auto-resolve Caller ID for either the active call OR the number currently typed in the dialpad
+  const resolvedCallerProfile = useMemo(() => {
+    const rawNum = activeCall?.callerNumber || dialNumber;
+    const digits = rawNum.replace(/\D/g, '');
+    if (digits.length < 7) return null;
+    const match = authAccounts.find(a => (a.phone || '').replace(/\D/g, '').endsWith(digits.slice(-7)));
+    if (!match) return null;
+    const org = tenants.find(t => t.id === match.tenantId);
+    const openIncCount = incidents.filter(
+      inc =>
+        inc.requesterEmail.toLowerCase() === match.email.toLowerCase() &&
+        inc.status !== 'resolved' &&
+        inc.status !== 'closed'
+    ).length;
+    return { account: match, orgName: org?.name || activeTenant.name, openIncCount };
+  }, [activeCall?.callerNumber, dialNumber, authAccounts, tenants, incidents, activeTenant.name]);
+
+  const openGsmQrModal = (label: string, code: string) => {
+    QRCode.toDataURL(`tel:${code}`, {
+      width: 220,
+      margin: 2,
+      color: { dark: '#0f172a', light: '#ffffff' },
+    })
+      .then(url => setGsmQrCode({ label, code, url }))
+      .catch(() => {});
+  };
+
+  const formatWhatsAppHref = (num: string, name?: string) => {
+    const digits = num.replace(/\D/g, '');
+    const msg = encodeURIComponent(
+      `Hello${name ? ` ${name}` : ''}, this is ${activeTenant.name} IT Support reaching out regarding your ticket.`
+    );
+    return `https://wa.me/${digits}?text=${msg}`;
+  };
+
+  const formatSmsHref = (num: string, name?: string) => {
+    const cleaned = sanitizeDialableNumber(num);
+    const msg = encodeURIComponent(
+      `[${activeTenant.name} IT Support] Hi${name ? ` ${name}` : ''}, calling from helpdesk regarding your request.`
+    );
+    return `sms:${cleaned}?body=${msg}`;
+  };
 
   // Generate QR code for dialer number
   const cleanDialNumber = useMemo(() => sanitizeDialableNumber(dialNumber), [dialNumber]);
@@ -806,6 +916,23 @@ export const TelephonyModule: React.FC = () => {
                   />
                 </form>
               )}
+
+              {/* Automatic Caller ID Screen-Pop Banner (Matches 524+ IAM Profiles) */}
+              {resolvedCallerProfile && (
+                <div className="mt-2 p-2.5 border border-emerald-800/70 bg-emerald-950/25 text-[11px] flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-bold text-emerald-300 truncate">
+                      Directory Match: {resolvedCallerProfile.account.name}
+                    </div>
+                    <div className="text-neutral-400 truncate">
+                      {resolvedCallerProfile.account.department} · {resolvedCallerProfile.orgName}
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-mono-strict text-amber-300 shrink-0 tabular-nums">
+                    {resolvedCallerProfile.openIncCount} open INC
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Active Call Controls OR Dialpad */}
@@ -970,25 +1097,25 @@ export const TelephonyModule: React.FC = () => {
                     </button>
                   </div>
 
-                  {/* Personal Mobile Carrier Handoff & QR Row */}
+                  {/* Personal Mobile Carrier Handoff, WhatsApp, SMS & QR Row */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {cleanDialNumber ? (
                       <a
                         href={`tel:${cleanDialNumber}`}
                         onClick={() => handleNativeMobileCall(cleanDialNumber, callerNameInput)}
-                        className="min-h-[40px] px-3 py-2 border border-sky-700/70 bg-sky-950/30 hover:bg-sky-900/40 text-sky-300 text-xs font-semibold flex items-center justify-center gap-2 transition-colors"
+                        className="min-h-[42px] px-3 py-2 border border-sky-700/70 bg-sky-950/30 hover:bg-sky-900/40 text-sky-300 text-xs font-semibold flex items-center justify-center gap-2 transition-colors"
                       >
                         <Smartphone className="w-3.5 h-3.5" />
-                        <span>Dial via Personal Mobile</span>
+                        <span>Call via Personal Mobile</span>
                       </a>
                     ) : (
                       <button
                         type="button"
                         disabled
-                        className="min-h-[40px] px-3 py-2 border border-neutral-800 bg-neutral-900/40 text-neutral-600 text-xs font-semibold flex items-center justify-center gap-2 cursor-not-allowed"
+                        className="min-h-[42px] px-3 py-2 border border-neutral-800 bg-neutral-900/40 text-neutral-600 text-xs font-semibold flex items-center justify-center gap-2 cursor-not-allowed"
                       >
                         <Smartphone className="w-3.5 h-3.5" />
-                        <span>Dial via Personal Mobile</span>
+                        <span>Call via Personal Mobile</span>
                       </button>
                     )}
 
@@ -996,7 +1123,7 @@ export const TelephonyModule: React.FC = () => {
                       type="button"
                       disabled={!cleanDialNumber}
                       onClick={() => setShowQrOnDialer(prev => !prev)}
-                      className={`min-h-[40px] px-3 py-2 border text-xs font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-40 ${
+                      className={`min-h-[42px] px-3 py-2 border text-xs font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-40 ${
                         showQrOnDialer
                           ? 'border-neutral-400 bg-neutral-800 text-neutral-100'
                           : 'border-neutral-700 bg-neutral-900 text-neutral-300 hover:bg-neutral-800'
@@ -1006,6 +1133,27 @@ export const TelephonyModule: React.FC = () => {
                       <span>{showQrOnDialer ? 'Hide Phone QR' : 'Scan-to-Call QR'}</span>
                     </button>
                   </div>
+
+                  {cleanDialNumber && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <a
+                        href={formatSmsHref(cleanDialNumber, callerNameInput || resolvedCallerProfile?.account.name)}
+                        className="min-h-[38px] px-2.5 py-1.5 border border-neutral-800 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 text-[11px] font-semibold flex items-center justify-center gap-1.5"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5 text-sky-400" />
+                        <span>SMS from Mobile</span>
+                      </a>
+                      <a
+                        href={formatWhatsAppHref(cleanDialNumber, callerNameInput || resolvedCallerProfile?.account.name)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="min-h-[38px] px-2.5 py-1.5 border border-emerald-800/70 bg-emerald-950/25 hover:bg-emerald-900/40 text-emerald-300 text-[11px] font-semibold flex items-center justify-center gap-1.5"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>WhatsApp Voice/Chat</span>
+                      </a>
+                    </div>
+                  )}
 
                   {/* Optional Server Two-Leg Carrier Bridge Action */}
                   {canUseServerBridge && (
@@ -1182,6 +1330,67 @@ export const TelephonyModule: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {/* Quick-Dial User Directory (Search 524+ IAM User Profiles & Dial via Personal Mobile) */}
+            <div className="border border-neutral-800 bg-neutral-950 p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-800 pb-2.5">
+                <div className="flex items-center gap-2 text-xs font-bold text-neutral-100 uppercase">
+                  <Users className="w-4 h-4 text-sky-400" />
+                  <span>Quick-Dial Enterprise Directory</span>
+                </div>
+                <span className="text-[11px] font-mono-strict text-neutral-500 tabular-nums">
+                  {authAccounts.filter(a => a.phone).length} phone-enabled profiles
+                </span>
+              </div>
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+                <input
+                  type="text"
+                  value={directoryQuery}
+                  onChange={e => setDirectoryQuery(e.target.value)}
+                  placeholder="Search user name, department, company ID, or phone to dial..."
+                  className="w-full bg-neutral-900 border border-neutral-800 pl-8 pr-3 py-2 text-xs text-neutral-100 placeholder:text-neutral-500 focus:outline-none focus:border-neutral-600"
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-0.5">
+                {directoryContacts.map(contact => (
+                  <div
+                    key={contact.id}
+                    className="p-2.5 border border-neutral-800/90 bg-neutral-900/40 flex items-center justify-between gap-2 text-xs"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-semibold text-neutral-100 truncate">{contact.name}</div>
+                      <div className="text-[10px] text-neutral-400 truncate">
+                        {contact.department} · <span className="font-mono-strict tabular-nums">{contact.phone}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDialNumber(contact.phone || '');
+                          setCallerNameInput(contact.name);
+                          setMobileTestNumber(contact.phone || '');
+                        }}
+                        className="px-2 py-1 text-[10px] font-semibold border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-200"
+                        title="Load into dialer"
+                      >
+                        Load
+                      </button>
+                      <a
+                        href={`tel:${sanitizeDialableNumber(contact.phone || '')}`}
+                        onClick={() => handleNativeMobileCall(contact.phone || '', contact.name)}
+                        className="px-2 py-1 text-[10px] font-semibold border border-sky-700/70 bg-sky-950/40 hover:bg-sky-900/50 text-sky-300 flex items-center gap-1"
+                        title="Call directly on Personal Mobile"
+                      >
+                        <Smartphone className="w-3 h-3" />
+                        <span>Call</span>
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
             {/* Historical Call Detail Records (CDR) */}
             <div className="border border-neutral-800 bg-neutral-950 p-5 space-y-4">
@@ -1478,11 +1687,33 @@ export const TelephonyModule: React.FC = () => {
                 })}
               </div>
 
-              {/* Mobile Number Form */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
+              {/* Mobile Number Form with Country Code Selector */}
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
+                <div className="sm:col-span-3 space-y-1.5">
                   <label className="text-[11px] font-mono-strict text-neutral-400 uppercase block">
-                    Agent Personal Mobile Number (E.164)
+                    Country Code
+                  </label>
+                  <select
+                    value={draftConfig.personalMobileCountryCode || '+1'}
+                    onChange={e =>
+                      setDraftConfig(prev => ({
+                        ...prev,
+                        personalMobileCountryCode: e.target.value,
+                      }))
+                    }
+                    className="w-full bg-neutral-900 border border-neutral-800 px-2.5 py-2 text-xs font-mono-strict text-neutral-100 focus:outline-none focus:border-neutral-600"
+                  >
+                    {COUNTRY_DIAL_CODES.map(c => (
+                      <option key={c.code} value={c.code}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="sm:col-span-5 space-y-1.5">
+                  <label className="text-[11px] font-mono-strict text-neutral-400 uppercase block">
+                    Your Personal Mobile Number (E.164)
                   </label>
                   <input
                     type="tel"
@@ -1494,14 +1725,14 @@ export const TelephonyModule: React.FC = () => {
                         personalMobileEnabled: true,
                       }))
                     }
-                    placeholder="+14155550199"
+                    placeholder={`${draftConfig.personalMobileCountryCode || '+1'}4155550199`}
                     className="w-full bg-neutral-900 border border-neutral-800 px-3 py-2 text-xs font-mono-strict text-neutral-100 focus:outline-none focus:border-neutral-600"
                   />
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="sm:col-span-4 space-y-1.5">
                   <label className="text-[11px] font-mono-strict text-neutral-400 uppercase block">
-                    Helpdesk / Queue Forwarding Number
+                    Helpdesk / Queue DID
                   </label>
                   <input
                     type="tel"
@@ -1537,14 +1768,20 @@ export const TelephonyModule: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => {
+                    const rawNum = (draftConfig.personalMobileNumber || '').trim();
+                    const normalized =
+                      rawNum && !rawNum.startsWith('+')
+                        ? `${draftConfig.personalMobileCountryCode || '+1'}${rawNum.replace(/[^\d]/g, '')}`
+                        : rawNum;
                     updateTelephonyConfig({
                       ...draftConfig,
+                      personalMobileNumber: normalized,
                       providerType: 'personal_mobile',
                       providerLabel: 'Personal Mobile System',
                       personalMobileEnabled: true,
                     });
                   }}
-                  className="px-4 py-2.5 bg-neutral-100 hover:bg-white text-neutral-950 font-bold text-xs flex items-center gap-2 transition-colors"
+                  className="px-4 py-2.5 min-h-[42px] bg-neutral-100 hover:bg-white text-neutral-950 font-bold text-xs flex items-center gap-2 transition-colors"
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   <span>Activate Personal Mobile as Active Telephony System</span>
@@ -1552,22 +1789,22 @@ export const TelephonyModule: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => updateTelephonyConfig({ ...draftConfig, personalMobileEnabled: true })}
-                  className="px-4 py-2.5 border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 font-semibold text-xs transition-colors"
+                  className="px-4 py-2.5 min-h-[42px] border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 font-semibold text-xs transition-colors"
                 >
                   Save Mobile Settings Only
                 </button>
               </div>
             </div>
 
-            {/* GSM Carrier Call Forwarding Helper */}
+            {/* GSM Carrier Call Forwarding Helper (Tappable tel: + Scannable QR for Desktop) */}
             <div className="border border-neutral-800 bg-neutral-950 p-5 space-y-4">
               <div className="border-b border-neutral-800 pb-3 space-y-1">
                 <div className="text-xs font-bold text-neutral-100 uppercase flex items-center gap-2">
                   <PhoneForwarded className="w-4 h-4 text-emerald-400" />
-                  <span>Carrier Shift Call-Forwarding Codes (GSM / LTE / 5G)</span>
+                  <span>One-Tap Shift Call-Forwarding Codes (GSM / LTE / 5G)</span>
                 </div>
                 <p className="text-xs text-neutral-400">
-                  Route inbound calls between your personal mobile and the central service desk queue on any standard GSM mobile carrier.
+                  Tap on your smartphone OR click QR to scan from desktop — instantly routes calls between your personal mobile and central helpdesk.
                 </p>
               </div>
 
@@ -1577,13 +1814,13 @@ export const TelephonyModule: React.FC = () => {
                     key: 'fwd-desk',
                     label: 'Forward Mobile → Helpdesk',
                     code: forwardToDeskCode,
-                    hint: 'Tap when going off-shift',
+                    hint: 'Activate when going off-shift',
                   },
                   {
                     key: 'fwd-mobile',
                     label: 'Forward Desk SIM → Mobile',
                     code: forwardToMobileCode,
-                    hint: 'Tap for on-call duty',
+                    hint: 'Activate for on-call duty',
                   },
                   {
                     key: 'fwd-cancel',
@@ -1603,12 +1840,21 @@ export const TelephonyModule: React.FC = () => {
                         href={`tel:${encodeURIComponent(item.code)}`}
                         className="flex-1 py-1.5 text-center text-[11px] font-semibold border border-emerald-700/60 bg-emerald-950/30 text-emerald-300 hover:bg-emerald-900/40"
                       >
-                        Dial Code
+                        Dial
                       </a>
+                      <button
+                        type="button"
+                        onClick={() => openGsmQrModal(item.label, item.code)}
+                        className="px-2 py-1.5 border border-neutral-700 bg-neutral-900 text-neutral-300 hover:text-neutral-100"
+                        title="Generate QR code for smartphone scan"
+                      >
+                        <QrCode className="w-3.5 h-3.5" />
+                      </button>
                       <button
                         type="button"
                         onClick={() => copyText(item.code, item.key)}
                         className="px-2 py-1.5 border border-neutral-700 bg-neutral-900 text-neutral-300 hover:text-neutral-100"
+                        title="Copy MMI code"
                       >
                         {copiedCode === item.key ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                       </button>
@@ -1616,19 +1862,64 @@ export const TelephonyModule: React.FC = () => {
                   </div>
                 ))}
               </div>
+
+              {gsmQrCode && (
+                <div className="p-4 border border-emerald-800/70 bg-emerald-950/20 flex flex-col sm:flex-row items-center gap-4">
+                  <img
+                    src={gsmQrCode.url}
+                    alt={`QR code for ${gsmQrCode.code}`}
+                    className="w-32 h-32 bg-white p-1.5 border border-neutral-700 shrink-0"
+                  />
+                  <div className="space-y-1.5 text-center sm:text-left flex-1">
+                    <div className="text-xs font-bold text-neutral-100">{gsmQrCode.label}</div>
+                    <div className="font-mono-strict text-xs text-emerald-400">{gsmQrCode.code}</div>
+                    <p className="text-[11px] text-neutral-400">
+                      Point your personal smartphone camera at this QR code and tap the Phone prompt to execute carrier forwarding immediately.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setGsmQrCode(null)}
+                      className="px-2.5 py-1 text-[11px] border border-neutral-700 bg-neutral-900 text-neutral-300 hover:text-white"
+                    >
+                      Close QR
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Right 5 cols: Live Scan-to-Call QR Launcher */}
+          {/* Right 5 cols: Live Scan-to-Call QR Launcher + WhatsApp/SMS + Directory Picker */}
           <div className="lg:col-span-5 border border-neutral-800 bg-neutral-950 p-5 space-y-4">
             <div className="border-b border-neutral-800 pb-3">
               <div className="text-xs font-bold text-neutral-100 uppercase flex items-center gap-2">
                 <QrCode className="w-4 h-4 text-amber-400" />
-                <span>Instant Mobile Scan-to-Call Launcher</span>
+                <span>Instant Personal Mobile Dispatch Console</span>
               </div>
               <p className="text-xs text-neutral-400 mt-1">
-                Enter any customer phone number to generate a camera-scannable QR code for your personal smartphone.
+                Pick a user from your company directory or enter any E.164 phone number to place a real mobile call, SMS, WhatsApp, or QR handoff.
               </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-mono-strict text-neutral-400 uppercase block">
+                Quick-Pick From {activeTenant.name} Directory
+              </label>
+              <select
+                value={mobileTestNumber}
+                onChange={e => setMobileTestNumber(e.target.value)}
+                className="w-full bg-neutral-900 border border-neutral-800 px-3 py-2 text-xs text-neutral-200 focus:outline-none focus:border-neutral-600"
+              >
+                <option value={mobileTestNumber}>Custom Number ({mobileTestNumber || 'Enter below'})</option>
+                {authAccounts
+                  .filter(a => a.phone && a.tenantId === activeTenant.id)
+                  .slice(0, 25)
+                  .map(acc => (
+                    <option key={acc.id} value={acc.phone}>
+                      {acc.name} — {acc.department} ({acc.phone})
+                    </option>
+                  ))}
+              </select>
             </div>
 
             <div className="space-y-1.5">
@@ -1665,14 +1956,14 @@ export const TelephonyModule: React.FC = () => {
                     <a
                       href={`tel:${cleanMobileTestNumber}`}
                       onClick={() => handleNativeMobileCall(cleanMobileTestNumber)}
-                      className="min-h-[40px] px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5"
+                      className="min-h-[42px] px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5"
                     >
                       <Phone className="w-3.5 h-3.5" />
                       <span>Call on Mobile</span>
                     </a>
                     <a
-                      href={`sms:${cleanMobileTestNumber}`}
-                      className="min-h-[40px] px-3 py-2 border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 font-semibold text-xs flex items-center justify-center gap-1.5"
+                      href={formatSmsHref(cleanMobileTestNumber)}
+                      className="min-h-[42px] px-3 py-2 border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 font-semibold text-xs flex items-center justify-center gap-1.5"
                     >
                       <MessageSquare className="w-3.5 h-3.5" />
                       <span>Send SMS</span>
@@ -1681,12 +1972,24 @@ export const TelephonyModule: React.FC = () => {
                 ) : null}
               </div>
 
+              {cleanMobileTestNumber && (
+                <a
+                  href={formatWhatsAppHref(cleanMobileTestNumber)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full min-h-[40px] px-3 py-2 border border-emerald-800/70 bg-emerald-950/30 hover:bg-emerald-900/40 text-emerald-300 font-semibold text-xs flex items-center justify-center gap-2"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Open WhatsApp Voice / Chat</span>
+                </a>
+              )}
+
               {canUseServerBridge && cleanMobileTestNumber && (
                 <button
                   type="button"
                   disabled={bridgingCall}
                   onClick={() => handleServerBridgeCall(cleanMobileTestNumber)}
-                  className="w-full min-h-[40px] px-3 py-2 border border-amber-700 bg-amber-950/30 hover:bg-amber-900/40 text-amber-300 font-semibold text-xs flex items-center justify-center gap-2"
+                  className="w-full min-h-[42px] px-3 py-2 border border-amber-700 bg-amber-950/30 hover:bg-amber-900/40 text-amber-300 font-semibold text-xs flex items-center justify-center gap-2"
                 >
                   <PhoneForwarded className="w-3.5 h-3.5" />
                   <span>{bridgingCall ? 'Bridging...' : 'Ring My Mobile & Bridge Customer'}</span>

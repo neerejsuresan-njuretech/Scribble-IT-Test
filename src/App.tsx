@@ -4,6 +4,7 @@ import { ITSMProvider, useITSM } from './context/ITSMContext';
 import { ServiceNowHeader } from './components/common/ServiceNowHeader';
 import { ServiceNowNavigator } from './components/common/ServiceNowNavigator';
 import { ToastViewport } from './components/common/ToastViewport';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { FreeITSMModuleId } from './types/itsm';
 import {
   Eye,
@@ -443,12 +444,14 @@ function MainApp() {
 
 export default function App() {
   return (
-    <ITSMProvider>
-      <HashRouter>
-        <MainApp />
-      </HashRouter>
-      <ToastViewport />
-    </ITSMProvider>
+    <ErrorBoundary>
+      <ITSMProvider>
+        <HashRouter>
+          <MainApp />
+        </HashRouter>
+        <ToastViewport />
+      </ITSMProvider>
+    </ErrorBoundary>
   );
 }
 

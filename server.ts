@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express, { type Request, type Response } from 'express';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import {
@@ -62,6 +63,27 @@ async function startServer() {
 
   app.get('/api/health', (_req: Request, res: Response) => {
     res.json({ ok: true, service: 'scribble-it-server', timestamp: new Date().toISOString() });
+  });
+
+  app.get('/api/system/database-info', (_req: Request, res: Response) => {
+    try {
+      const cfgPath = path.resolve(__dirname, 'firebase-applet-config.json');
+      const raw = fs.existsSync(cfgPath) ? JSON.parse(fs.readFileSync(cfgPath, 'utf-8')) : {};
+      res.json({
+        ok: true,
+        engine: 'Google Cloud Firestore (Enterprise)',
+        projectId: typeof raw.projectId === 'string' ? raw.projectId : null,
+        firestoreDatabaseId:
+          typeof raw.firestoreDatabaseId === 'string' ? raw.firestoreDatabaseId : '(default)',
+        authDomain: typeof raw.authDomain === 'string' ? raw.authDomain : null,
+        serverTime: new Date().toISOString(),
+      });
+    } catch (err) {
+      res.status(500).json({
+        ok: false,
+        error: err instanceof Error ? err.message : 'Unable to read database metadata.',
+      });
+    }
   });
 
   app.post('/api/wiki/grounding', async (req: Request, res: Response) => {

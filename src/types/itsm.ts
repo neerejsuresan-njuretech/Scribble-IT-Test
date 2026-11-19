@@ -66,6 +66,8 @@ export interface AuthAccount {
   email: string;
   password: string;
   department: string;
+  jobTitle?: string;
+  phone?: string;
   companyId?: string;
   tenantId?: string;
   policyIds?: string[];
@@ -141,6 +143,7 @@ export interface Tenant {
   };
   enabledModules: Record<FreeITSMModuleId, boolean>;
   preferenceTemplate: TenantPreferenceTemplate;
+  companyLogoDataUrl?: string;
   portalBranding?: TenantPortalBranding;
   createdAt: string;
 }

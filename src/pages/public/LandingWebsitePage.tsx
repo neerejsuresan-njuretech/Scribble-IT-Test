@@ -14,6 +14,8 @@ import {
   Workflow,
   PhoneCall,
   Layers,
+  Menu,
+  X,
 } from 'lucide-react';
 import { useITSM } from '../../context/ITSMContext';
 import heroOpsImg from '../../assets/images/hero_scribbleit_ops_1795074484892.jpg';
@@ -56,14 +58,14 @@ const FEATURES: FeatureItem[] = [
   {
     id: 'telephony-cti',
     category: 'telephony_iam',
-    categoryLabel: 'Voice & Carrier CTI',
-    title: 'Multi-Provider Softphone & Personal Mobile Telephony',
+    categoryLabel: 'Voice & Personal Mobile CTI',
+    title: 'Operational Personal Mobile & Multi-Provider Softphone',
     summary:
-      'Connect Amazon Connect CCP v2, Twilio Programmable Voice, SIP/WebRTC gateways, RingCentral, or Genesys Cloud — or turn any personal smartphone number into a tracked helpdesk line with zero hardware.',
+      'Turn any personal smartphone number into an operational helpdesk line immediately — or connect Amazon Connect CCP v2, Twilio Programmable Voice, SIP/WebRTC gateways, RingCentral, or Genesys Cloud.',
     highlights: [
-      'Native mobile dialer handoff (tel:/sms:) and scannable desktop-to-phone QR dialing',
-      'Server-side two-leg carrier bridge and 1-tap GSM shift call-forwarding codes',
-      'Live Web Audio DTMF dialpad, microphone input check, call notes, and 1-click ticket screen-pop',
+      'Direct personal mobile calling (tel:/sms:/WhatsApp) & desktop-to-phone scan-to-call QR handoff',
+      'Live Caller ID directory lookup, 1-tap GSM shift forwarding QR codes & two-leg Twilio bridge',
+      'Web Audio DTMF dialpad, incoming ringtone cadence, microphone test, call notes & 1-click incident screen-pop',
     ],
     span: 'standard',
     image: featureTelephonyImg,
@@ -76,25 +78,25 @@ const FEATURES: FeatureItem[] = [
     categoryLabel: 'Core ITIL & AI Triage',
     title: 'Incident, Problem, Change (CAB) & AI Triage Assistant',
     summary:
-      'Manage full ITIL service delivery with automated assignment-group and priority recommendations on intake, a live Triage Assistant sidebar matching Knowledge Base articles, and Google Search-grounded System Wiki updates.',
+      'Manage full ITIL service delivery across incidents, service requests, problems, CAB changes, and knowledge articles — paired with automated assignment-group recommendations on intake and a live AI Triage Assistant sidebar.',
     highlights: [
-      'AI-powered ticket routing on the New Incident form with one-click apply',
-      'Real-time Incident Triage sidebar summarizing impact, next steps, and relevant KB docs',
-      'CAB voting workflows, Change risk analysis, SLA tracking, and global audit logs',
+      'AI-powered ticket routing on the New Incident form with one-click priority and queue apply',
+      'Real-time Incident Triage sidebar matching SOPs and KB articles with actionable remediation steps',
+      'CAB voting workflows, Change risk analysis, SLA tracking, and centralized audit logs',
     ],
     span: 'standard',
   },
   {
     id: 'iam-multitenant',
     category: 'telephony_iam',
-    categoryLabel: 'Governance & Access',
-    title: 'Four Isolated Portals & Multi-Tenant Directory',
+    categoryLabel: 'Multi-Company Cloud & IAM',
+    title: 'Centralized Cloud Sync, Multi-Company Branding & IAM Governance',
     summary:
-      'Operate separate workspaces for Super Administrators, Operations Employees, IAM Operators, and End-User Self-Service requesters with strict per-tenant isolation and granular module controls.',
+      'Operate isolated company profiles with custom uploaded logos across Super Admin, Employee Ops, IAM Governance, and End-User Self-Service portals — synchronized live across desktop, tablet, and mobile via Google Cloud Firestore.',
     highlights: [
-      'Per-tenant module enable/disable matrix and custom portal branding per company',
-      'Dedicated IAM portal for identities, Company IDs, MFA policies, and RBAC permission scopes',
-      'Managed-device SSO simulation alongside credential login and instant evaluation test accounts',
+      'Per-company logo upload & optimization synced to Cloud Firestore across every portal and device',
+      'Granular IAM directory profiles, RBAC & MFA access policies, and Company ID bindings',
+      'Instant per-tenant module enable/disable matrix, custom SLAs, and cross-device workspace continuity',
     ],
     span: 'wide',
   },
@@ -102,13 +104,13 @@ const FEATURES: FeatureItem[] = [
     id: 'cmdb-operations',
     category: 'workflows_cmdb',
     categoryLabel: 'Infrastructure & Operations',
-    title: 'CMDB Network Map, Asset Lifecycle & Operations Suite',
+    title: 'CMDB Dependency Map, Asset Lifecycle & Operations Suite',
     summary:
-      'Track hardware assets, software licenses, vendor contracts, SSL/domain expirations, morning infrastructure checks, major incident War Rooms, Kanban tasks, LMS training, and client invoicing under one roof.',
+      'Track hardware CIs, software licenses, vendor contracts, SSL/domain expirations, morning infrastructure checks, major incident War Rooms, Kanban tasks, LMS training, and client invoicing in one unified suite.',
     highlights: [
-      'Interactive CMDB dependency mapping linked directly to incidents and assets',
+      'Interactive CMDB dependency mapping linked directly to incidents, hardware assets, and software seats',
       'Major incident War Room bridge feeds, checklists, and live Service Status publishing',
-      'Self-service catalog, custom form builder, Google Workspace connectors, and CSV/audit reporting',
+      'Self-service catalog, custom form builder, Google Workspace connectors, and full JSON/CSV backup',
     ],
     span: 'wide',
   },
@@ -123,81 +125,81 @@ const UNIQUENESS_ITEMS = [
   },
   {
     index: '02.',
-    title: 'Personal Mobile Number as a Helpdesk Endpoint',
+    title: 'Personal Mobile Number as an Operational Helpdesk Line',
     detail:
-      'Small IT teams and on-call engineers do not need a PBX contract to log calls. Scribble IT bridges personal smartphones via desktop QR scan-to-call, native carrier links, GSM shift-forwarding codes, or server-side two-leg calling while still supporting full Amazon Connect CCP embeds.',
+      'Small IT teams and on-call engineers do not need a PBX contract to run live support. Scribble IT turns any personal smartphone into a tracked telephony system via native carrier calling, WhatsApp/SMS dispatch, desktop scan-to-call QR, scannable GSM shift-forwarding codes, and server-side two-leg carrier bridging — alongside full Amazon Connect CCP embeds.',
   },
   {
     index: '03.',
-    title: 'True Multi-Portal Separation Out of the Box',
+    title: 'Multi-Company Logo Branding & Cross-Device Cloud Persistence',
     detail:
-      'Super Admins, Service Desk Engineers, IAM Operators, and End-User Requesters each receive tailored navigation, permissions, and portal branding rather than sharing one overloaded interface.',
+      'Every company profile stores its own optimized brand logo, portal titles, SLAs, tickets, and telephony configuration inside Google Cloud Firestore so admins can switch companies and manage operations seamlessly from desktop, tablet, or phone.',
   },
   {
     index: '04.',
-    title: 'AI Embedded Inside Operational Forms, Not Bolted On',
+    title: 'Role-Isolated Portals Under One Architecture',
     detail:
-      'AI routing runs inside the New Incident intake form, the Triage Assistant updates alongside each selected ticket, and System Wiki documentation stays current with live Google Search grounding and source citations.',
+      'Super Admin, Service Desk Operations, IAM Governance, and End-User Self-Service portals share a single synchronized data backbone while keeping permissions, branding, and module visibility cleanly separated per company.',
   },
   {
     index: '05.',
-    title: 'Dual-Theme Dot-Matrix Engineering Interface',
+    title: 'AI Embedded Inside Operational Forms & Dual-Theme Ergonomics',
     detail:
-      'Purpose-built dark dot-matrix mode reduces eye strain during extended operations shifts, while inverted corporate light mode keeps executive reviews crisp across desktop, tablet, and phone screens.',
+      'AI routing runs inside the New Incident intake form, the Triage Assistant updates beside every ticket, and System Wiki stays grounded via Google Search — all wrapped in dark dot-matrix and corporate light modes engineered for phones, tablets, and widescreens.',
   },
 ];
 
 const PLUS_POINTS = [
   {
-    title: '31 Modules Unified in One Suite',
-    detail: 'Replaces separate ticketing, CMDB, wiki, process mapping, status page, LMS, and CTI tools with a single consistent interface.',
+    title: 'Centralized Cloud Firestore Database & Cross-Device Sync',
+    detail: 'Incidents, requests, company profiles, custom logos, IAM policies, and telephony settings persist in Google Cloud Firestore and sync live across desktop, tablet, and smartphone sessions.',
   },
   {
-    title: 'Zero-Friction Trial & Instant Multi-Role Demo',
-    detail: 'Evaluate Super Admin, Employee Operations, IAM, and End-User workflows immediately in the browser with no installation or procurement wait.',
+    title: 'Multi-Company Branding & Per-Tenant Governance',
+    detail: 'Run multiple isolated organizations from one workspace with custom uploaded corporate logos, per-portal titles, tailored SLAs, and granular module toggles.',
   },
   {
-    title: 'Flexible Telephony From Startup to Enterprise',
-    detail: 'Start with any personal mobile number via QR or native dialer, then scale to Amazon Connect CCP v2, Twilio Voice, or SIP/WebRTC without switching platforms.',
+    title: 'Operational Personal Mobile + Enterprise Carrier Telephony',
+    detail: 'Start immediately using any personal mobile number with QR handoff, GSM shift forwarding, directory Caller ID lookup, and WhatsApp/SMS — then scale to Amazon Connect or Twilio.',
   },
   {
-    title: 'Pre-Close Visual Governance',
-    detail: 'Guarantees approvals, notifications, and checks are modeled cleanly before an incident or service request can close.',
+    title: '31 Modules Unified with Visual Pre-Close Workflows',
+    detail: 'Replaces fragmented ticketing, CMDB, wiki, process mapper, status page, LMS, and CTI tools with one cohesive interface anchored by Figma-style pre-close gates.',
   },
   {
     title: 'Practical AI & Search-Grounded Documentation',
     detail: 'Accelerates intake categorization, ticket triage, CAB assessments, KB drafting, and external IT documentation research via server-side Gemini routes.',
   },
   {
-    title: 'Multi-Device Ergonomics & Dual Themes',
-    detail: 'Responsive layouts, mobile bottom navigation, touch-sized controls, and crisp light/dark themes work cleanly from 1440px monitors to phones.',
+    title: 'Responsive Across Every Device & Theme',
+    detail: 'Adaptive layouts, paginated high-volume tables, mobile bottom navigation, 44px touch targets, and dark/light themes perform cleanly from 360px smartphones to 1440px+ monitors.',
   },
 ];
 
 const MINUS_POINTS = [
   {
-    title: 'Browser-Local Persistence by Default',
-    detail: 'Workspace records persist in browser localStorage out of the box—fast for demos and single-browser evaluation, but multi-agent production teams will need a centralized database backend (PostgreSQL or Firestore).',
+    title: 'Google Sign-In Required for Cloud Cross-Device Sync',
+    detail: 'Unauthenticated sessions save cleanly to local browser storage for offline speed, while real-time multi-device Cloud Firestore sync activates once you sign in with Google.',
   },
   {
-    title: 'Client-Side Evaluation Authentication',
-    detail: 'Built-in portal logins and one-click Test Login buttons streamline evaluation; enterprise production deployments should integrate an external IdP (Okta, Microsoft Entra ID, SAML 2.0, or OIDC).',
+    title: 'Evaluation Portals vs. Production SAML/OIDC IdP',
+    detail: 'Built-in portal logins and one-click Test Accounts streamline evaluation; enterprise production deployments should connect a dedicated corporate IdP (Okta, Microsoft Entra ID, SAML 2.0).',
   },
   {
-    title: 'External Prerequisites for Cloud Telephony',
+    title: 'External Prerequisites for Cloud Carrier Bridges',
     detail: 'Embedding Amazon Connect requires whitelisting your origin in AWS Approved Origins, and server-side Twilio two-leg bridging requires carrier credentials configured in environment secrets.',
   },
   {
-    title: 'No Native Browser Recording for Carrier Mobile Calls',
-    detail: 'Using a personal mobile number via native tel: or QR handoff uses your cellular network directly, so audio recording and live speech transcription are not captured by the browser unless routed through a cloud carrier.',
+    title: 'Cellular Carrier Audio Not Recorded in Browser',
+    detail: 'Using a personal mobile number via native tel:, WhatsApp, or QR handoff uses your mobile network directly, so server-side audio recording requires routing through Twilio or Amazon Connect.',
   },
   {
     title: 'Server API Key Required for AI Capabilities',
     detail: 'AI incident routing, the Triage Assistant sidebar, CAB review, and Google Search wiki grounding rely on a server-configured Gemini API key.',
   },
   {
-    title: 'Broad 31-Module Surface Requires Curation',
-    detail: 'Smaller teams may find all 31 modules more than needed on day one and should disable unused modules per tenant inside System Module Controls.',
+    title: 'Broad 31-Module Surface Benefits from Curation',
+    detail: 'Smaller teams may not need all 31 modules on day one and should toggle unused modules per company inside Tenant Governance Controls.',
   },
 ];
 
@@ -241,6 +243,7 @@ export const LandingWebsitePage: React.FC = () => {
   const { loginAsTestAccount, theme, toggleTheme } = useITSM();
   const [featureFilter, setFeatureFilter] = useState<FeatureCategory>('all');
   const [brokenImages, setBrokenImages] = useState<Record<string, boolean>>({});
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const visibleFeatures = useMemo(() => {
     if (featureFilter === 'all') return FEATURES;
@@ -248,6 +251,7 @@ export const LandingWebsitePage: React.FC = () => {
   }, [featureFilter]);
 
   const scrollToSection = (sectionId: string) => {
+    setMobileMenuOpen(false);
     const target = document.getElementById(sectionId);
     if (target) {
       target.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -318,8 +322,8 @@ export const LandingWebsitePage: React.FC = () => {
             </Link>
           </nav>
 
-          {/* Zone 3: Single Primary Action */}
-          <div className="flex items-center shrink-0">
+          {/* Zone 3: Single Primary Action + Mobile Menu Trigger (< md only) */}
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={() => handleLaunchDemo('super_admin', '/watchtower')}
@@ -328,8 +332,47 @@ export const LandingWebsitePage: React.FC = () => {
               <Play className="w-3.5 h-3.5 fill-current" />
               <span>Launch Demo</span>
             </button>
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(prev => !prev)}
+              aria-label={mobileMenuOpen ? 'Close menu' : 'Open navigation menu'}
+              aria-expanded={mobileMenuOpen}
+              className="md:hidden min-h-[40px] min-w-[40px] border border-neutral-800 bg-neutral-900 text-neutral-200 flex items-center justify-center"
+            >
+              {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+            </button>
           </div>
         </div>
+
+        {/* Mobile Responsive Navigation Panel (< md) */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-b border-neutral-800 bg-neutral-950 px-4 py-3 space-y-1">
+            {[
+              { id: 'overview', label: 'Overview' },
+              { id: 'features', label: 'Platform Features' },
+              { id: 'uniqueness', label: 'What Makes It Unique' },
+              { id: 'tradeoffs', label: 'Plus & Minus Points' },
+              { id: 'portals', label: 'Interactive Demo Roles' },
+            ].map(item => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => scrollToSection(item.id)}
+                className="w-full text-left px-3 py-2.5 min-h-[44px] text-sm font-medium text-neutral-200 hover:bg-neutral-900 rounded-sm block"
+              >
+                {item.label}
+              </button>
+            ))}
+            <Link
+              to="/login"
+              onClick={() => setMobileMenuOpen(false)}
+              className="w-full text-left px-3 py-2.5 min-h-[44px] text-sm font-semibold text-rose-400 hover:bg-neutral-900 rounded-sm flex items-center justify-between"
+            >
+              <span>Sign In to Portals</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        )}
       </header>
 
       <main className="flex-1">
@@ -449,13 +492,29 @@ export const LandingWebsitePage: React.FC = () => {
               )}
             </div>
 
-            {/* Full-Width 4-Column Factual Specification Strip */}
+            {/* Full-Width Platform Architecture Specification Strip */}
             <div className="grid grid-cols-2 lg:grid-cols-4 border border-neutral-800 bg-neutral-950 divide-y lg:divide-y-0 lg:divide-x divide-neutral-800 rounded-lg overflow-hidden">
               {[
-                { metric: '31', label: 'Integrated Modules', detail: 'ITIL, CMDB, Wiki, War Room, LMS & Billing' },
-                { metric: '4', label: 'Isolated Access Portals', detail: 'Super Admin, Employee, IAM & Self-Service' },
-                { metric: '7', label: 'Telephony Connectors', detail: 'Amazon Connect, Twilio, SIP & Personal Mobile' },
-                { metric: '100%', label: 'Tenant-Scoped Controls', detail: 'Per-company modules, SLAs & portal branding' },
+                {
+                  metric: '31',
+                  label: 'Integrated ITSM Modules',
+                  detail: 'Incidents, Requests, Change CAB, CMDB, Knowledge & Billing',
+                },
+                {
+                  metric: '4',
+                  label: 'Role-Isolated Portals',
+                  detail: 'Super Admin, Service Desk, IAM Governance & End-User',
+                },
+                {
+                  metric: '7+',
+                  label: 'Telephony Integrations',
+                  detail: 'Personal Mobile, Amazon Connect, Twilio, SIP & WebRTC',
+                },
+                {
+                  metric: 'Cloud',
+                  label: 'Cross-Device Sync',
+                  detail: 'Google Cloud Firestore persistence across desktop & mobile',
+                },
               ].map(item => (
                 <div key={item.label} className="p-5 sm:p-6 space-y-1.5">
                   <div className="text-2xl sm:text-3xl font-bold font-mono-strict tabular-nums text-neutral-100">
@@ -711,9 +770,8 @@ export const LandingWebsitePage: React.FC = () => {
                     04. Launch the live Scribble IT demo
                   </h2>
                   <p className="text-sm sm:text-[15px] text-neutral-400 leading-relaxed">
-                    Jump directly into the live workspace with pre-seeded incidents, process wireframes, assets, and
-                    telephony connectors — or proceed to the multi-portal login screen to test credential and SSO
-                    authentication.
+                    Jump directly into the interactive workspace across any role portal — or proceed to the multi-portal
+                    login screen to sign in with credentials or Google Cloud sync.
                   </p>
                 </div>
 

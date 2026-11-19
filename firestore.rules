@@ -2,53 +2,419 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Pillar 0: Global Default-Deny Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ==========================================
+    // GLOBAL HARDENED PRIMITIVES
+    // ==========================================
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Incidents collection
-    match /incidents/{incidentId} {
-      allow read: if true; // Public read for service desk visibility
-      allow write: if isSignedIn() || request.auth == null; // Permissive for preview/applet operations with fallbacks
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
     }
 
-    // Service Requests
-    match /service_requests/{requestId} {
-      allow read: if true;
-      allow write: if isSignedIn() || request.auth == null;
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
-    // Problems
-    match /problems/{problemId} {
-      allow read: if true;
-      allow write: if isSignedIn() || request.auth == null;
+    function incoming() {
+      return request.resource.data;
     }
 
-    // Changes
-    match /changes/{changeId} {
-      allow read: if true;
-      allow write: if isSignedIn() || request.auth == null;
+    function existing() {
+      return resource.data;
     }
 
-    // CMDB Assets
-    match /assets/{assetId} {
-      allow read: if true;
-      allow write: if isSignedIn() || request.auth == null;
+    function isAdmin() {
+      return isVerifiedUser() && (
+        request.auth.token.email == 'neerej.suresan.s@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
     }
 
-    // Inventory
-    match /inventory/{itemId} {
-      allow read: if true;
-      allow write: if isSignedIn() || request.auth == null;
+    function isWorkspaceOwner(ownerUid) {
+      return isVerifiedUser() && request.auth.uid == ownerUid;
     }
 
-    // Workspace sync & user profiles
-    match /users/{userId} {
-      allow read, write: if isSignedIn();
+    function hasWorkspaceMasterGate(ownerUid) {
+      return exists(/databases/$(database)/documents/workspaces/$(ownerUid)) &&
+        get(/databases/$(database)/documents/workspaces/$(ownerUid)).data.ownerUid == request.auth.uid;
     }
 
-    match /{document=**} {
-      allow read, write: if isSignedIn();
+    function isOptionalString(data, key, maxLen) {
+      return !(key in data) || (data[key] is string && data[key].size() <= maxLen);
+    }
+
+    function isOptionalMap(data, key) {
+      return !(key in data) || data[key] is map;
+    }
+
+    function isBoundedList(data, key, maxLen) {
+      return data[key] is list && data[key].size() <= maxLen && (
+        data[key].size() == 0 || data[key][0] is map || data[key][0] is string
+      );
+    }
+
+    // ==========================================
+    // ENTITY VALIDATION BLUEPRINTS
+    // ==========================================
+    function isValidWorkspaceRoot(data, ownerUid) {
+      return data.keys().hasAll(['ownerUid', 'ownerEmail', 'activeTenantId', 'theme', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['ownerUid', 'ownerEmail', 'activeTenantId', 'theme', 'createdAt', 'updatedAt']) &&
+        isValidId(data.ownerUid) &&
+        data.ownerUid == ownerUid &&
+        data.ownerEmail is string && data.ownerEmail.size() >= 3 && data.ownerEmail.size() <= 160 &&
+        data.activeTenantId is string && data.activeTenantId.size() >= 1 && data.activeTenantId.size() <= 128 &&
+        data.theme in ['dark', 'light'] &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidTenantProfile(data, ownerUid, tenantId) {
+      return data.keys().hasAll([
+          'id', 'ownerUid', 'name', 'slug', 'domain', 'plan', 'region', 'timezone',
+          'currency', 'primaryContactEmail', 'status', 'slaTargets', 'enabledModules',
+          'preferenceTemplate', 'portalBranding', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'ownerUid', 'name', 'slug', 'companyCode', 'domain', 'plan', 'region', 'timezone',
+          'currency', 'primaryContactEmail', 'status', 'companyLogoDataUrl', 'slaTargets',
+          'enabledModules', 'preferenceTemplate', 'portalBranding', 'clientCreatedAt',
+          'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.id) &&
+        data.id == tenantId &&
+        isValidId(data.ownerUid) &&
+        data.ownerUid == ownerUid &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 160 &&
+        data.slug is string && data.slug.size() >= 1 && data.slug.size() <= 96 &&
+        isOptionalString(data, 'companyCode', 48) &&
+        data.domain is string && data.domain.size() >= 1 && data.domain.size() <= 160 &&
+        data.plan in ['Enterprise', 'Managed MSP', 'Dedicated'] &&
+        data.region is string && data.region.size() >= 1 && data.region.size() <= 64 &&
+        data.timezone is string && data.timezone.size() >= 1 && data.timezone.size() <= 64 &&
+        data.currency in ['USD', 'GBP', 'EUR'] &&
+        data.primaryContactEmail is string && data.primaryContactEmail.size() >= 3 && data.primaryContactEmail.size() <= 160 &&
+        data.status in ['active', 'suspended'] &&
+        isOptionalString(data, 'companyLogoDataUrl', 260000) &&
+        data.slaTargets is map &&
+        data.enabledModules is map &&
+        data.preferenceTemplate is map &&
+        data.portalBranding is map &&
+        isOptionalString(data, 'clientCreatedAt', 64) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidIncident(data, ownerUid, incidentId) {
+      return data.keys().hasAll([
+          'id', 'ownerUid', 'tenantId', 'title', 'description', 'status', 'priority',
+          'urgency', 'impact', 'category', 'requesterName', 'requesterEmail', 'assignee',
+          'slaDeadline', 'slaBreached', 'activityLog', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'ownerUid', 'tenantId', 'title', 'description', 'status', 'priority',
+          'urgency', 'impact', 'category', 'requesterName', 'requesterEmail', 'assignee',
+          'assignmentGroup', 'affectedCI', 'slaDeadline', 'slaBreached', 'sourceChannel',
+          'resolutionNotes', 'activityLog', 'clientCreatedAt', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.id) &&
+        data.id == incidentId &&
+        isValidId(data.ownerUid) &&
+        data.ownerUid == ownerUid &&
+        isValidId(data.tenantId) &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 256 &&
+        data.description is string && data.description.size() <= 8192 &&
+        data.status in ['new', 'assigned', 'in_progress', 'pending', 'resolved', 'closed'] &&
+        data.priority in ['P1', 'P2', 'P3', 'P4'] &&
+        data.urgency in ['high', 'medium', 'low'] &&
+        data.impact in ['high', 'medium', 'low'] &&
+        data.category in ['hardware', 'software', 'network', 'security', 'access', 'telephony'] &&
+        data.requesterName is string && data.requesterName.size() <= 128 &&
+        data.requesterEmail is string && data.requesterEmail.size() <= 160 &&
+        data.assignee is string && data.assignee.size() <= 128 &&
+        isOptionalString(data, 'assignmentGroup', 128) &&
+        isOptionalString(data, 'affectedCI', 128) &&
+        data.slaDeadline is string && data.slaDeadline.size() <= 64 &&
+        data.slaBreached is bool &&
+        (!('sourceChannel' in data) || data.sourceChannel in ['portal', 'email', 'phone', 'monitor']) &&
+        isOptionalString(data, 'resolutionNotes', 4096) &&
+        isBoundedList(data, 'activityLog', 100) &&
+        isOptionalString(data, 'clientCreatedAt', 64) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidServiceRequest(data, ownerUid, requestId) {
+      return data.keys().hasAll([
+          'id', 'ownerUid', 'tenantId', 'catalogItemId', 'catalogItemName', 'description',
+          'requesterName', 'requesterEmail', 'department', 'cost', 'status', 'currentStage',
+          'approvals', 'deliveryEstimateDays', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'ownerUid', 'tenantId', 'catalogItemId', 'catalogItemName', 'description',
+          'requesterName', 'requesterEmail', 'department', 'cost', 'status', 'currentStage',
+          'approvals', 'deliveryEstimateDays', 'deliveryDate', 'customFormValues',
+          'clientCreatedAt', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.id) &&
+        data.id == requestId &&
+        isValidId(data.ownerUid) &&
+        data.ownerUid == ownerUid &&
+        isValidId(data.tenantId) &&
+        data.catalogItemId is string && data.catalogItemId.size() <= 64 &&
+        data.catalogItemName is string && data.catalogItemName.size() >= 1 && data.catalogItemName.size() <= 256 &&
+        data.description is string && data.description.size() <= 4096 &&
+        data.requesterName is string && data.requesterName.size() <= 128 &&
+        data.requesterEmail is string && data.requesterEmail.size() <= 160 &&
+        data.department is string && data.department.size() <= 128 &&
+        data.cost is number && data.cost >= 0 &&
+        data.status in ['submitted', 'manager_approved', 'security_review', 'fulfillment', 'completed', 'rejected'] &&
+        data.currentStage is number && data.currentStage >= 1 && data.currentStage <= 4 &&
+        isBoundedList(data, 'approvals', 12) &&
+        data.deliveryEstimateDays is number && data.deliveryEstimateDays >= 0 &&
+        isOptionalString(data, 'deliveryDate', 64) &&
+        isOptionalMap(data, 'customFormValues') &&
+        isOptionalString(data, 'clientCreatedAt', 64) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidModuleBucket(data, ownerUid, bucketId) {
+      return data.keys().hasAll(['id', 'ownerUid', 'moduleKey', 'itemCount', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'ownerUid', 'moduleKey', 'items', 'settingsMap', 'itemCount', 'createdAt', 'updatedAt']) &&
+        isValidId(data.id) &&
+        data.id == bucketId &&
+        isValidId(data.ownerUid) &&
+        data.ownerUid == ownerUid &&
+        data.moduleKey is string && data.moduleKey.size() >= 1 && data.moduleKey.size() <= 64 &&
+        (!('items' in data) || isBoundedList(data, 'items', 500)) &&
+        isOptionalMap(data, 'settingsMap') &&
+        data.itemCount is number && data.itemCount >= 0 && data.itemCount <= 500 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    // ==========================================
+    // ADMINS REGISTRY (READ-ONLY TO CLIENTS)
+    // ==========================================
+    match /admins/{adminUid} {
+      allow get: if isVerifiedUser() && isValidId(adminUid) && request.auth.uid == adminUid;
+      allow list, write: if false;
+    }
+
+    // ==========================================
+    // WORKSPACES ROOT & SUBCOLLECTIONS
+    // ==========================================
+    match /workspaces/{ownerUid} {
+      allow get: if isVerifiedUser() && isValidId(ownerUid) && (isWorkspaceOwner(ownerUid) || isAdmin());
+      allow list: if isVerifiedUser() && (resource.data.ownerUid == request.auth.uid || isAdmin());
+
+      allow create: if isVerifiedUser() &&
+        isValidId(ownerUid) &&
+        isValidWorkspaceRoot(incoming(), ownerUid) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        (isWorkspaceOwner(ownerUid) || isAdmin());
+
+      allow update: if isVerifiedUser() &&
+        isValidId(ownerUid) &&
+        isValidWorkspaceRoot(incoming(), ownerUid) &&
+        incoming().ownerUid == existing().ownerUid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          isAdmin() ||
+          (
+            isWorkspaceOwner(ownerUid) &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['activeTenantId', 'theme', 'ownerEmail', 'updatedAt'])
+          )
+        );
+
+      allow delete: if isVerifiedUser() && isValidId(ownerUid) && isAdmin();
+
+      // Multi-Company Profiles, Logos & Portal Branding
+      match /tenants/{tenantId} {
+        allow get: if isVerifiedUser() && isValidId(ownerUid) && isValidId(tenantId) && (
+          isAdmin() || (isWorkspaceOwner(ownerUid) && hasWorkspaceMasterGate(ownerUid))
+        );
+        allow list: if isVerifiedUser() && (resource.data.ownerUid == request.auth.uid || isAdmin());
+
+        allow create: if isVerifiedUser() &&
+          isValidId(ownerUid) &&
+          isValidId(tenantId) &&
+          isValidTenantProfile(incoming(), ownerUid, tenantId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          (
+            isAdmin() ||
+            (isWorkspaceOwner(ownerUid) && hasWorkspaceMasterGate(ownerUid))
+          );
+
+        allow update: if isVerifiedUser() &&
+          isValidId(ownerUid) &&
+          isValidId(tenantId) &&
+          isValidTenantProfile(incoming(), ownerUid, tenantId) &&
+          incoming().ownerUid == existing().ownerUid &&
+          incoming().id == existing().id &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          (
+            isAdmin() ||
+            (
+              isWorkspaceOwner(ownerUid) &&
+              hasWorkspaceMasterGate(ownerUid) &&
+              incoming().diff(existing()).affectedKeys().hasOnly([
+                'name', 'slug', 'companyCode', 'domain', 'plan', 'region', 'timezone',
+                'currency', 'primaryContactEmail', 'status', 'companyLogoDataUrl',
+                'slaTargets', 'enabledModules', 'preferenceTemplate', 'portalBranding', 'updatedAt'
+              ])
+            )
+          );
+
+        allow delete: if isVerifiedUser() && isValidId(ownerUid) && isValidId(tenantId) && (
+          isAdmin() || (isWorkspaceOwner(ownerUid) && hasWorkspaceMasterGate(ownerUid))
+        );
+      }
+
+      // ITIL Incidents
+      match /incidents/{incidentId} {
+        allow get: if isVerifiedUser() && isValidId(ownerUid) && isValidId(incidentId) && (
+          isAdmin() || (isWorkspaceOwner(ownerUid) && hasWorkspaceMasterGate(ownerUid))
+        );
+        allow list: if isVerifiedUser() && (resource.data.ownerUid == request.auth.uid || isAdmin());
+
+        allow create: if isVerifiedUser() &&
+          isValidId(ownerUid) &&
+          isValidId(incidentId) &&
+          isValidIncident(incoming(), ownerUid, incidentId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          (
+            isAdmin() ||
+            (isWorkspaceOwner(ownerUid) && hasWorkspaceMasterGate(ownerUid))
+          );
+
+        allow update: if isVerifiedUser() &&
+          isValidId(ownerUid) &&
+          isValidId(incidentId) &&
+          isValidIncident(incoming(), ownerUid, incidentId) &&
+          incoming().ownerUid == existing().ownerUid &&
+          incoming().id == existing().id &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          (
+            isAdmin() ||
+            (
+              isWorkspaceOwner(ownerUid) &&
+              hasWorkspaceMasterGate(ownerUid) &&
+              existing().status != 'closed' &&
+              incoming().diff(existing()).affectedKeys().hasOnly([
+                'tenantId', 'title', 'description', 'status', 'priority', 'urgency', 'impact',
+                'category', 'requesterName', 'requesterEmail', 'assignee', 'assignmentGroup',
+                'affectedCI', 'slaDeadline', 'slaBreached', 'sourceChannel', 'resolutionNotes',
+                'activityLog', 'updatedAt'
+              ])
+            )
+          );
+
+        allow delete: if isVerifiedUser() && isValidId(ownerUid) && isValidId(incidentId) && (
+          isAdmin() || (isWorkspaceOwner(ownerUid) && hasWorkspaceMasterGate(ownerUid))
+        );
+      }
+
+      // ITIL Service Requests
+      match /service_requests/{requestId} {
+        allow get: if isVerifiedUser() && isValidId(ownerUid) && isValidId(requestId) && (
+          isAdmin() || (isWorkspaceOwner(ownerUid) && hasWorkspaceMasterGate(ownerUid))
+        );
+        allow list: if isVerifiedUser() && (resource.data.ownerUid == request.auth.uid || isAdmin());
+
+        allow create: if isVerifiedUser() &&
+          isValidId(ownerUid) &&
+          isValidId(requestId) &&
+          isValidServiceRequest(incoming(), ownerUid, requestId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          (
+            isAdmin() ||
+            (isWorkspaceOwner(ownerUid) && hasWorkspaceMasterGate(ownerUid))
+          );
+
+        allow update: if isVerifiedUser() &&
+          isValidId(ownerUid) &&
+          isValidId(requestId) &&
+          isValidServiceRequest(incoming(), ownerUid, requestId) &&
+          incoming().ownerUid == existing().ownerUid &&
+          incoming().id == existing().id &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          (
+            isAdmin() ||
+            (
+              isWorkspaceOwner(ownerUid) &&
+              hasWorkspaceMasterGate(ownerUid) &&
+              existing().status != 'completed' &&
+              existing().status != 'rejected' &&
+              incoming().diff(existing()).affectedKeys().hasOnly([
+                'tenantId', 'catalogItemId', 'catalogItemName', 'description', 'requesterName',
+                'requesterEmail', 'department', 'cost', 'status', 'currentStage', 'approvals',
+                'deliveryEstimateDays', 'deliveryDate', 'customFormValues', 'updatedAt'
+              ])
+            )
+          );
+
+        allow delete: if isVerifiedUser() && isValidId(ownerUid) && isValidId(requestId) && (
+          isAdmin() || (isWorkspaceOwner(ownerUid) && hasWorkspaceMasterGate(ownerUid))
+        );
+      }
+
+      // Synchronized Module State Buckets (Workflows, Process Maps, Telephony, CMDB, IAM, Settings)
+      match /module_state/{bucketId} {
+        allow get: if isVerifiedUser() && isValidId(ownerUid) && isValidId(bucketId) && (
+          isAdmin() || (isWorkspaceOwner(ownerUid) && hasWorkspaceMasterGate(ownerUid))
+        );
+        allow list: if isVerifiedUser() && (resource.data.ownerUid == request.auth.uid || isAdmin());
+
+        allow create: if isVerifiedUser() &&
+          isValidId(ownerUid) &&
+          isValidId(bucketId) &&
+          isValidModuleBucket(incoming(), ownerUid, bucketId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          (
+            isAdmin() ||
+            (isWorkspaceOwner(ownerUid) && hasWorkspaceMasterGate(ownerUid))
+          );
+
+        allow update: if isVerifiedUser() &&
+          isValidId(ownerUid) &&
+          isValidId(bucketId) &&
+          isValidModuleBucket(incoming(), ownerUid, bucketId) &&
+          incoming().ownerUid == existing().ownerUid &&
+          incoming().id == existing().id &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          (
+            isAdmin() ||
+            (
+              isWorkspaceOwner(ownerUid) &&
+              hasWorkspaceMasterGate(ownerUid) &&
+              incoming().diff(existing()).affectedKeys().hasOnly([
+                'moduleKey', 'items', 'settingsMap', 'itemCount', 'updatedAt'
+              ])
+            )
+          );
+
+        allow delete: if isVerifiedUser() && isValidId(ownerUid) && isValidId(bucketId) && (
+          isAdmin() || (isWorkspaceOwner(ownerUid) && hasWorkspaceMasterGate(ownerUid))
+        );
+      }
     }
   }
 }

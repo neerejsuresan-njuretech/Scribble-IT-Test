@@ -18,10 +18,27 @@ import {
   createAllEnabledModules,
   getDefaultTenantBranding
 } from '../data/freeitsmSeedData';
+import {
+  generateEnterpriseSeedBundle,
+  DEFAULT_TEST_ENV_ACCOUNTS,
+  CORE_IAM_POLICIES,
+} from '../data/enterpriseSeedGenerator';
 import { getModuleLabel } from '../data/workflowCatalog';
-import { auth, db, googleSignIn, logout as firebaseLogout, initAuth } from '../lib/firebase';
-import { setDoc, doc } from 'firebase/firestore';
+import { googleSignIn, logout as firebaseLogout, initAuth } from '../lib/firebase';
+import {
+  ensureWorkspaceRoot,
+  upsertTenantInCloud,
+  upsertIncidentInCloud,
+  upsertRequestInCloud,
+  upsertModuleBucketInCloud,
+  pushFullWorkspaceSnapshotToCloud,
+  subscribeWorkspace,
+  clearKnownCloudDocPaths,
+  type CloudWorkspaceSnapshot,
+} from '../services/firestoreSync';
 import { User } from 'firebase/auth';
+
+export type CloudSyncStatus = 'disconnected' | 'connecting' | 'synced' | 'syncing' | 'error';
 
 interface ITSMContextType {
   // Multi-Tenant Architecture
@@ -34,6 +51,7 @@ interface ITSMContextType {
   toggleTenantModule: (tenantId: string, moduleId: FreeITSMModuleId) => void;
   isModuleEnabled: (moduleId: FreeITSMModuleId) => boolean;
   updateTenantPortalBranding: (tenantId: string, portalKey: CustomPortalKey, updates: Partial<PortalBrandConfig>) => void;
+  applyCompanyLogoToAllPortals: (tenantId: string, logoDataUrl: string) => void;
   getPortalBranding: (portalKey: CustomPortalKey) => PortalBrandConfig;
 
   role: Role;
@@ -76,12 +94,17 @@ interface ITSMContextType {
   deleteIamPolicy: (id: string) => void;
   hasPermission: (scope: IamPermissionScope) => boolean;
 
-  // Google Auth & Workspace
+  // Google Auth, Workspace & Centralized Firestore Cloud Sync
   googleUser: User | null;
   googleToken: string | null;
-  loginWithGoogle: () => Promise<void>;
+  loginWithGoogle: () => Promise<boolean>;
+  loginWithGooglePortal: () => Promise<boolean>;
   logoutGoogle: () => Promise<void>;
   isFirebaseConnected: boolean;
+  cloudSyncStatus: CloudSyncStatus;
+  lastCloudSyncAt: string | null;
+  cloudSyncError: string | null;
+  forceCloudSync: () => Promise<void>;
 
   // Tenant-Isolated Collections
   incidents: Incident[];
@@ -218,13 +241,31 @@ interface ITSMContextType {
   setTheme: (mode: ThemeMode) => void;
   toggleTheme: () => void;
 
-  // Data backup & reset
+  // Global Multi-Company Aggregate Totals (for Overview Website & Database Dashboard)
+  workspaceTotals: {
+    companies: number;
+    companyLogos: number;
+    users: number;
+    policies: number;
+    kbArticles: number;
+    wikiPages: number;
+    incidents: number;
+    requests: number;
+    problems: number;
+    changes: number;
+    assets: number;
+    tasks: number;
+    calls: number;
+  };
+
+  // Data backup, seed & reset
+  loadEnterpriseSeedData: () => void;
   resetDatabase: () => void;
   exportDatabaseJSON: () => string;
   importDatabaseJSON: (data: string) => boolean;
 }
 
-const STORAGE_KEY = 'SCRIBBLE_ITSM_DB_V4_BLANK';
+const STORAGE_KEY = 'SCRIBBLE_ITSM_DB_V5_ENTERPRISE';
 
 function loadState<T>(suffix: string, fallback: T): T {
   try {
@@ -235,130 +276,32 @@ function loadState<T>(suffix: string, fallback: T): T {
   }
 }
 
+function safeSaveLocal(suffix: string, value: unknown): void {
+  try {
+    localStorage.setItem(`${STORAGE_KEY}_${suffix}`, JSON.stringify(value));
+  } catch (e) {
+    console.warn(`LocalStorage save skipped for ${suffix}:`, e);
+  }
+}
+
 const ITSMContext = createContext<ITSMContextType | undefined>(undefined);
 
-const DEFAULT_TEST_ENV_ACCOUNTS: AuthAccount[] = [
-  {
-    id: 'USR-TEST-ADMIN',
-    portalType: 'super_admin',
-    role: 'admin',
-    name: 'Test Super Admin',
-    email: 'admin@njuretech.io',
-    password: 'Admin@Scribble2025',
-    department: 'Platform Governance',
-    companyId: 'COMP-NJURE-01',
-    tenantId: 'tenant-default',
-    policyIds: ['POL-SUPER-ADMIN'],
-    status: 'active',
-    mfaEnabled: true,
-    createdAt: '2026-01-01T00:00:00.000Z'
-  },
-  {
-    id: 'USR-TEST-EMP',
-    portalType: 'employee',
-    role: 'technician',
-    name: 'Test IT Employee',
-    email: 'employee@njuretech.io',
-    password: 'Employee@Scribble2025',
-    department: 'IT Operations',
-    companyId: 'COMP-NJURE-01',
-    tenantId: 'tenant-default',
-    policyIds: ['POL-EMPLOYEE-OPS'],
-    status: 'active',
-    mfaEnabled: false,
-    createdAt: '2026-01-01T00:00:00.000Z'
-  },
-  {
-    id: 'USR-TEST-IAM',
-    portalType: 'iam',
-    role: 'technician',
-    name: 'Test IAM Administrator',
-    email: 'iam@njuretech.io',
-    password: 'Iam@Scribble2025',
-    department: 'Identity & Access',
-    companyId: 'COMP-NJURE-01',
-    tenantId: 'tenant-default',
-    policyIds: ['POL-IAM-ADMIN'],
-    status: 'active',
-    mfaEnabled: true,
-    createdAt: '2026-01-01T00:00:00.000Z'
-  },
-  {
-    id: 'USR-TEST-PORTAL',
-    portalType: 'end_user',
-    role: 'customer',
-    name: 'Test End User',
-    email: 'user@njuretech.io',
-    password: 'Portal@Scribble2025',
-    department: 'Self-Service',
-    companyId: 'COMP-NJURE-01',
-    tenantId: 'tenant-default',
-    policyIds: ['POL-END-USER'],
-    status: 'active',
-    mfaEnabled: false,
-    createdAt: '2026-01-01T00:00:00.000Z'
-  }
-];
-
-const DEFAULT_IAM_POLICIES: IamPolicy[] = [
-  {
-    id: 'POL-SUPER-ADMIN',
-    tenantId: 'tenant-default',
-    name: 'Root Tenant Governance',
-    description: 'Full access across multi-tenant controls, IAM, workflows, incidents, and CMDB assets.',
-    permissions: [
-      'incidents:read', 'incidents:write', 'assets:read', 'assets:write',
-      'requests:approve', 'changes:cab_vote', 'workflows:manage',
-      'iam:manage', 'tenants:admin', 'billing:read'
-    ],
-    mfaRequired: true,
-    ssoOnly: false,
-    createdAt: '2026-01-01T00:00:00.000Z'
-  },
-  {
-    id: 'POL-EMPLOYEE-OPS',
-    tenantId: 'tenant-default',
-    name: 'ITIL Operations & CMDB Engineer',
-    description: 'Read/write access to incidents, requests, assets, and change reviews.',
-    permissions: ['incidents:read', 'incidents:write', 'assets:read', 'assets:write', 'requests:approve', 'changes:cab_vote'],
-    mfaRequired: false,
-    ssoOnly: false,
-    createdAt: '2026-01-01T00:00:00.000Z'
-  },
-  {
-    id: 'POL-IAM-ADMIN',
-    tenantId: 'tenant-default',
-    name: 'IAM Directory & Policy Officer',
-    description: 'Create identity IDs, assign company IDs, roles, and access policies.',
-    permissions: ['iam:manage', 'incidents:read', 'assets:read', 'workflows:manage'],
-    mfaRequired: true,
-    ssoOnly: false,
-    createdAt: '2026-01-01T00:00:00.000Z'
-  },
-  {
-    id: 'POL-END-USER',
-    tenantId: 'tenant-default',
-    name: 'Self-Service Requester',
-    description: 'Scoped read/submit access limited to requester own tickets and assigned assets.',
-    permissions: ['incidents:read', 'assets:read'],
-    mfaRequired: false,
-    ssoOnly: false,
-    createdAt: '2026-01-01T00:00:00.000Z'
-  }
-];
+const DEFAULT_IAM_POLICIES: IamPolicy[] = CORE_IAM_POLICIES;
 
 export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const initialSeed = useMemo(() => generateEnterpriseSeedBundle(), []);
+
   // Authentication, Portal Accounts & Company Device SSO Trust
   const [authSession, setAuthSession] = useState<AuthSession | null>(() => loadState('AUTH_SESSION', null));
   const [authAccounts, setAuthAccounts] = useState<AuthAccount[]>(() => {
     const saved = loadState<AuthAccount[]>('AUTH_ACCOUNTS', []);
-    if (saved.length === 0) return DEFAULT_TEST_ENV_ACCOUNTS;
+    if (saved.length === 0) return initialSeed.authAccounts;
     const hasIamTest = saved.some(a => a.portalType === 'iam');
     return hasIamTest ? saved : [...saved, DEFAULT_TEST_ENV_ACCOUNTS[2]];
   });
   const [allIamPolicies, setAllIamPolicies] = useState<IamPolicy[]>(() => {
     const saved = loadState<IamPolicy[]>('IAM_POLICIES', []);
-    return saved.length > 0 ? saved : DEFAULT_IAM_POLICIES;
+    return saved.length > 0 ? saved : initialSeed.iamPolicies;
   });
   const [managedDevice, setManagedDevice] = useState<ManagedDeviceTrust | null>(() => loadState('MANAGED_DEVICE', null));
 
@@ -447,19 +390,25 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  // Multi-Tenant State (Blank Default Workspace)
-  const [tenants, setTenants] = useState<Tenant[]>(() => loadState('TENANTS', [DEFAULT_BLANK_TENANT]));
-  const [activeTenantId, setActiveTenantId] = useState<string>(() => loadState('ACTIVE_TENANT', DEFAULT_BLANK_TENANT.id));
+  // Multi-Tenant State (Preloaded with 8 Enterprise Companies & Custom Logos)
+  const [tenants, setTenants] = useState<Tenant[]>(() => loadState('TENANTS', initialSeed.tenants));
+  const [activeTenantId, setActiveTenantId] = useState<string>(() => loadState('ACTIVE_TENANT', initialSeed.tenants[0].id));
 
   const activeTenant = useMemo(
     () => tenants.find(t => t.id === activeTenantId) || tenants[0],
     [tenants, activeTenantId]
   );
 
-  // Google / Firebase Auth
+  // Google / Firebase Auth & Cloud Sync Status
   const [googleUser, setGoogleUser] = useState<User | null>(null);
   const [googleToken, setGoogleToken] = useState<string | null>(null);
-  const [isFirebaseConnected] = useState<boolean>(true);
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<CloudSyncStatus>('disconnected');
+  const [lastCloudSyncAt, setLastCloudSyncAt] = useState<string | null>(null);
+  const [cloudSyncError, setCloudSyncError] = useState<string | null>(null);
+  const isFirebaseConnected = Boolean(googleUser && cloudSyncStatus !== 'error');
+
+  const cloudReadyUidRef = useRef<string | null>(null);
+  const syncedHashesRef = useRef<Map<string, string>>(new Map());
 
   useEffect(() => {
     const unsubscribe = initAuth(
@@ -475,20 +424,50 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
-  const loginWithGoogle = async () => {
+  const performGoogleSignInWithFallback = async (): Promise<{ user: User; accessToken: string }> => {
     try {
-      const res = await googleSignIn();
+      return await googleSignIn(true);
+    } catch (err: any) {
+      const code = String(err?.code || '');
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+        throw err;
+      }
+      // Fallback to basic Google profile sign-in so Cloud DB sync still succeeds even if Workspace scopes are blocked
+      return await googleSignIn(false);
+    }
+  };
+
+  const loginWithGoogle = async (): Promise<boolean> => {
+    try {
+      const res = await performGoogleSignInWithFallback();
       setGoogleUser(res.user);
       setGoogleToken(res.accessToken);
-    } catch (e) {
+      showToast({
+        variant: 'success',
+        title: 'Cloud Database Connected',
+        description: `Signed in as ${res.user.email || res.user.displayName}. Syncing workspace across devices.`,
+      });
+      return true;
+    } catch (e: any) {
       console.error('Login failed:', e);
+      showToast({
+        variant: 'error',
+        title: 'Google Sign-In Failed',
+        description: e?.message || 'Unable to sign in with Google.',
+      });
+      return false;
     }
   };
 
   const logoutGoogle = async () => {
     await firebaseLogout();
+    cloudReadyUidRef.current = null;
+    syncedHashesRef.current.clear();
+    clearKnownCloudDocPaths();
     setGoogleUser(null);
     setGoogleToken(null);
+    setCloudSyncStatus('disconnected');
+    setCloudSyncError(null);
   };
 
   const portalToRole = (p: AuthPortalType): Role =>
@@ -701,7 +680,7 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginViaGooglePortal = async (portalType: AuthPortalType): Promise<{ ok: boolean; error?: string }> => {
     try {
-      const res = await googleSignIn();
+      const res = await performGoogleSignInWithFallback();
       setGoogleUser(res.user);
       setGoogleToken(res.accessToken);
       const targetRole = portalToRole(portalType);
@@ -717,10 +696,22 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         deviceId: managedDevice?.deviceId,
         authenticatedAt: new Date().toISOString()
       });
+      showToast({
+        variant: 'success',
+        title: 'Signed In & Cloud Sync Active',
+        description: `Connected ${res.user.email || 'Google account'} to centralized cloud database.`,
+      });
       return { ok: true };
     } catch (e: any) {
-      return { ok: false, error: e?.message || 'Google authentication was cancelled or failed.' };
+      const msg = e?.message || 'Google authentication was cancelled or failed.';
+      showToast({ variant: 'error', title: 'Google Sign-In Failed', description: msg });
+      return { ok: false, error: msg };
     }
+  };
+
+  const loginWithGooglePortal = async (): Promise<boolean> => {
+    const res = await loginViaGooglePortal('super_admin');
+    return res.ok;
   };
 
   const logoutSession = async () => {
@@ -737,37 +728,37 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     phone: ''
   };
 
-  // Master Multi-Tenant Stores (Blank by default)
-  const [allIncidents, setAllIncidents] = useState<Incident[]>(() => loadState('INCIDENTS', []));
-  const [allRequests, setAllRequests] = useState<ServiceRequest[]>(() => loadState('REQUESTS', []));
-  const [allProblems, setAllProblems] = useState<Problem[]>(() => loadState('PROBLEMS', []));
-  const [allChanges, setAllChanges] = useState<ChangeRequest[]>(() => loadState('CHANGES', []));
-  const [allAssets, setAllAssets] = useState<Asset[]>(() => loadState('ASSETS', []));
-  const [allInventory, setAllInventory] = useState<InventoryItem[]>(() => loadState('INVENTORY', []));
-  const [allCalls, setAllCalls] = useState<TelephonyCall[]>(() => loadState('CALLS', []));
-  const [allInvoices, setAllInvoices] = useState<Invoice[]>(() => loadState('INVOICES', []));
+  // Master Multi-Tenant Stores (Preloaded Enterprise Seed Dataset)
+  const [allIncidents, setAllIncidents] = useState<Incident[]>(() => loadState('INCIDENTS', initialSeed.incidents));
+  const [allRequests, setAllRequests] = useState<ServiceRequest[]>(() => loadState('REQUESTS', initialSeed.requests));
+  const [allProblems, setAllProblems] = useState<Problem[]>(() => loadState('PROBLEMS', initialSeed.problems));
+  const [allChanges, setAllChanges] = useState<ChangeRequest[]>(() => loadState('CHANGES', initialSeed.changes));
+  const [allAssets, setAllAssets] = useState<Asset[]>(() => loadState('ASSETS', initialSeed.assets));
+  const [allInventory, setAllInventory] = useState<InventoryItem[]>(() => loadState('INVENTORY', initialSeed.inventory));
+  const [allCalls, setAllCalls] = useState<TelephonyCall[]>(() => loadState('CALLS', initialSeed.calls));
+  const [allInvoices, setAllInvoices] = useState<Invoice[]>(() => loadState('INVOICES', initialSeed.invoices));
 
-  // Extended FreeITSM Stores (Blank by default)
-  const [allSoftware, setAllSoftware] = useState<SoftwareLicense[]>(() => loadState('SOFTWARE', []));
-  const [allTasks, setAllTasks] = useState<TaskItem[]>(() => loadState('TASKS', []));
-  const [allProjects, setAllProjects] = useState<ProjectItem[]>(() => loadState('PROJECTS', []));
-  const [allKb, setAllKb] = useState<KnowledgeArticle[]>(() => loadState('KB', []));
-  const [allContracts, setAllContracts] = useState<ContractRecord[]>(() => loadState('CONTRACTS', []));
-  const [allDomains, setAllDomains] = useState<DomainRecord[]>(() => loadState('DOMAINS', []));
-  const [allStatusComponents, setAllStatusComponents] = useState<ServiceStatusComponent[]>(() => loadState('STATUS', []));
-  const [allMorningChecks, setAllMorningChecks] = useState<MorningCheckRun[]>(() => loadState('CHECKS', []));
-  const [allCalendarEvents, setAllCalendarEvents] = useState<CalendarEvent[]>(() => loadState('CALENDAR', []));
-  const [allWarRooms, setAllWarRooms] = useState<WarRoomSession[]>(() => loadState('WAR_ROOMS', []));
-  const [allLmsCourses, setAllLmsCourses] = useState<LmsCourse[]>(() => loadState('LMS', []));
-  const [allWikiPages, setAllWikiPages] = useState<WikiPage[]>(() => loadState('WIKI', []));
-  const [allProcessMaps, setAllProcessMaps] = useState<ProcessMap[]>(() => loadState('PROCESS_MAPS', []));
-  const [allCustomForms, setAllCustomForms] = useState<CustomFormDefinition[]>(() => loadState('CUSTOM_FORMS', []));
-  const [allCmdbRelations, setAllCmdbRelations] = useState<CmdbRelation[]>(() => loadState('CMDB_REL', []));
-  const [allAuditLogs, setAllAuditLogs] = useState<AuditLogEntry[]>(() => loadState('AUDIT', []));
-  const [allWorkflows, setAllWorkflows] = useState<WorkflowDefinition[]>(() => loadState('WORKFLOWS', []));
-  const [allTicketWorkflows, setAllTicketWorkflows] = useState<TicketWorkflowRule[]>(() => loadState('TICKET_WORKFLOWS', []));
+  // Extended FreeITSM Stores (Preloaded Enterprise Seed Dataset)
+  const [allSoftware, setAllSoftware] = useState<SoftwareLicense[]>(() => loadState('SOFTWARE', initialSeed.software));
+  const [allTasks, setAllTasks] = useState<TaskItem[]>(() => loadState('TASKS', initialSeed.tasks));
+  const [allProjects, setAllProjects] = useState<ProjectItem[]>(() => loadState('PROJECTS', initialSeed.projects));
+  const [allKb, setAllKb] = useState<KnowledgeArticle[]>(() => loadState('KB', initialSeed.kbArticles));
+  const [allContracts, setAllContracts] = useState<ContractRecord[]>(() => loadState('CONTRACTS', initialSeed.contracts));
+  const [allDomains, setAllDomains] = useState<DomainRecord[]>(() => loadState('DOMAINS', initialSeed.domains));
+  const [allStatusComponents, setAllStatusComponents] = useState<ServiceStatusComponent[]>(() => loadState('STATUS', initialSeed.statusComponents));
+  const [allMorningChecks, setAllMorningChecks] = useState<MorningCheckRun[]>(() => loadState('CHECKS', initialSeed.morningChecks));
+  const [allCalendarEvents, setAllCalendarEvents] = useState<CalendarEvent[]>(() => loadState('CALENDAR', initialSeed.calendarEvents));
+  const [allWarRooms, setAllWarRooms] = useState<WarRoomSession[]>(() => loadState('WAR_ROOMS', initialSeed.warRooms));
+  const [allLmsCourses, setAllLmsCourses] = useState<LmsCourse[]>(() => loadState('LMS', initialSeed.lmsCourses));
+  const [allWikiPages, setAllWikiPages] = useState<WikiPage[]>(() => loadState('WIKI', initialSeed.wikiPages));
+  const [allProcessMaps, setAllProcessMaps] = useState<ProcessMap[]>(() => loadState('PROCESS_MAPS', initialSeed.processMaps));
+  const [allCustomForms, setAllCustomForms] = useState<CustomFormDefinition[]>(() => loadState('CUSTOM_FORMS', initialSeed.customForms));
+  const [allCmdbRelations, setAllCmdbRelations] = useState<CmdbRelation[]>(() => loadState('CMDB_REL', initialSeed.cmdbRelations));
+  const [allAuditLogs, setAllAuditLogs] = useState<AuditLogEntry[]>(() => loadState('AUDIT', initialSeed.auditLogs));
+  const [allWorkflows, setAllWorkflows] = useState<WorkflowDefinition[]>(() => loadState('WORKFLOWS', initialSeed.workflows));
+  const [allTicketWorkflows, setAllTicketWorkflows] = useState<TicketWorkflowRule[]>(() => loadState('TICKET_WORKFLOWS', initialSeed.ticketWorkflows));
   const [telephonyConfigsByTenant, setTelephonyConfigsByTenant] = useState<Record<string, TelephonyProviderConfig>>(() =>
-    loadState('TELEPHONY_CONFIGS', {})
+    loadState('TELEPHONY_CONFIGS', initialSeed.telephonyConfigsByTenant)
   );
 
   const [activeCall, setActiveCall] = useState<TelephonyCall | null>(null);
@@ -826,45 +817,41 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [telephonyConfigsByTenant, activeTenant.id, activeTenant.domain, currentUser.phone]);
 
-  // Persist to localStorage
+  // Persist each collection independently to localStorage so a single large key never blocks saving other data
   useEffect(() => {
-    try {
-      localStorage.setItem(`${STORAGE_KEY}_AUTH_SESSION`, JSON.stringify(authSession));
-      localStorage.setItem(`${STORAGE_KEY}_AUTH_ACCOUNTS`, JSON.stringify(authAccounts));
-      localStorage.setItem(`${STORAGE_KEY}_IAM_POLICIES`, JSON.stringify(allIamPolicies));
-      localStorage.setItem(`${STORAGE_KEY}_MANAGED_DEVICE`, JSON.stringify(managedDevice));
-      localStorage.setItem(`${STORAGE_KEY}_TENANTS`, JSON.stringify(tenants));
-      localStorage.setItem(`${STORAGE_KEY}_ACTIVE_TENANT`, JSON.stringify(activeTenantId));
-      localStorage.setItem(`${STORAGE_KEY}_INCIDENTS`, JSON.stringify(allIncidents));
-      localStorage.setItem(`${STORAGE_KEY}_REQUESTS`, JSON.stringify(allRequests));
-      localStorage.setItem(`${STORAGE_KEY}_PROBLEMS`, JSON.stringify(allProblems));
-      localStorage.setItem(`${STORAGE_KEY}_CHANGES`, JSON.stringify(allChanges));
-      localStorage.setItem(`${STORAGE_KEY}_ASSETS`, JSON.stringify(allAssets));
-      localStorage.setItem(`${STORAGE_KEY}_INVENTORY`, JSON.stringify(allInventory));
-      localStorage.setItem(`${STORAGE_KEY}_CALLS`, JSON.stringify(allCalls));
-      localStorage.setItem(`${STORAGE_KEY}_INVOICES`, JSON.stringify(allInvoices));
-      localStorage.setItem(`${STORAGE_KEY}_SOFTWARE`, JSON.stringify(allSoftware));
-      localStorage.setItem(`${STORAGE_KEY}_TASKS`, JSON.stringify(allTasks));
-      localStorage.setItem(`${STORAGE_KEY}_PROJECTS`, JSON.stringify(allProjects));
-      localStorage.setItem(`${STORAGE_KEY}_KB`, JSON.stringify(allKb));
-      localStorage.setItem(`${STORAGE_KEY}_CONTRACTS`, JSON.stringify(allContracts));
-      localStorage.setItem(`${STORAGE_KEY}_DOMAINS`, JSON.stringify(allDomains));
-      localStorage.setItem(`${STORAGE_KEY}_STATUS`, JSON.stringify(allStatusComponents));
-      localStorage.setItem(`${STORAGE_KEY}_CHECKS`, JSON.stringify(allMorningChecks));
-      localStorage.setItem(`${STORAGE_KEY}_CALENDAR`, JSON.stringify(allCalendarEvents));
-      localStorage.setItem(`${STORAGE_KEY}_WAR_ROOMS`, JSON.stringify(allWarRooms));
-      localStorage.setItem(`${STORAGE_KEY}_LMS`, JSON.stringify(allLmsCourses));
-      localStorage.setItem(`${STORAGE_KEY}_WIKI`, JSON.stringify(allWikiPages));
-      localStorage.setItem(`${STORAGE_KEY}_PROCESS_MAPS`, JSON.stringify(allProcessMaps));
-      localStorage.setItem(`${STORAGE_KEY}_CUSTOM_FORMS`, JSON.stringify(allCustomForms));
-      localStorage.setItem(`${STORAGE_KEY}_CMDB_REL`, JSON.stringify(allCmdbRelations));
-      localStorage.setItem(`${STORAGE_KEY}_AUDIT`, JSON.stringify(allAuditLogs));
-      localStorage.setItem(`${STORAGE_KEY}_WORKFLOWS`, JSON.stringify(allWorkflows));
-      localStorage.setItem(`${STORAGE_KEY}_TICKET_WORKFLOWS`, JSON.stringify(allTicketWorkflows));
-      localStorage.setItem(`${STORAGE_KEY}_TELEPHONY_CONFIGS`, JSON.stringify(telephonyConfigsByTenant));
-    } catch (e) {
-      console.warn('LocalStorage save warning:', e);
-    }
+    safeSaveLocal('AUTH_SESSION', authSession);
+    safeSaveLocal('AUTH_ACCOUNTS', authAccounts);
+    safeSaveLocal('IAM_POLICIES', allIamPolicies);
+    safeSaveLocal('MANAGED_DEVICE', managedDevice);
+    safeSaveLocal('ACTIVE_TENANT', activeTenantId);
+    safeSaveLocal('INCIDENTS', allIncidents);
+    safeSaveLocal('REQUESTS', allRequests);
+    safeSaveLocal('PROBLEMS', allProblems);
+    safeSaveLocal('CHANGES', allChanges);
+    safeSaveLocal('ASSETS', allAssets);
+    safeSaveLocal('INVENTORY', allInventory);
+    safeSaveLocal('CALLS', allCalls);
+    safeSaveLocal('INVOICES', allInvoices);
+    safeSaveLocal('SOFTWARE', allSoftware);
+    safeSaveLocal('TASKS', allTasks);
+    safeSaveLocal('PROJECTS', allProjects);
+    safeSaveLocal('KB', allKb);
+    safeSaveLocal('CONTRACTS', allContracts);
+    safeSaveLocal('DOMAINS', allDomains);
+    safeSaveLocal('STATUS', allStatusComponents);
+    safeSaveLocal('CHECKS', allMorningChecks);
+    safeSaveLocal('CALENDAR', allCalendarEvents);
+    safeSaveLocal('WAR_ROOMS', allWarRooms);
+    safeSaveLocal('LMS', allLmsCourses);
+    safeSaveLocal('WIKI', allWikiPages);
+    safeSaveLocal('PROCESS_MAPS', allProcessMaps);
+    safeSaveLocal('CUSTOM_FORMS', allCustomForms);
+    safeSaveLocal('CMDB_REL', allCmdbRelations);
+    safeSaveLocal('AUDIT', allAuditLogs);
+    safeSaveLocal('WORKFLOWS', allWorkflows);
+    safeSaveLocal('TICKET_WORKFLOWS', allTicketWorkflows);
+    safeSaveLocal('TELEPHONY_CONFIGS', telephonyConfigsByTenant);
+    safeSaveLocal('TENANTS', tenants);
   }, [
     authSession, authAccounts, allIamPolicies, managedDevice,
     tenants, activeTenantId, allIncidents, allRequests, allProblems, allChanges,
@@ -874,6 +861,425 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     allWikiPages, allProcessMaps, allCustomForms, allCmdbRelations, allAuditLogs,
     allWorkflows, allTicketWorkflows, telephonyConfigsByTenant
   ]);
+
+  // Build normalized module state buckets for centralized Firestore sync.
+  // Auth accounts (520+ profiles) are sharded into <=200-item buckets to stay strictly within Firestore 1MB doc & 500-item rule bounds.
+  const buildModuleBuckets = useCallback((): CloudWorkspaceSnapshot['moduleBuckets'] => {
+    const accountShardSize = 200;
+    const accountShards: CloudWorkspaceSnapshot['moduleBuckets'] = {};
+    const totalShards = Math.max(1, Math.ceil(authAccounts.length / accountShardSize));
+    for (let s = 0; s < totalShards; s++) {
+      accountShards[`auth_accounts_${s}`] = {
+        items: authAccounts.slice(s * accountShardSize, (s + 1) * accountShardSize),
+      };
+    }
+
+    return {
+      problems: { items: allProblems },
+      changes: { items: allChanges },
+      assets: { items: allAssets },
+      inventory: { items: allInventory },
+      calls: { items: allCalls },
+      invoices: { items: allInvoices },
+      software: { items: allSoftware },
+      tasks: { items: allTasks },
+      projects: { items: allProjects },
+      kb: { items: allKb },
+      contracts: { items: allContracts },
+      domains: { items: allDomains },
+      status: { items: allStatusComponents },
+      checks: { items: allMorningChecks },
+      calendar: { items: allCalendarEvents },
+      war_rooms: { items: allWarRooms },
+      lms: { items: allLmsCourses },
+      wiki: { items: allWikiPages },
+      process_maps: { items: allProcessMaps },
+      custom_forms: { items: allCustomForms },
+      cmdb_rel: { items: allCmdbRelations },
+      audit: { items: allAuditLogs.slice(0, 120) },
+      workflows: { items: allWorkflows },
+      ticket_workflows: { items: allTicketWorkflows },
+      iam_policies: { items: allIamPolicies },
+      ...accountShards,
+      telephony_configs: { settingsMap: telephonyConfigsByTenant as unknown as Record<string, unknown> },
+    };
+  }, [
+    allProblems, allChanges, allAssets, allInventory, allCalls, allInvoices,
+    allSoftware, allTasks, allProjects, allKb, allContracts, allDomains,
+    allStatusComponents, allMorningChecks, allCalendarEvents, allWarRooms,
+    allLmsCourses, allWikiPages, allProcessMaps, allCustomForms, allCmdbRelations,
+    allAuditLogs, allWorkflows, allTicketWorkflows, allIamPolicies, authAccounts,
+    telephonyConfigsByTenant
+  ]);
+
+  // Keep latest state ref for initial cloud bootstrap without stale closures
+  const latestSnapshotRef = useRef<CloudWorkspaceSnapshot>({
+    activeTenantId,
+    theme,
+    tenants,
+    incidents: allIncidents,
+    requests: allRequests,
+    moduleBuckets: buildModuleBuckets(),
+  });
+
+  useEffect(() => {
+    latestSnapshotRef.current = {
+      activeTenantId,
+      theme,
+      tenants,
+      incidents: allIncidents,
+      requests: allRequests,
+      moduleBuckets: buildModuleBuckets(),
+    };
+  }, [activeTenantId, theme, tenants, allIncidents, allRequests, buildModuleBuckets]);
+
+  // Real-time Firestore Workspace Hydration & Cross-Device Live Listener
+  useEffect(() => {
+    if (!googleUser?.uid) {
+      cloudReadyUidRef.current = null;
+      syncedHashesRef.current.clear();
+      clearKnownCloudDocPaths();
+      setCloudSyncStatus('disconnected');
+      setCloudSyncError(null);
+      return;
+    }
+
+    const uid = googleUser.uid;
+    const email = googleUser.email || 'user@scribbleit.local';
+    let cancelled = false;
+    let unsubscribe: (() => void) | null = null;
+    let initialSeedChecked = false;
+    let sawTenants = false;
+    let sawIncidents = false;
+    let sawRequests = false;
+    let sawBuckets = false;
+    let remoteTenantCount = 0;
+    let remoteIncidentCount = 0;
+    let remoteRequestCount = 0;
+    let remoteBucketCount = 0;
+
+    setCloudSyncStatus('connecting');
+    setCloudSyncError(null);
+
+    const recordSnapshotHashes = (snap: CloudWorkspaceSnapshot) => {
+      syncedHashesRef.current.set('root', JSON.stringify({ activeTenantId: snap.activeTenantId, theme: snap.theme }));
+      snap.tenants.forEach(t => syncedHashesRef.current.set(`tenant:${t.id}`, JSON.stringify(t)));
+      snap.incidents.forEach(inc => syncedHashesRef.current.set(`incident:${inc.id}`, JSON.stringify(inc)));
+      snap.requests.forEach(req => syncedHashesRef.current.set(`request:${req.id}`, JSON.stringify(req)));
+      Object.entries(snap.moduleBuckets).forEach(([k, v]) => {
+        syncedHashesRef.current.set(`bucket:${k}`, JSON.stringify(v));
+      });
+    };
+
+    const maybeFinishInitialSync = () => {
+      if (cancelled || initialSeedChecked) return;
+      if (!(sawTenants && sawIncidents && sawRequests && sawBuckets)) return;
+      initialSeedChecked = true;
+
+      const hasRemoteData =
+        remoteTenantCount > 0 || remoteIncidentCount > 0 || remoteRequestCount > 0 || remoteBucketCount > 0;
+
+      if (!hasRemoteData) {
+        const localSnap = latestSnapshotRef.current;
+        setCloudSyncStatus('syncing');
+        pushFullWorkspaceSnapshotToCloud(uid, email, localSnap)
+          .then(() => {
+            if (cancelled) return;
+            recordSnapshotHashes(localSnap);
+            cloudReadyUidRef.current = uid;
+            setCloudSyncStatus('synced');
+            setLastCloudSyncAt(new Date().toISOString());
+          })
+          .catch(err => {
+            if (cancelled) return;
+            cloudReadyUidRef.current = uid;
+            setCloudSyncStatus('error');
+            setCloudSyncError(err instanceof Error ? err.message : 'Initial cloud upload failed.');
+          });
+      } else {
+        cloudReadyUidRef.current = uid;
+        setCloudSyncStatus('synced');
+        setLastCloudSyncAt(new Date().toISOString());
+      }
+    };
+
+    const startSync = async () => {
+      try {
+        const snap = latestSnapshotRef.current;
+        await ensureWorkspaceRoot(uid, email, snap.activeTenantId, snap.theme);
+        if (cancelled) return;
+
+        unsubscribe = subscribeWorkspace(uid, {
+          onWorkspaceRoot: root => {
+            if (cancelled || !root) return;
+            syncedHashesRef.current.set(
+              'root',
+              JSON.stringify({ activeTenantId: root.activeTenantId, theme: root.theme })
+            );
+            setThemeState(root.theme);
+            if (root.activeTenantId) {
+              setActiveTenantId(root.activeTenantId);
+            }
+          },
+          onTenants: remoteTenants => {
+            if (cancelled) return;
+            sawTenants = true;
+            remoteTenantCount = remoteTenants.length;
+            if (remoteTenants.length > 0) {
+              remoteTenants.forEach(t => syncedHashesRef.current.set(`tenant:${t.id}`, JSON.stringify(t)));
+              setTenants(remoteTenants);
+              setActiveTenantId(prev =>
+                remoteTenants.some(t => t.id === prev) ? prev : remoteTenants[0].id
+              );
+              setLastCloudSyncAt(new Date().toISOString());
+            }
+            maybeFinishInitialSync();
+          },
+          onIncidents: remoteIncidents => {
+            if (cancelled) return;
+            sawIncidents = true;
+            remoteIncidentCount = remoteIncidents.length;
+            if (remoteIncidents.length > 0 || initialSeedChecked) {
+              remoteIncidents.forEach(inc => syncedHashesRef.current.set(`incident:${inc.id}`, JSON.stringify(inc)));
+              setAllIncidents(remoteIncidents);
+              setLastCloudSyncAt(new Date().toISOString());
+            }
+            maybeFinishInitialSync();
+          },
+          onRequests: remoteRequests => {
+            if (cancelled) return;
+            sawRequests = true;
+            remoteRequestCount = remoteRequests.length;
+            if (remoteRequests.length > 0 || initialSeedChecked) {
+              remoteRequests.forEach(req => syncedHashesRef.current.set(`request:${req.id}`, JSON.stringify(req)));
+              setAllRequests(remoteRequests);
+              setLastCloudSyncAt(new Date().toISOString());
+            }
+            maybeFinishInitialSync();
+          },
+          onModuleBuckets: buckets => {
+            if (cancelled) return;
+            sawBuckets = true;
+            remoteBucketCount = Object.keys(buckets).length;
+            const shardedAccountEntries: Array<[number, AuthAccount[]]> = [];
+            let legacyAccounts: AuthAccount[] = [];
+
+            Object.entries(buckets).forEach(([key, rec]) => {
+              const payload =
+                rec.settingsMap !== undefined
+                  ? { settingsMap: rec.settingsMap }
+                  : { items: rec.items || [] };
+              syncedHashesRef.current.set(`bucket:${key}`, JSON.stringify(payload));
+              if (key.startsWith('auth_accounts_')) {
+                const idx = Number(key.replace('auth_accounts_', ''));
+                if (!Number.isNaN(idx) && Array.isArray(rec.items)) {
+                  shardedAccountEntries.push([idx, rec.items as AuthAccount[]]);
+                }
+                return;
+              }
+              switch (key) {
+                case 'problems': if (rec.items) setAllProblems(rec.items as Problem[]); break;
+                case 'changes': if (rec.items) setAllChanges(rec.items as ChangeRequest[]); break;
+                case 'assets': if (rec.items) setAllAssets(rec.items as Asset[]); break;
+                case 'inventory': if (rec.items) setAllInventory(rec.items as InventoryItem[]); break;
+                case 'calls': if (rec.items) setAllCalls(rec.items as TelephonyCall[]); break;
+                case 'invoices': if (rec.items) setAllInvoices(rec.items as Invoice[]); break;
+                case 'software': if (rec.items) setAllSoftware(rec.items as SoftwareLicense[]); break;
+                case 'tasks': if (rec.items) setAllTasks(rec.items as TaskItem[]); break;
+                case 'projects': if (rec.items) setAllProjects(rec.items as ProjectItem[]); break;
+                case 'kb': if (rec.items) setAllKb(rec.items as KnowledgeArticle[]); break;
+                case 'contracts': if (rec.items) setAllContracts(rec.items as ContractRecord[]); break;
+                case 'domains': if (rec.items) setAllDomains(rec.items as DomainRecord[]); break;
+                case 'status': if (rec.items) setAllStatusComponents(rec.items as ServiceStatusComponent[]); break;
+                case 'checks': if (rec.items) setAllMorningChecks(rec.items as MorningCheckRun[]); break;
+                case 'calendar': if (rec.items) setAllCalendarEvents(rec.items as CalendarEvent[]); break;
+                case 'war_rooms': if (rec.items) setAllWarRooms(rec.items as WarRoomSession[]); break;
+                case 'lms': if (rec.items) setAllLmsCourses(rec.items as LmsCourse[]); break;
+                case 'wiki': if (rec.items) setAllWikiPages(rec.items as WikiPage[]); break;
+                case 'process_maps': if (rec.items) setAllProcessMaps(rec.items as ProcessMap[]); break;
+                case 'custom_forms': if (rec.items) setAllCustomForms(rec.items as CustomFormDefinition[]); break;
+                case 'cmdb_rel': if (rec.items) setAllCmdbRelations(rec.items as CmdbRelation[]); break;
+                case 'audit': if (rec.items) setAllAuditLogs(rec.items as AuditLogEntry[]); break;
+                case 'workflows': if (rec.items) setAllWorkflows(rec.items as WorkflowDefinition[]); break;
+                case 'ticket_workflows': if (rec.items) setAllTicketWorkflows(rec.items as TicketWorkflowRule[]); break;
+                case 'iam_policies': if (rec.items && rec.items.length > 0) setAllIamPolicies(rec.items as IamPolicy[]); break;
+                case 'auth_accounts': if (rec.items && rec.items.length > 0) legacyAccounts = rec.items as AuthAccount[]; break;
+                case 'telephony_configs':
+                  if (rec.settingsMap) {
+                    setTelephonyConfigsByTenant(rec.settingsMap as unknown as Record<string, TelephonyProviderConfig>);
+                  }
+                  break;
+              }
+            });
+
+            if (shardedAccountEntries.length > 0) {
+              shardedAccountEntries.sort((a, b) => a[0] - b[0]);
+              const combined = shardedAccountEntries.flatMap(([, list]) => list);
+              if (combined.length > 0) setAuthAccounts(combined);
+            } else if (legacyAccounts.length > 0) {
+              setAuthAccounts(legacyAccounts);
+            }
+
+            if (remoteBucketCount > 0) {
+              setLastCloudSyncAt(new Date().toISOString());
+            }
+            maybeFinishInitialSync();
+          },
+          onError: err => {
+            if (cancelled) return;
+            setCloudSyncStatus('error');
+            setCloudSyncError(err.message);
+          },
+        });
+      } catch (err) {
+        if (cancelled) return;
+        setCloudSyncStatus('error');
+        setCloudSyncError(err instanceof Error ? err.message : 'Failed to connect to cloud database.');
+      }
+    };
+
+    void startSync();
+
+    return () => {
+      cancelled = true;
+      if (unsubscribe) unsubscribe();
+    };
+  }, [googleUser?.uid]);
+
+  // Debounced Diff-Aware Cloud Sync: only pushes modified documents/buckets to Firestore
+  useEffect(() => {
+    if (!googleUser?.uid || cloudReadyUidRef.current !== googleUser.uid) return;
+
+    const uid = googleUser.uid;
+    const email = googleUser.email || 'user@scribbleit.local';
+
+    const timer = setTimeout(() => {
+      const tasks: Promise<void>[] = [];
+      const pendingHashUpdates: [string, string][] = [];
+
+      const rootHash = JSON.stringify({ activeTenantId, theme });
+      if (syncedHashesRef.current.get('root') !== rootHash) {
+        pendingHashUpdates.push(['root', rootHash]);
+        tasks.push(ensureWorkspaceRoot(uid, email, activeTenantId, theme));
+      }
+
+      tenants.forEach(t => {
+        const key = `tenant:${t.id}`;
+        const h = JSON.stringify(t);
+        if (syncedHashesRef.current.get(key) !== h) {
+          pendingHashUpdates.push([key, h]);
+          tasks.push(upsertTenantInCloud(uid, t));
+        }
+      });
+
+      allIncidents.forEach(inc => {
+        const key = `incident:${inc.id}`;
+        const h = JSON.stringify(inc);
+        if (syncedHashesRef.current.get(key) !== h) {
+          pendingHashUpdates.push([key, h]);
+          tasks.push(upsertIncidentInCloud(uid, inc));
+        }
+      });
+
+      allRequests.forEach(req => {
+        const key = `request:${req.id}`;
+        const h = JSON.stringify(req);
+        if (syncedHashesRef.current.get(key) !== h) {
+          pendingHashUpdates.push([key, h]);
+          tasks.push(upsertRequestInCloud(uid, req));
+        }
+      });
+
+      const buckets = buildModuleBuckets();
+      Object.entries(buckets).forEach(([bKey, bVal]) => {
+        const key = `bucket:${bKey}`;
+        const h = JSON.stringify(bVal);
+        const alreadySynced = syncedHashesRef.current.has(key);
+        const hasData = Array.isArray(bVal.items)
+          ? bVal.items.length > 0
+          : bVal.settingsMap
+          ? Object.keys(bVal.settingsMap).length > 0
+          : false;
+        if (syncedHashesRef.current.get(key) !== h && (alreadySynced || hasData)) {
+          pendingHashUpdates.push([key, h]);
+          tasks.push(upsertModuleBucketInCloud(uid, bKey, bVal));
+        }
+      });
+
+      if (tasks.length === 0) return;
+
+      setCloudSyncStatus('syncing');
+      Promise.allSettled(tasks).then(results => {
+        const rejected = results.find(r => r.status === 'rejected') as PromiseRejectedResult | undefined;
+        pendingHashUpdates.forEach(([k, v], idx) => {
+          if (results[idx]?.status === 'fulfilled') {
+            syncedHashesRef.current.set(k, v);
+          }
+        });
+        if (rejected) {
+          setCloudSyncStatus('error');
+          setCloudSyncError(rejected.reason instanceof Error ? rejected.reason.message : String(rejected.reason));
+        } else {
+          setCloudSyncStatus('synced');
+          setCloudSyncError(null);
+          setLastCloudSyncAt(new Date().toISOString());
+        }
+      });
+    }, 550);
+
+    return () => clearTimeout(timer);
+  }, [
+    googleUser?.uid,
+    activeTenantId,
+    theme,
+    tenants,
+    allIncidents,
+    allRequests,
+    buildModuleBuckets,
+  ]);
+
+  const forceCloudSync = useCallback(async () => {
+    if (!googleUser?.uid) {
+      const ok = await loginWithGoogle();
+      if (!ok) return;
+      return;
+    }
+    const uid = googleUser.uid;
+    const email = googleUser.email || 'user@scribbleit.local';
+    const snap: CloudWorkspaceSnapshot = {
+      activeTenantId,
+      theme,
+      tenants,
+      incidents: allIncidents,
+      requests: allRequests,
+      moduleBuckets: buildModuleBuckets(),
+    };
+    setCloudSyncStatus('syncing');
+    setCloudSyncError(null);
+    try {
+      await pushFullWorkspaceSnapshotToCloud(uid, email, snap);
+      syncedHashesRef.current.set('root', JSON.stringify({ activeTenantId, theme }));
+      tenants.forEach(t => syncedHashesRef.current.set(`tenant:${t.id}`, JSON.stringify(t)));
+      allIncidents.forEach(inc => syncedHashesRef.current.set(`incident:${inc.id}`, JSON.stringify(inc)));
+      allRequests.forEach(req => syncedHashesRef.current.set(`request:${req.id}`, JSON.stringify(req)));
+      Object.entries(snap.moduleBuckets).forEach(([k, v]) => {
+        syncedHashesRef.current.set(`bucket:${k}`, JSON.stringify(v));
+      });
+      cloudReadyUidRef.current = uid;
+      setCloudSyncStatus('synced');
+      setLastCloudSyncAt(new Date().toISOString());
+      showToast({
+        variant: 'success',
+        title: 'Cloud Database Synced',
+        description: `Backed up ${tenants.length} org(s), ${allIncidents.length} incident(s), ${allRequests.length} request(s), and all settings.`,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Cloud sync failed.';
+      setCloudSyncStatus('error');
+      setCloudSyncError(msg);
+      showToast({ variant: 'error', title: 'Cloud Sync Error', description: msg });
+    }
+  }, [googleUser, activeTenantId, theme, tenants, allIncidents, allRequests, buildModuleBuckets, showToast]);
 
   // Helper: Tenant-Scoped Audit Log
   const recordAudit = (module: string, action: string, targetId: string, detail: string) => {
@@ -900,6 +1306,13 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const slug = (data.slug || data.name || 'new-tenant').toLowerCase().replace(/[^a-z0-9]+/g, '-');
     const id = `tenant-${slug}-${Math.floor(100 + Math.random() * 900)}`;
     const tenantDisplayName = data.name || 'New Enterprise Tenant';
+    const initialLogo = data.companyLogoDataUrl || '';
+    const defaultBranding = getDefaultTenantBranding(tenantDisplayName);
+    const hydratedBranding = data.portalBranding || {
+      employees: { ...defaultBranding.employees, logoDataUrl: initialLogo },
+      enduser: { ...defaultBranding.enduser, logoDataUrl: initialLogo },
+      iam: { ...defaultBranding.iam, logoDataUrl: initialLogo },
+    };
     const newTenant: Tenant = {
       id,
       name: tenantDisplayName,
@@ -912,6 +1325,7 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
       currency: data.currency || 'USD',
       primaryContactEmail: data.primaryContactEmail || `ops@${slug}.io`,
       status: 'active',
+      companyLogoDataUrl: initialLogo,
       slaTargets: data.slaTargets || { P1: 1, P2: 4, P3: 24, P4: 72 },
       enabledModules: data.enabledModules || createAllEnabledModules(),
       preferenceTemplate: data.preferenceTemplate || {
@@ -921,7 +1335,7 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         requireCabForNormalChange: true,
         portalBannerTitle: `${(data.name || slug).toUpperCase()} SUPPORT`
       },
-      portalBranding: data.portalBranding || getDefaultTenantBranding(tenantDisplayName),
+      portalBranding: hydratedBranding,
       createdAt: new Date().toISOString()
     };
     setTenants(prev => [...prev, newTenant]);
@@ -945,8 +1359,14 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
       prev.map(t => {
         if (t.id !== tenantId) return t;
         const base = t.portalBranding || getDefaultTenantBranding(t.name);
+        const nextLogo =
+          updates.logoDataUrl !== undefined
+            ? updates.logoDataUrl
+            : base[portalKey].logoDataUrl;
         return {
           ...t,
+          companyLogoDataUrl:
+            !t.companyLogoDataUrl && nextLogo ? nextLogo : t.companyLogoDataUrl,
           portalBranding: {
             ...base,
             [portalKey]: {
@@ -961,9 +1381,37 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     showToast({ variant: 'success', title: 'Portal Branding Saved', description: `Updated ${portalKey} portal branding.` });
   };
 
+  const applyCompanyLogoToAllPortals = (tenantId: string, logoDataUrl: string) => {
+    setTenants(prev =>
+      prev.map(t => {
+        if (t.id !== tenantId) return t;
+        const base = t.portalBranding || getDefaultTenantBranding(t.name);
+        return {
+          ...t,
+          companyLogoDataUrl: logoDataUrl,
+          portalBranding: {
+            employees: { ...base.employees, logoDataUrl },
+            enduser: { ...base.enduser, logoDataUrl },
+            iam: { ...base.iam, logoDataUrl },
+          },
+        };
+      })
+    );
+    recordAudit('Tenant Branding', 'APPLY_COMPANY_LOGO', tenantId, logoDataUrl ? 'Applied company logo to all portals' : 'Cleared company logo across portals');
+    showToast({
+      variant: 'success',
+      title: logoDataUrl ? 'Company Logo Applied to All Portals' : 'Company Logo Cleared',
+      description: 'Saved across Employees, End-User, and IAM portals.',
+    });
+  };
+
   const getPortalBranding = (portalKey: CustomPortalKey): PortalBrandConfig => {
     const base = activeTenant.portalBranding || getDefaultTenantBranding(activeTenant.name);
-    return base[portalKey] || getDefaultTenantBranding(activeTenant.name)[portalKey];
+    const cfg = base[portalKey] || getDefaultTenantBranding(activeTenant.name)[portalKey];
+    return {
+      ...cfg,
+      logoDataUrl: cfg.logoDataUrl || activeTenant.companyLogoDataUrl || '',
+    };
   };
 
   const toggleTenantModule = (tenantId: string, moduleId: FreeITSMModuleId) => {
@@ -1161,12 +1609,6 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setAllIncidents(prev => [newInc, ...prev]);
     recordAudit('Incidents', 'CREATE', id, `${newInc.priority} ${newInc.title} -> ${resolvedGroup}`);
     showToast({ variant: 'success', title: `Incident Created: ${id}`, description: `${newInc.priority} · ${resolvedGroup} · ${newInc.title}` });
-
-    try {
-      setDoc(doc(db, 'incidents', id), newInc).catch(() => {});
-    } catch {
-      // offline fallback
-    }
     return newInc;
   };
 
@@ -1184,19 +1626,13 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
           note
         });
       }
-      const updated = {
+      return {
         ...inc,
         status,
         updatedAt: now,
         resolutionNotes: resolutionNotes || inc.resolutionNotes,
         activityLog: updatedLog
       };
-      try {
-        setDoc(doc(db, 'incidents', id), updated).catch(() => {});
-      } catch {
-        // fallback
-      }
-      return updated;
     }));
     recordAudit('Incidents', 'STATUS_CHANGE', id, `Moved to ${status}`);
     showToast({ variant: 'success', title: `Incident Updated: ${id}`, description: `State changed to ${status.replace('_', ' ')}` });
@@ -2209,12 +2645,20 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
   ): TelephonyCall => {
     const pType = providerMeta?.providerType || telephonyConfig.providerType;
     const pLabel = providerMeta?.providerLabel || telephonyConfig.providerLabel;
+    const digitsOnly = number.replace(/\D/g, '');
+    const matchedProfile = digitsOnly.length >= 7
+      ? authAccounts.find(a => (a.phone || '').replace(/\D/g, '').endsWith(digitsOnly.slice(-7)))
+      : undefined;
+    const matchedTenant = matchedProfile?.tenantId
+      ? tenants.find(t => t.id === matchedProfile.tenantId)
+      : undefined;
+
     const newCall: TelephonyCall = {
       id: `CALL-${Math.floor(9100 + Math.random() * 800)}`,
       tenantId: activeTenant.id,
       callerNumber: number,
-      callerName: name || 'Remote Engineer / Client',
-      callerCompany: activeTenant.name,
+      callerName: name || matchedProfile?.name || 'Remote Engineer / Client',
+      callerCompany: matchedTenant?.name || activeTenant.name,
       direction: 'outbound',
       status: 'active',
       startTime: new Date().toISOString(),
@@ -2223,6 +2667,9 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
       providerLabel: pLabel,
       liveTranscript: [
         `System: Call session opened for ${number} via ${pLabel}`,
+        ...(matchedProfile
+          ? [`Directory Match: ${matchedProfile.name} (${matchedProfile.department}${matchedProfile.jobTitle ? ` · ${matchedProfile.jobTitle}` : ''})`]
+          : []),
         ...(providerMeta?.initialNote ? [providerMeta.initialNote] : []),
       ],
     };
@@ -2244,11 +2691,14 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const simulateIncomingCall = () => {
+    const tenantUsers = authAccounts.filter(a => a.tenantId === activeTenant.id && a.phone);
+    const pool = tenantUsers.length > 0 ? tenantUsers : authAccounts.filter(a => a.phone);
+    const picked = pool.length > 0 ? pool[Math.floor(Math.random() * Math.min(pool.length, 40))] : undefined;
     const call: TelephonyCall = {
       id: `CALL-${Math.floor(9200 + Math.random() * 700)}`,
       tenantId: activeTenant.id,
-      callerNumber: '+44 20 7183 9920',
-      callerName: 'Dr. Alistair Finch',
+      callerNumber: picked?.phone || '+14155550192',
+      callerName: picked?.name || 'Dr. Alistair Finch',
       callerCompany: activeTenant.name,
       direction: 'inbound',
       status: 'ringing',
@@ -2256,7 +2706,10 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
       durationSec: 0,
       providerType: telephonyConfig.providerType,
       providerLabel: telephonyConfig.providerLabel,
-      liveTranscript: [`Incoming call signal received via ${telephonyConfig.providerLabel} (${activeTenant.domain})`],
+      liveTranscript: [
+        `Incoming call signal received via ${telephonyConfig.providerLabel} (${activeTenant.domain})`,
+        ...(picked ? [`Caller ID Directory Match: ${picked.name} · ${picked.department} (${picked.email})`] : []),
+      ],
     };
     setActiveCall(call);
   };
@@ -2328,6 +2781,76 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return newInv;
   };
 
+  const workspaceTotals = useMemo(
+    () => ({
+      companies: tenants.length,
+      companyLogos: tenants.filter(
+        t =>
+          Boolean(t.companyLogoDataUrl) ||
+          Boolean(t.portalBranding?.employees?.logoDataUrl) ||
+          Boolean(t.portalBranding?.enduser?.logoDataUrl) ||
+          Boolean(t.portalBranding?.iam?.logoDataUrl)
+      ).length,
+      users: authAccounts.length,
+      policies: allIamPolicies.length,
+      kbArticles: allKb.length,
+      wikiPages: allWikiPages.length,
+      incidents: allIncidents.length,
+      requests: allRequests.length,
+      problems: allProblems.length,
+      changes: allChanges.length,
+      assets: allAssets.length,
+      tasks: allTasks.length,
+      calls: allCalls.length,
+    }),
+    [
+      tenants, authAccounts.length, allIamPolicies.length, allKb.length,
+      allWikiPages.length, allIncidents.length, allRequests.length,
+      allProblems.length, allChanges.length, allAssets.length, allTasks.length, allCalls.length,
+    ]
+  );
+
+  // Reload Full Preloaded Enterprise Seed Dataset
+  const loadEnterpriseSeedData = () => {
+    const seed = generateEnterpriseSeedBundle();
+    setTenants(seed.tenants);
+    setActiveTenantId(seed.tenants[0].id);
+    setAuthAccounts(seed.authAccounts);
+    setAllIamPolicies(seed.iamPolicies);
+    setAllIncidents(seed.incidents);
+    setAllRequests(seed.requests);
+    setAllProblems(seed.problems);
+    setAllChanges(seed.changes);
+    setAllAssets(seed.assets);
+    setAllInventory(seed.inventory);
+    setAllCalls(seed.calls);
+    setAllInvoices(seed.invoices);
+    setAllSoftware(seed.software);
+    setAllTasks(seed.tasks);
+    setAllProjects(seed.projects);
+    setAllKb(seed.kbArticles);
+    setAllContracts(seed.contracts);
+    setAllDomains(seed.domains);
+    setAllStatusComponents(seed.statusComponents);
+    setAllMorningChecks(seed.morningChecks);
+    setAllCalendarEvents(seed.calendarEvents);
+    setAllWarRooms(seed.warRooms);
+    setAllLmsCourses(seed.lmsCourses);
+    setAllWikiPages(seed.wikiPages);
+    setAllProcessMaps(seed.processMaps);
+    setAllCustomForms(seed.customForms);
+    setAllCmdbRelations(seed.cmdbRelations);
+    setAllAuditLogs(seed.auditLogs);
+    setAllWorkflows(seed.workflows);
+    setAllTicketWorkflows(seed.ticketWorkflows);
+    setTelephonyConfigsByTenant(seed.telephonyConfigsByTenant);
+    showToast({
+      variant: 'success',
+      title: 'Enterprise Seed Dataset Loaded',
+      description: `${seed.tenants.length} companies, ${seed.authAccounts.length} users, ${seed.iamPolicies.length} policies, ${seed.kbArticles.length} KBs, ${seed.incidents.length} incidents, ${seed.requests.length} requests & ${seed.assets.length} assets ready.`,
+    });
+  };
+
   // Reset to Blank Workspace
   const resetDatabase = () => {
     localStorage.clear();
@@ -2365,26 +2888,60 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const exportDatabaseJSON = (): string => {
-    showToast({ variant: 'info', title: 'Export Generated', description: `Snapshot prepared for ${activeTenant.name}.` });
+    showToast({ variant: 'info', title: 'Export Generated', description: `Full workspace snapshot prepared for ${activeTenant.name}.` });
     return JSON.stringify({
-      version: '3.0-MultiTenant-FreeITSM',
+      version: '4.0-CloudSync-MultiTenant',
       exportedAt: new Date().toISOString(),
       activeTenant: activeTenant.id,
       tenantName: activeTenant.name,
-      incidents, requests, problems, changes, assets, inventory,
-      softwareLicenses, tasks, projects, kbArticles, contracts, domains,
-      statusComponents, morningChecks, calendarEvents, warRooms,
-      lmsCourses, wikiPages, processMaps, customForms, cmdbRelations,
-      calls, invoices, auditLogs
+      tenants,
+      incidents: allIncidents,
+      requests: allRequests,
+      problems: allProblems,
+      changes: allChanges,
+      assets: allAssets,
+      inventory: allInventory,
+      softwareLicenses: allSoftware,
+      tasks: allTasks,
+      projects: allProjects,
+      kbArticles: allKb,
+      contracts: allContracts,
+      domains: allDomains,
+      statusComponents: allStatusComponents,
+      morningChecks: allMorningChecks,
+      calendarEvents: allCalendarEvents,
+      warRooms: allWarRooms,
+      lmsCourses: allLmsCourses,
+      wikiPages: allWikiPages,
+      processMaps: allProcessMaps,
+      customForms: allCustomForms,
+      cmdbRelations: allCmdbRelations,
+      calls: allCalls,
+      invoices: allInvoices,
+      workflows: allWorkflows,
+      ticketWorkflows: allTicketWorkflows,
+      telephonyConfigsByTenant,
+      auditLogs: allAuditLogs
     }, null, 2);
   };
 
   const importDatabaseJSON = (jsonStr: string): boolean => {
     try {
       const data = JSON.parse(jsonStr);
-      if (data.incidents) setAllIncidents(prev => [...data.incidents, ...prev.filter(p => p.tenantId !== activeTenant.id)]);
-      if (data.assets) setAllAssets(prev => [...data.assets, ...prev.filter(p => p.tenantId !== activeTenant.id)]);
-      showToast({ variant: 'success', title: 'Database Snapshot Imported', description: 'Records merged into active tenant.' });
+      if (Array.isArray(data.tenants) && data.tenants.length > 0) setTenants(data.tenants);
+      if (Array.isArray(data.incidents)) setAllIncidents(data.incidents);
+      if (Array.isArray(data.requests)) setAllRequests(data.requests);
+      if (Array.isArray(data.problems)) setAllProblems(data.problems);
+      if (Array.isArray(data.changes)) setAllChanges(data.changes);
+      if (Array.isArray(data.assets)) setAllAssets(data.assets);
+      if (Array.isArray(data.inventory)) setAllInventory(data.inventory);
+      if (Array.isArray(data.workflows)) setAllWorkflows(data.workflows);
+      if (Array.isArray(data.ticketWorkflows)) setAllTicketWorkflows(data.ticketWorkflows);
+      if (Array.isArray(data.processMaps)) setAllProcessMaps(data.processMaps);
+      if (data.telephonyConfigsByTenant && typeof data.telephonyConfigsByTenant === 'object') {
+        setTelephonyConfigsByTenant(data.telephonyConfigsByTenant);
+      }
+      showToast({ variant: 'success', title: 'Database Snapshot Imported', description: 'Records restored and queued for cloud sync.' });
       return true;
     } catch {
       showToast({ variant: 'error', title: 'Import Failed', description: 'Invalid JSON snapshot format.' });
@@ -2396,12 +2953,13 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <ITSMContext.Provider
       value={{
         tenants, activeTenantId, activeTenant, switchTenant, createTenant, updateTenant, toggleTenantModule, isModuleEnabled,
-        updateTenantPortalBranding, getPortalBranding,
+        updateTenantPortalBranding, applyCompanyLogoToAllPortals, getPortalBranding,
         role, setRole, activeTab, setActiveTab, currentUser,
         authSession, authAccounts, managedDevice,
         registerAccount, loginWithCredentials, loginAsTestAccount, enrollCompanyDevice, unenrollCompanyDevice, loginEmployeeDeviceSso, loginViaGooglePortal, logoutSession,
         iamPolicies, createIamIdentity, updateIamIdentity, deleteIamIdentity, createIamPolicy, deleteIamPolicy, hasPermission,
-        googleUser, googleToken, loginWithGoogle, logoutGoogle, isFirebaseConnected,
+        googleUser, googleToken, loginWithGoogle, loginWithGooglePortal, logoutGoogle, isFirebaseConnected,
+        cloudSyncStatus, lastCloudSyncAt, cloudSyncError, forceCloudSync,
         incidents, requests, problems, changes, assets, inventory, calls, invoices, activeCall,
         softwareLicenses, tasks, projects, kbArticles, contracts, domains, statusComponents,
         morningChecks, calendarEvents, warRooms, lmsCourses, wikiPages, processMaps,
@@ -2427,6 +2985,7 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         payInvoice, createInvoice,
         toasts, showToast, dismissToast, clearToasts,
         theme, setTheme, toggleTheme,
+        workspaceTotals, loadEnterpriseSeedData,
         resetDatabase, exportDatabaseJSON, importDatabaseJSON
       }}
     >

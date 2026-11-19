@@ -1,72 +1,142 @@
 {
   "entities": {
-    "Incident": {
-      "title": "Incident",
-      "description": "ITIL Incident record representing an IT disruption or outage",
+    "WorkspaceRoot": {
+      "title": "WorkspaceRoot",
+      "description": "Root multi-device workspace configuration and preferences owned by an authenticated user",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "maxLength": 32 },
+        "ownerUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerEmail": { "type": "string", "maxLength": 160 },
+        "activeTenantId": { "type": "string", "maxLength": 128 },
+        "theme": { "type": "string", "enum": ["dark", "light"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerUid", "ownerEmail", "activeTenantId", "theme", "createdAt", "updatedAt"]
+    },
+    "TenantProfile": {
+      "title": "TenantProfile",
+      "description": "Isolated company profile with SLA policy, enabled modules, custom company logo, and per-portal branding",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "maxLength": 160 },
+        "slug": { "type": "string", "maxLength": 96 },
+        "companyCode": { "type": "string", "maxLength": 48 },
+        "domain": { "type": "string", "maxLength": 160 },
+        "plan": { "type": "string", "enum": ["Enterprise", "Managed MSP", "Dedicated"] },
+        "region": { "type": "string", "maxLength": 64 },
+        "timezone": { "type": "string", "maxLength": 64 },
+        "currency": { "type": "string", "enum": ["USD", "GBP", "EUR"] },
+        "primaryContactEmail": { "type": "string", "maxLength": 160 },
+        "status": { "type": "string", "enum": ["active", "suspended"] },
+        "companyLogoDataUrl": { "type": "string", "maxLength": 260000 },
+        "slaTargets": { "type": "object" },
+        "enabledModules": { "type": "object" },
+        "preferenceTemplate": { "type": "object" },
+        "portalBranding": { "type": "object" },
+        "clientCreatedAt": { "type": "string", "maxLength": 64 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ownerUid", "name", "slug", "domain", "plan", "region", "timezone", "currency", "primaryContactEmail", "status", "slaTargets", "enabledModules", "preferenceTemplate", "portalBranding", "createdAt", "updatedAt"]
+    },
+    "IncidentRecord": {
+      "title": "IncidentRecord",
+      "description": "Tenant-scoped ITIL Incident record with SLA tracking and activity timeline",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "tenantId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
         "title": { "type": "string", "maxLength": 256 },
-        "description": { "type": "string", "maxLength": 4096 },
+        "description": { "type": "string", "maxLength": 8192 },
         "status": { "type": "string", "enum": ["new", "assigned", "in_progress", "pending", "resolved", "closed"] },
         "priority": { "type": "string", "enum": ["P1", "P2", "P3", "P4"] },
-        "category": { "type": "string", "maxLength": 64 },
+        "urgency": { "type": "string", "enum": ["high", "medium", "low"] },
+        "impact": { "type": "string", "enum": ["high", "medium", "low"] },
+        "category": { "type": "string", "enum": ["hardware", "software", "network", "security", "access", "telephony"] },
         "requesterName": { "type": "string", "maxLength": 128 },
-        "requesterEmail": { "type": "string", "maxLength": 128 },
+        "requesterEmail": { "type": "string", "maxLength": 160 },
         "assignee": { "type": "string", "maxLength": 128 },
-        "affectedCI": { "type": "string", "maxLength": 64 },
-        "workNotes": { "type": "string", "maxLength": 4096 },
-        "customerComments": { "type": "string", "maxLength": 4096 },
-        "createdAt": { "type": "string" },
-        "updatedAt": { "type": "string" }
+        "assignmentGroup": { "type": "string", "maxLength": 128 },
+        "affectedCI": { "type": "string", "maxLength": 128 },
+        "slaDeadline": { "type": "string", "maxLength": 64 },
+        "slaBreached": { "type": "boolean" },
+        "sourceChannel": { "type": "string", "enum": ["portal", "email", "phone", "monitor"] },
+        "resolutionNotes": { "type": "string", "maxLength": 4096 },
+        "activityLog": { "type": "array" },
+        "clientCreatedAt": { "type": "string", "maxLength": 64 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "title", "status", "priority", "category"]
+      "required": ["id", "ownerUid", "tenantId", "title", "description", "status", "priority", "urgency", "impact", "category", "requesterName", "requesterEmail", "assignee", "slaDeadline", "slaBreached", "activityLog", "createdAt", "updatedAt"]
     },
-    "ServiceRequest": {
-      "title": "ServiceRequest",
-      "description": "ITIL Service Catalog request item (RITM)",
+    "ServiceRequestRecord": {
+      "title": "ServiceRequestRecord",
+      "description": "Tenant-scoped ITIL Service Catalog request with multi-stage approvals",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "maxLength": 32 },
+        "id": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "tenantId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "catalogItemId": { "type": "string", "maxLength": 64 },
         "catalogItemName": { "type": "string", "maxLength": 256 },
         "description": { "type": "string", "maxLength": 4096 },
+        "requesterName": { "type": "string", "maxLength": 128 },
+        "requesterEmail": { "type": "string", "maxLength": 160 },
+        "department": { "type": "string", "maxLength": 128 },
+        "cost": { "type": "number" },
         "status": { "type": "string", "enum": ["submitted", "manager_approved", "security_review", "fulfillment", "completed", "rejected"] },
         "currentStage": { "type": "number" },
-        "cost": { "type": "number" },
-        "requesterName": { "type": "string", "maxLength": 128 },
-        "requesterEmail": { "type": "string", "maxLength": 128 },
-        "createdAt": { "type": "string" }
+        "approvals": { "type": "array" },
+        "deliveryEstimateDays": { "type": "number" },
+        "deliveryDate": { "type": "string", "maxLength": 64 },
+        "customFormValues": { "type": "object" },
+        "clientCreatedAt": { "type": "string", "maxLength": 64 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "catalogItemName", "status"]
+      "required": ["id", "ownerUid", "tenantId", "catalogItemId", "catalogItemName", "description", "requesterName", "requesterEmail", "department", "cost", "status", "currentStage", "approvals", "deliveryEstimateDays", "createdAt", "updatedAt"]
     },
-    "Asset": {
-      "title": "Asset",
-      "description": "CMDB Configuration Item (CI)",
+    "ModuleStateBucket": {
+      "title": "ModuleStateBucket",
+      "description": "Synchronized module state bucket for workflows, process maps, telephony settings, CMDB assets, IAM policies, and operations records",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "maxLength": 32 },
-        "assetTag": { "type": "string", "maxLength": 64 },
-        "name": { "type": "string", "maxLength": 256 },
-        "type": { "type": "string", "maxLength": 64 },
-        "serialNumber": { "type": "string", "maxLength": 128 },
-        "status": { "type": "string", "enum": ["in_use", "in_stock", "maintenance", "retired"] },
-        "location": { "type": "string", "maxLength": 128 }
+        "id": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "moduleKey": { "type": "string", "maxLength": 64 },
+        "items": { "type": "array" },
+        "settingsMap": { "type": "object" },
+        "itemCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "assetTag", "name", "status"]
+      "required": ["id", "ownerUid", "moduleKey", "itemCount", "createdAt", "updatedAt"]
     }
   },
   "firestore": {
-    "/incidents/{incidentId}": {
-      "schema": "Incident",
-      "description": "Collection of all ITIL incidents"
+    "/workspaces/{ownerUid}": {
+      "schema": "WorkspaceRoot",
+      "description": "Root workspace metadata, theme, and active company selection for an authenticated user"
     },
-    "/service_requests/{requestId}": {
-      "schema": "ServiceRequest",
-      "description": "Collection of all service catalog requests"
+    "/workspaces/{ownerUid}/tenants/{tenantId}": {
+      "schema": "TenantProfile",
+      "description": "Multi-company tenant profiles, custom uploaded logos, portal branding, SLA policies, and module toggles"
     },
-    "/assets/{assetId}": {
-      "schema": "Asset",
-      "description": "CMDB Configuration Items"
+    "/workspaces/{ownerUid}/incidents/{incidentId}": {
+      "schema": "IncidentRecord",
+      "description": "Tenant-scoped ITIL incident records persisted across sessions and devices"
+    },
+    "/workspaces/{ownerUid}/service_requests/{requestId}": {
+      "schema": "ServiceRequestRecord",
+      "description": "Tenant-scoped ITIL service request records persisted across sessions and devices"
+    },
+    "/workspaces/{ownerUid}/module_state/{bucketId}": {
+      "schema": "ModuleStateBucket",
+      "description": "Per-module synchronized state buckets for workflows, process maps, telephony configs, assets, IAM policies, and settings"
     }
   }
 }

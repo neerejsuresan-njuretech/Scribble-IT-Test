@@ -7,8 +7,11 @@ export const KnowledgeBasePage: React.FC = () => {
   const { activeTenant, kbArticles, createKbArticle, voteKbHelpful, showToast } = useITSM();
   const [search, setSearch] = useState('');
   const [visFilter, setVisFilter] = useState<'all' | 'public' | 'internal'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [page, setPage] = useState<number>(1);
   const [selectedId, setSelectedId] = useState<string>(kbArticles[0]?.id || '');
   const [showNew, setShowNew] = useState(false);
+  const PAGE_SIZE = 15;
 
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('Operations');
@@ -38,15 +41,23 @@ export const KnowledgeBasePage: React.FC = () => {
     }
   };
 
+  const categories = Array.from(new Set(kbArticles.map(k => k.category))).sort();
+
   const filtered = kbArticles.filter(k => {
     const matchesSearch = k.title.toLowerCase().includes(search.toLowerCase()) ||
       k.content.toLowerCase().includes(search.toLowerCase()) ||
-      k.category.toLowerCase().includes(search.toLowerCase());
+      k.category.toLowerCase().includes(search.toLowerCase()) ||
+      k.tags.some(t => t.toLowerCase().includes(search.toLowerCase()));
     const matchesVis = visFilter === 'all' || k.visibility === visFilter;
-    return matchesSearch && matchesVis;
+    const matchesCat = categoryFilter === 'all' || k.category === categoryFilter;
+    return matchesSearch && matchesVis && matchesCat;
   });
 
-  const selected = filtered.find(k => k.id === selectedId) || filtered[0];
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pagedArticles = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const selected = filtered.find(k => k.id === selectedId) || pagedArticles[0] || filtered[0];
 
   const handlePublish = (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,42 +139,95 @@ export const KnowledgeBasePage: React.FC = () => {
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="relative flex-1 max-w-md">
+        <div className="relative flex-1 min-w-[220px] max-w-md">
           <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search articles, runbooks, error codes..." className="w-full bg-neutral-900 border border-neutral-800 pl-8 pr-3 py-2 text-neutral-200 focus:outline-none" />
+          <input
+            value={search}
+            onChange={e => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            placeholder="Search 100+ SOPs, runbooks, tags, error codes..."
+            className="w-full bg-neutral-900 border border-neutral-800 pl-8 pr-3 py-2 text-neutral-200 focus:outline-none"
+          />
         </div>
-        <div className="flex border border-neutral-800 bg-neutral-900/60 p-0.5">
-          {(['all', 'public', 'internal'] as const).map(v => (
-            <button
-              key={v}
-              onClick={() => setVisFilter(v)}
-              className={`px-3 py-1 uppercase text-[11px] ${visFilter === v ? 'bg-neutral-800 text-white font-bold' : 'text-neutral-400'}`}
-            >
-              {v}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={categoryFilter}
+            onChange={e => {
+              setCategoryFilter(e.target.value);
+              setPage(1);
+            }}
+            className="bg-neutral-900 border border-neutral-800 px-2.5 py-2 text-[11px] text-neutral-200 focus:outline-none"
+          >
+            <option value="all">All Categories ({categories.length})</option>
+            {categories.map(cat => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+          <div className="flex border border-neutral-800 bg-neutral-900/60 p-0.5">
+            {(['all', 'public', 'internal'] as const).map(v => (
+              <button
+                key={v}
+                onClick={() => {
+                  setVisFilter(v);
+                  setPage(1);
+                }}
+                className={`px-3 py-1 uppercase text-[11px] ${visFilter === v ? 'bg-neutral-800 text-white font-bold' : 'text-neutral-400'}`}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        <div className="lg:col-span-5 border border-neutral-800 divide-y divide-neutral-900 bg-neutral-950">
-          {filtered.map(art => (
-            <button
-              key={art.id}
-              onClick={() => setSelectedId(art.id)}
-              className={`w-full text-left p-4 transition-colors ${selected?.id === art.id ? 'bg-neutral-900 text-white' : 'hover:bg-neutral-900/40 text-neutral-300'}`}
-            >
-              <div className="text-[11px] text-neutral-500 flex items-center justify-between">
-                <span>{art.id} · {art.category}</span>
-                <span>{art.visibility.toUpperCase()}</span>
+        <div className="lg:col-span-5 border border-neutral-800 bg-neutral-950 flex flex-col">
+          <div className="divide-y divide-neutral-900">
+            {pagedArticles.map(art => (
+              <button
+                key={art.id}
+                onClick={() => setSelectedId(art.id)}
+                className={`w-full text-left p-4 transition-colors ${selected?.id === art.id ? 'bg-neutral-900 text-white' : 'hover:bg-neutral-900/40 text-neutral-300'}`}
+              >
+                <div className="text-[11px] text-neutral-500 flex items-center justify-between gap-2">
+                  <span className="truncate">{art.id} · {art.category}</span>
+                  <span className="shrink-0">{art.visibility.toUpperCase()}</span>
+                </div>
+                <div className="font-bold text-neutral-100 mt-1">{art.title}</div>
+                <div className="text-[11px] text-neutral-500 mt-1 tabular-nums">
+                  {art.views} views · {art.helpfulVotes} helpful · Updated {art.updatedAt}
+                </div>
+              </button>
+            ))}
+            {pagedArticles.length === 0 && <div className="p-6 text-center text-neutral-500">No articles match your filter.</div>}
+          </div>
+          {totalPages > 1 && (
+            <div className="border-t border-neutral-800 px-3 py-2.5 flex items-center justify-between text-[11px] bg-neutral-900/40">
+              <span className="text-neutral-400 tabular-nums">
+                Page {safePage}/{totalPages} ({filtered.length} docs)
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={safePage <= 1}
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  className="px-2.5 py-1 border border-neutral-800 bg-neutral-950 text-neutral-200 disabled:opacity-40 hover:bg-neutral-800"
+                >
+                  Prev
+                </button>
+                <button
+                  type="button"
+                  disabled={safePage >= totalPages}
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  className="px-2.5 py-1 border border-neutral-800 bg-neutral-950 text-neutral-200 disabled:opacity-40 hover:bg-neutral-800"
+                >
+                  Next
+                </button>
               </div>
-              <div className="font-bold text-neutral-100 mt-1">{art.title}</div>
-              <div className="text-[11px] text-neutral-500 mt-1 tabular-nums">
-                {art.views} views · {art.helpfulVotes} helpful · Updated {art.updatedAt}
-              </div>
-            </button>
-          ))}
-          {filtered.length === 0 && <div className="p-6 text-center text-neutral-500">No articles match your filter.</div>}
+            </div>
+          )}
         </div>
 
         <div className="lg:col-span-7 border border-neutral-800 bg-neutral-900/30 p-6 space-y-4">
