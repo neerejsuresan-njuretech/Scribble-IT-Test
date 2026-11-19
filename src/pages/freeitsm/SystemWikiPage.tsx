@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useITSM } from '../../context/ITSMContext';
+import { apiUrl, parseApiJson } from '../../utils/apiClient';
 import { WikiPage } from '../../types/itsm';
 import {
   FileCode2,
@@ -118,7 +119,7 @@ export const SystemWikiPage: React.FC = () => {
     );
 
     try {
-      const res = await fetch('/api/wiki/grounding', {
+      const res = await fetch(apiUrl('/api/wiki/grounding'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -130,7 +131,7 @@ export const SystemWikiPage: React.FC = () => {
         })
       });
 
-      const data = await res.json();
+      const data = await parseApiJson<GroundingResponse & { error?: string }>(res, 'Google Search Grounding');
       if (!res.ok) {
         const msg = data?.error || `Search grounding request failed (${res.status})`;
         setGroundingError(msg);

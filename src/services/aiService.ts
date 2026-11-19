@@ -1,4 +1,5 @@
 import type { IncidentCategory, IncidentPriority, RiskLevel } from '../types/itsm';
+import { apiUrl, parseApiJson } from '../utils/apiClient';
 
 export interface IncidentTriageResponse {
   recommendedPriority: IncidentPriority;
@@ -79,12 +80,12 @@ export interface TriageAssistantKbPayload {
 }
 
 async function postAiJson<TReq, TRes>(url: string, payload: TReq): Promise<TRes> {
-  const res = await fetch(url, {
+  const res = await fetch(apiUrl(url), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  const data = await res.json();
+  const data = await parseApiJson<TRes & { error?: string }>(res, 'AI Service');
   if (!res.ok) {
     throw new Error(data?.error || `AI request failed (${res.status})`);
   }

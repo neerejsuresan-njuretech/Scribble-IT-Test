@@ -1,298 +1,128 @@
 import React, { useEffect, useState } from 'react';
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
-  PauseCircle,
-  ShieldAlert,
-  Ban,
-} from 'lucide-react';
+import { Clock, AlertTriangle, CheckCircle2, PauseCircle, XCircle } from 'lucide-react';
 import type { ServiceRequest } from '../../types/itsm';
 
-export type SlaHealthTier =
-  | 'healthy'
-  | 'warning'
-  | 'critical'
-  | 'breached'
-  | 'met'
-  | 'paused'
-  | 'cancelled';
+export type SlaTier = 'breached' | 'critical' | 'warning' | 'healthy' | 'met' | 'paused' | 'cancelled';
 
-export interface SlaEvaluation {
-  tier: SlaHealthTier;
-  /** Positive = ms left before breach, negative = ms overdue */
-  remainingMs: number;
-  /** 0 to 100 percentage of SLA window remaining */
-  remainingPct: number;
-  /** Compact tabular countdown readout (e.g., "02:44:19", "1d 22h", "-00:18:05") */
-  countdownText: string;
-  /** Explicit accessible text label paired with color indicator */
-  statusLabel: string;
-  /** Formatted target deadline timestamp */
-  deadlineLabel: string;
-}
-
-// Single shared 1-second ticker across all mounted SLA timers
-type TickListener = (now: number) => void;
-const tickListeners = new Set<TickListener>();
-let sharedIntervalId: number | null = null;
-
-function subscribeSlaClock(listener: TickListener): () => void {
-  tickListeners.add(listener);
-  if (sharedIntervalId === null && typeof window !== 'undefined') {
-    sharedIntervalId = window.setInterval(() => {
-      const now = Date.now();
-      tickListeners.forEach(cb => cb(now));
-    }, 1000);
-  }
-  return () => {
-    tickListeners.delete(listener);
-    if (tickListeners.size === 0 && sharedIntervalId !== null && typeof window !== 'undefined') {
-      window.clearInterval(sharedIntervalId);
-      sharedIntervalId = null;
-    }
-  };
-}
-
-export function useSlaNow(active = true): number {
-  const [now, setNow] = useState<number>(() => Date.now());
-  useEffect(() => {
-    if (!active) return;
-    setNow(Date.now());
-    return subscribeSlaClock(setNow);
-  }, [active]);
-  return now;
-}
-
-/**
- * Derives a consistent fulfillment SLA deadline ISO string for a Service Request
- * from its creation timestamp and estimated business/calendar delivery days.
- */
-export function getRequestSlaDeadline(
-  req: Pick<ServiceRequest, 'createdAt' | 'deliveryEstimateDays' | 'deliveryDate'>
-): string {
-  const createdMs = new Date(req.createdAt).getTime();
-  const estDays = Math.max(1, Number(req.deliveryEstimateDays) || 3);
-  if (Number.isFinite(createdMs)) {
-    return new Date(createdMs + estDays * 24 * 60 * 60 * 1000).toISOString();
-  }
-  if (req.deliveryDate) {
-    const parsed = new Date(req.deliveryDate).getTime();
-    if (Number.isFinite(parsed)) return new Date(parsed).toISOString();
-  }
-  return new Date(Date.now() + estDays * 24 * 60 * 60 * 1000).toISOString();
-}
-
-function formatDurationMs(absMs: number, includeSeconds: boolean): string {
-  const totalSeconds = Math.max(0, Math.floor(absMs / 1000));
-  const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor((totalSeconds % 86400) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-
-  if (days >= 1) {
-    return `${days}d ${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m`;
-  }
-  if (includeSeconds) {
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds
-      .toString()
-      .padStart(2, '0')}`;
-  }
-  return `${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m`;
-}
-
-export interface EvaluateSlaOptions {
+export interface SlaEvaluationInput {
   createdAt: string;
   deadline: string;
   isCompleted?: boolean;
   isPaused?: boolean;
   isCancelled?: boolean;
   breachedFlag?: boolean;
-  warningThresholdPct?: number;
-  criticalThresholdPct?: number;
   nowMs?: number;
 }
 
-export function evaluateSlaState({
-  createdAt,
-  deadline,
-  isCompleted = false,
-  isPaused = false,
-  isCancelled = false,
-  breachedFlag = false,
-  warningThresholdPct = 45,
-  criticalThresholdPct = 15,
-  nowMs = Date.now(),
-}: EvaluateSlaOptions): SlaEvaluation {
-  const createdMs = new Date(createdAt).getTime();
-  const deadlineMs = new Date(deadline).getTime();
-  const validDeadline = Number.isFinite(deadlineMs) ? deadlineMs : nowMs + 4 * 3600 * 1000;
-  const validCreated =
-    Number.isFinite(createdMs) && createdMs < validDeadline
-      ? createdMs
-      : validDeadline - 4 * 3600 * 1000;
+export interface SlaEvaluationResult {
+  tier: SlaTier;
+  percentElapsed: number;
+  remainingMs: number;
+  label: string;
+  shortText: string;
+}
 
-  const totalWindowMs = Math.max(validDeadline - validCreated, 60 * 1000);
-  const remainingMs = validDeadline - nowMs;
-  const rawPct = (remainingMs / totalWindowMs) * 100;
-  const remainingPct = Math.max(0, Math.min(100, Math.round(rawPct)));
+export function getRequestSlaDeadline(req: Pick<ServiceRequest, 'createdAt' | 'deliveryEstimateDays' | 'deliveryDate'>): string {
+  if (req.deliveryDate) {
+    const parsed = new Date(req.deliveryDate);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString();
+    }
+  }
+  const createdMs = new Date(req.createdAt).getTime();
+  const baseMs = Number.isNaN(createdMs) ? Date.now() : createdMs;
+  const days = Math.max(1, Number(req.deliveryEstimateDays) || 3);
+  return new Date(baseMs + days * 24 * 60 * 60 * 1000).toISOString();
+}
 
-  const deadlineDate = new Date(validDeadline);
-  const deadlineLabel = deadlineDate.toLocaleString([], {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+function formatDurationMs(absMs: number): string {
+  const totalMinutes = Math.max(0, Math.floor(absMs / 60000));
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const mins = totalMinutes % 60;
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${mins}m`;
+  return `${mins}m`;
+}
 
-  if (isCancelled) {
+export function evaluateSlaState(input: SlaEvaluationInput): SlaEvaluationResult {
+  const now = input.nowMs ?? Date.now();
+  const createdMs = new Date(input.createdAt).getTime();
+  const deadlineMs = new Date(input.deadline).getTime();
+  const totalWindowMs = Math.max(60000, (Number.isNaN(deadlineMs) ? now + 3600000 : deadlineMs) - (Number.isNaN(createdMs) ? now : createdMs));
+  const remainingMs = (Number.isNaN(deadlineMs) ? now : deadlineMs) - now;
+  const elapsedMs = totalWindowMs - remainingMs;
+  const percentElapsed = Math.max(0, Math.min(100, Math.round((elapsedMs / totalWindowMs) * 100)));
+
+  if (input.isCancelled) {
     return {
       tier: 'cancelled',
+      percentElapsed,
       remainingMs,
-      remainingPct: 0,
-      countdownText: 'Stopped',
-      statusLabel: 'Cancelled',
-      deadlineLabel,
+      label: 'SLA Cancelled',
+      shortText: 'Cancelled',
     };
   }
 
-  if (isCompleted) {
-    if (breachedFlag) {
-      return {
-        tier: 'breached',
-        remainingMs: 0,
-        remainingPct: 0,
-        countdownText: 'Closed Late',
-        statusLabel: 'Breached',
-        deadlineLabel,
-      };
-    }
+  if (input.isCompleted) {
     return {
       tier: 'met',
-      remainingMs: Math.max(0, remainingMs),
-      remainingPct: 100,
-      countdownText: 'Within SLA',
-      statusLabel: 'SLA Met',
-      deadlineLabel,
+      percentElapsed: 100,
+      remainingMs,
+      label: input.breachedFlag ? 'Completed (Post-Breach)' : 'SLA Met',
+      shortText: input.breachedFlag ? 'Met Late' : 'SLA Met',
     };
   }
 
-  if (isPaused) {
-    const absText = formatDurationMs(Math.abs(remainingMs), false);
+  if (input.isPaused) {
     return {
       tier: 'paused',
+      percentElapsed,
       remainingMs,
-      remainingPct,
-      countdownText: remainingMs >= 0 ? `${absText} left` : `-${absText}`,
-      statusLabel: 'Paused',
-      deadlineLabel,
+      label: `SLA Paused (${formatDurationMs(Math.abs(remainingMs))} left)`,
+      shortText: `Paused · ${formatDurationMs(Math.abs(remainingMs))}`,
     };
   }
 
-  if (breachedFlag || remainingMs <= 0) {
-    const overdueMs = Math.max(0, -remainingMs);
+  if (input.breachedFlag || remainingMs <= 0) {
+    const overdue = formatDurationMs(Math.abs(remainingMs));
     return {
       tier: 'breached',
+      percentElapsed: 100,
       remainingMs,
-      remainingPct: 0,
-      countdownText: `-${formatDurationMs(overdueMs, true)}`,
-      statusLabel: 'Breached',
-      deadlineLabel,
+      label: `SLA Breached by ${overdue}`,
+      shortText: `Breached -${overdue}`,
     };
   }
 
-  // Critical threshold: <= 15% remaining OR <= 20 minutes remaining
-  const isCritical =
-    remainingPct <= criticalThresholdPct || remainingMs <= 20 * 60 * 1000;
-  if (isCritical) {
+  const remainingFormatted = formatDurationMs(remainingMs);
+  if (percentElapsed >= 85 || remainingMs <= 30 * 60 * 1000) {
     return {
       tier: 'critical',
+      percentElapsed,
       remainingMs,
-      remainingPct,
-      countdownText: formatDurationMs(remainingMs, true),
-      statusLabel: 'Critical',
-      deadlineLabel,
+      label: `Critical · ${remainingFormatted} remaining`,
+      shortText: `${remainingFormatted} left`,
     };
   }
 
-  // Warning threshold: <= 45% remaining OR <= 60 minutes remaining
-  const isWarning =
-    remainingPct <= warningThresholdPct || remainingMs <= 60 * 60 * 1000;
-  if (isWarning) {
+  if (percentElapsed >= 65) {
     return {
       tier: 'warning',
+      percentElapsed,
       remainingMs,
-      remainingPct,
-      countdownText: formatDurationMs(remainingMs, true),
-      statusLabel: 'Warning',
-      deadlineLabel,
+      label: `Warning · ${remainingFormatted} remaining`,
+      shortText: `${remainingFormatted} left`,
     };
   }
 
   return {
     tier: 'healthy',
+    percentElapsed,
     remainingMs,
-    remainingPct,
-    countdownText: formatDurationMs(remainingMs, true),
-    statusLabel: 'On Track',
-    deadlineLabel,
+    label: `On Track · ${remainingFormatted} remaining`,
+    shortText: `${remainingFormatted} left`,
   };
-}
-
-interface TierStyles {
-  textClass: string;
-  barClass: string;
-  indicatorClass: string;
-  containerTintClass: string;
-  Icon: React.ComponentType<{ className?: string }>;
-}
-
-function getTierStyles(tier: SlaHealthTier): TierStyles {
-  switch (tier) {
-    case 'healthy':
-    case 'met':
-      return {
-        textClass: 'text-emerald-400',
-        barClass: 'bg-emerald-500',
-        indicatorClass: 'bg-emerald-500',
-        containerTintClass: 'border-emerald-800/70 bg-emerald-950/20',
-        Icon: tier === 'met' ? CheckCircle2 : Clock,
-      };
-    case 'warning':
-      return {
-        textClass: 'text-amber-400',
-        barClass: 'bg-amber-500',
-        indicatorClass: 'bg-amber-500',
-        containerTintClass: 'border-amber-800/70 bg-amber-950/20',
-        Icon: AlertTriangle,
-      };
-    case 'critical':
-    case 'breached':
-      return {
-        textClass: 'text-rose-400',
-        barClass: 'bg-rose-500',
-        indicatorClass: 'bg-rose-500',
-        containerTintClass: 'border-rose-800/70 bg-rose-950/20',
-        Icon: ShieldAlert,
-      };
-    case 'paused':
-      return {
-        textClass: 'text-neutral-400',
-        barClass: 'bg-neutral-500',
-        indicatorClass: 'bg-neutral-500',
-        containerTintClass: 'border-neutral-800 bg-neutral-900/40',
-        Icon: PauseCircle,
-      };
-    case 'cancelled':
-    default:
-      return {
-        textClass: 'text-neutral-500',
-        barClass: 'bg-neutral-600',
-        indicatorClass: 'bg-neutral-600',
-        containerTintClass: 'border-neutral-800 bg-neutral-900/30',
-        Icon: Ban,
-      };
-  }
 }
 
 export interface SlaTimerProps {
@@ -302,30 +132,72 @@ export interface SlaTimerProps {
   isPaused?: boolean;
   isCancelled?: boolean;
   breachedFlag?: boolean;
-  /** table = table column cell, compact = narrow split-list card row, detailed = full detail header */
-  variant?: 'table' | 'compact' | 'detailed';
-  /** Optional custom title shown in detailed mode (e.g., "SLA Resolution Window" or "Fulfillment SLA Target") */
+  variant?: 'compact' | 'table' | 'detailed';
   label?: string;
-  warningThresholdPct?: number;
-  criticalThresholdPct?: number;
-  className?: string;
 }
+
+const TIER_STYLES: Record<SlaTier, { text: string; bar: string; border: string; bg: string }> = {
+  breached: {
+    text: 'text-rose-400',
+    bar: 'bg-rose-500',
+    border: 'border-rose-800/70',
+    bg: 'bg-rose-950/20',
+  },
+  critical: {
+    text: 'text-rose-300',
+    bar: 'bg-rose-500',
+    border: 'border-rose-800/60',
+    bg: 'bg-rose-950/15',
+  },
+  warning: {
+    text: 'text-amber-400',
+    bar: 'bg-amber-500',
+    border: 'border-amber-800/60',
+    bg: 'bg-amber-950/15',
+  },
+  healthy: {
+    text: 'text-emerald-400',
+    bar: 'bg-emerald-500',
+    border: 'border-neutral-800',
+    bg: 'bg-neutral-900/40',
+  },
+  met: {
+    text: 'text-emerald-400',
+    bar: 'bg-emerald-500',
+    border: 'border-emerald-800/50',
+    bg: 'bg-emerald-950/15',
+  },
+  paused: {
+    text: 'text-sky-400',
+    bar: 'bg-sky-500',
+    border: 'border-sky-800/50',
+    bg: 'bg-sky-950/15',
+  },
+  cancelled: {
+    text: 'text-neutral-500',
+    bar: 'bg-neutral-600',
+    border: 'border-neutral-800',
+    bg: 'bg-neutral-900/30',
+  },
+};
 
 export const SlaTimer: React.FC<SlaTimerProps> = ({
   createdAt,
   deadline,
-  isCompleted = false,
-  isPaused = false,
-  isCancelled = false,
-  breachedFlag = false,
-  variant = 'table',
-  label = 'SLA Resolution Window',
-  warningThresholdPct = 45,
-  criticalThresholdPct = 15,
-  className = '',
+  isCompleted,
+  isPaused,
+  isCancelled,
+  breachedFlag,
+  variant = 'compact',
+  label = 'SLA Window',
 }) => {
-  const isLive = !isCompleted && !isPaused && !isCancelled;
-  const nowMs = useSlaNow(isLive);
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+
+  useEffect(() => {
+    if (isCompleted || isPaused || isCancelled) return;
+    const interval = window.setInterval(() => setNowMs(Date.now()), 30000);
+    return () => window.clearInterval(interval);
+  }, [isCompleted, isPaused, isCancelled]);
 
   const state = evaluateSlaState({
     createdAt,
@@ -334,176 +206,64 @@ export const SlaTimer: React.FC<SlaTimerProps> = ({
     isPaused,
     isCancelled,
     breachedFlag,
-    warningThresholdPct,
-    criticalThresholdPct,
     nowMs,
   });
+  const styles = TIER_STYLES[state.tier];
 
-  const { textClass, barClass, indicatorClass, containerTintClass, Icon } = getTierStyles(
-    state.tier
-  );
+  const renderIcon = () => {
+    if (state.tier === 'breached' || state.tier === 'critical') return <AlertTriangle className="w-3 h-3 shrink-0" />;
+    if (state.tier === 'met') return <CheckCircle2 className="w-3 h-3 shrink-0" />;
+    if (state.tier === 'paused') return <PauseCircle className="w-3 h-3 shrink-0" />;
+    if (state.tier === 'cancelled') return <XCircle className="w-3 h-3 shrink-0" />;
+    return <Clock className="w-3 h-3 shrink-0" />;
+  };
 
-  // For breached active records, fill bar 100% red so visual urgency is unmistakable
-  const barWidthPct =
-    state.tier === 'breached'
-      ? 100
-      : state.tier === 'met'
-      ? 100
-      : state.tier === 'cancelled'
-      ? 0
-      : Math.max(4, state.remainingPct);
-
-  const tooltip = `${state.statusLabel} · ${state.countdownText} · Target: ${state.deadlineLabel}${
-    isLive ? ` (${state.remainingPct}% remaining)` : ''
-  }`;
+  if (variant === 'table') {
+    return (
+      <div className="min-w-[115px] space-y-1">
+        <div className={`flex items-center gap-1 text-[11px] font-mono-strict tabular-nums font-semibold ${styles.text}`}>
+          {renderIcon()}
+          <span className="truncate">{state.shortText}</span>
+        </div>
+        <div className="h-1 w-full bg-neutral-800 overflow-hidden">
+          <div className={`h-full ${styles.bar}`} style={{ width: `${state.percentElapsed}%` }} />
+        </div>
+      </div>
+    );
+  }
 
   if (variant === 'compact') {
     return (
-      <div className={`space-y-1 ${className}`} title={tooltip}>
-        <div className="flex items-center justify-between gap-2 text-[10px] leading-none">
-          <span className={`inline-flex items-center gap-1 font-semibold ${textClass} whitespace-nowrap`}>
-            <Icon className="w-3 h-3 shrink-0" />
-            <span>{state.statusLabel}</span>
+      <div className="space-y-1">
+        <div className={`flex items-center justify-between gap-2 text-[10px] font-mono-strict tabular-nums ${styles.text}`}>
+          <span className="inline-flex items-center gap-1 truncate">
+            {renderIcon()}
+            <span>{state.shortText}</span>
           </span>
-          <span className={`font-mono-strict tabular-nums font-bold ${textClass} whitespace-nowrap`}>
-            {state.countdownText}
-          </span>
+          <span className="text-neutral-500">{state.percentElapsed}%</span>
         </div>
-        <div className="relative w-full h-1 bg-neutral-800 overflow-hidden">
-          <div
-            className={`h-full transition-all duration-300 ${barClass}`}
-            style={{ width: `${barWidthPct}%` }}
-          />
-          {isLive && (
-            <>
-              <span
-                aria-hidden="true"
-                className="absolute top-0 bottom-0 w-px bg-neutral-950/70"
-                style={{ left: `${criticalThresholdPct}%` }}
-              />
-              <span
-                aria-hidden="true"
-                className="absolute top-0 bottom-0 w-px bg-neutral-950/70"
-                style={{ left: `${warningThresholdPct}%` }}
-              />
-            </>
-          )}
+        <div className="h-1 w-full bg-neutral-800 overflow-hidden">
+          <div className={`h-full ${styles.bar}`} style={{ width: `${state.percentElapsed}%` }} />
         </div>
       </div>
     );
   }
 
-  if (variant === 'detailed') {
-    return (
-      <div
-        className={`p-3 border space-y-2 ${containerTintClass} ${className}`}
-        title={tooltip}
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className={`w-2 h-2 shrink-0 ${indicatorClass}`} aria-hidden="true" />
-            <span className="text-neutral-300 font-semibold tracking-wide uppercase truncate">
-              {label}
-            </span>
-            <span className="text-neutral-600" aria-hidden="true">
-              ·
-            </span>
-            <span className={`inline-flex items-center gap-1 font-bold ${textClass} whitespace-nowrap`}>
-              <Icon className="w-3.5 h-3.5 shrink-0" />
-              <span>{state.statusLabel}</span>
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-[10px] text-neutral-500 hidden sm:inline">
-              Target {state.deadlineLabel}
-            </span>
-            <span className={`font-mono-strict tabular-nums text-xs font-bold ${textClass}`}>
-              {state.countdownText}
-            </span>
-          </div>
-        </div>
-
-        {/* Visual countdown bar with critical & warning breach markers */}
-        <div className="space-y-1">
-          <div className="relative w-full h-2 bg-neutral-800 overflow-hidden">
-            <div
-              className={`h-full transition-all duration-300 ${barClass}`}
-              style={{ width: `${barWidthPct}%` }}
-            />
-            {isLive && (
-              <>
-                <span
-                  aria-hidden="true"
-                  title={`Critical threshold (${criticalThresholdPct}%)`}
-                  className="absolute top-0 bottom-0 w-0.5 bg-neutral-950/80"
-                  style={{ left: `${criticalThresholdPct}%` }}
-                />
-                <span
-                  aria-hidden="true"
-                  title={`Warning threshold (${warningThresholdPct}%)`}
-                  className="absolute top-0 bottom-0 w-0.5 bg-neutral-950/80"
-                  style={{ left: `${warningThresholdPct}%` }}
-                />
-              </>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between text-[10px] text-neutral-500 tabular-nums">
-            <span>
-              {state.tier === 'breached'
-                ? 'Breach threshold exceeded — immediate escalation required'
-                : state.tier === 'critical'
-                ? `Critical breach zone (<${criticalThresholdPct}% window remaining)`
-                : state.tier === 'warning'
-                ? `Approaching SLA breach warning (<${warningThresholdPct}% remaining)`
-                : state.tier === 'met'
-                ? 'Fulfilled within agreed SLA target'
-                : state.tier === 'paused'
-                ? 'SLA clock paused while record is pending'
-                : state.tier === 'cancelled'
-                ? 'SLA tracking stopped'
-                : `Healthy buffer (${state.remainingPct}% SLA window remaining)`}
-            </span>
-            {isLive && <span className="font-mono-strict shrink-0">{state.remainingPct}%</span>}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Default: 'table' cell variant
   return (
-    <div className={`min-w-[162px] max-w-[210px] space-y-1.5 ${className}`} title={tooltip}>
-      <div className="flex items-center justify-between gap-2 text-[11px] leading-none">
-        <span className={`inline-flex items-center gap-1.5 font-semibold ${textClass} whitespace-nowrap`}>
-          <Icon className="w-3.5 h-3.5 shrink-0" />
-          <span>{state.statusLabel}</span>
+    <div className={`p-3 border ${styles.border} ${styles.bg} space-y-2`}>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+        <span className={`font-semibold inline-flex items-center gap-1.5 ${styles.text}`}>
+          {renderIcon()}
+          <span>{label}</span>
         </span>
-        <span className={`font-mono-strict tabular-nums font-bold ${textClass} whitespace-nowrap`}>
-          {state.countdownText}
-        </span>
+        <span className={`font-mono-strict tabular-nums font-bold ${styles.text}`}>{state.label}</span>
       </div>
-
-      <div className="relative w-full h-1.5 bg-neutral-800 overflow-hidden">
-        <div
-          className={`h-full transition-all duration-300 ${barClass}`}
-          style={{ width: `${barWidthPct}%` }}
-        />
-        {isLive && (
-          <>
-            <span
-              aria-hidden="true"
-              className="absolute top-0 bottom-0 w-px bg-neutral-950/75"
-              style={{ left: `${criticalThresholdPct}%` }}
-            />
-            <span
-              aria-hidden="true"
-              className="absolute top-0 bottom-0 w-px bg-neutral-950/75"
-              style={{ left: `${warningThresholdPct}%` }}
-            />
-          </>
-        )}
+      <div className="h-1.5 w-full bg-neutral-800 overflow-hidden">
+        <div className={`h-full ${styles.bar} transition-all`} style={{ width: `${state.percentElapsed}%` }} />
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono-strict tabular-nums text-neutral-500">
+        <span>Opened: {new Date(createdAt).toLocaleString()}</span>
+        <span>Target: {new Date(deadline).toLocaleString()}</span>
       </div>
     </div>
   );

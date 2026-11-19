@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { useITSM } from '../../context/ITSMContext';
 import type { TelephonyProviderConfig, TelephonyProviderType } from '../../types/itsm';
+import { apiUrl, parseApiJson } from '../../utils/apiClient';
 
 type TelephonyTab = 'dialer' | 'ccp' | 'mobile' | 'providers';
 
@@ -222,8 +223,8 @@ export const TelephonyModule: React.FC = () => {
   // Fetch server-side telephony bridge readiness
   useEffect(() => {
     let active = true;
-    fetch('/api/telephony/status')
-      .then(res => (res.ok ? res.json() : null))
+    fetch(apiUrl('/api/telephony/status'))
+      .then(res => (res.ok && (res.headers.get('content-type') || '').includes('application/json') ? res.json() : null))
       .then((data: ServerTelephonyStatus | null) => {
         if (active && data) setServerStatus(data);
       })
@@ -435,7 +436,7 @@ export const TelephonyModule: React.FC = () => {
     if (!cleaned) return;
     setBridgingCall(true);
     try {
-      const response = await fetch('/api/telephony/bridge-call', {
+      const response = await fetch(apiUrl('/api/telephony/bridge-call'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -447,13 +448,13 @@ export const TelephonyModule: React.FC = () => {
           outboundWebhookUrl: telephonyConfig.outboundWebhookUrl || undefined,
         }),
       });
-      const payload = (await response.json()) as {
+      const payload = await parseApiJson<{
         ok?: boolean;
         message?: string;
         callSid?: string;
         status?: string;
         error?: string;
-      };
+      }>(response, 'Carrier Call Bridge');
       if (!response.ok || !payload.ok) {
         showToast({
           variant: 'error',
@@ -585,7 +586,7 @@ export const TelephonyModule: React.FC = () => {
         return;
       }
 
-      const res = await fetch('/api/telephony/test-connection', {
+      const res = await fetch(apiUrl('/api/telephony/test-connection'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -595,7 +596,10 @@ export const TelephonyModule: React.FC = () => {
           amazonConnectRegion: draftConfig.amazonConnectRegion,
         }),
       });
-      const data = (await res.json()) as { ok?: boolean; detail?: string; error?: string; latencyMs?: number };
+      const data = await parseApiJson<{ ok?: boolean; detail?: string; error?: string; latencyMs?: number }>(
+        res,
+        'Telephony Connection Probe'
+      );
       if (!res.ok || !data.ok) {
         setConnResult({
           ok: false,
