@@ -957,7 +957,7 @@ export const TelephonyModule: React.FC = () => {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    <div className="grid grid-cols-4 gap-2 text-xs">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                       <button
                         onClick={() => setIsMuted(!isMuted)}
                         className={`min-h-[52px] p-2 border transition-colors flex flex-col items-center justify-center gap-1 ${

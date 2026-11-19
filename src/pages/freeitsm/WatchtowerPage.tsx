@@ -43,22 +43,24 @@ export const WatchtowerPage: React.FC = () => {
   return (
     <div className="space-y-6 font-mono text-xs">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-800 pb-4">
-        <div>
-          <div className="text-neutral-500 uppercase tracking-wider">{activeTenant.name} · ATTENTION COMMAND CENTER</div>
-          <h1 className="text-xl font-bold text-neutral-100 mt-0.5 flex items-center gap-3">
-            <Eye className="w-5 h-5 text-rose-500" />
-            <span>WATCHTOWER</span>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4 border-b border-neutral-800 pb-4">
+        <div className="min-w-0">
+          <div className="text-[11px] text-neutral-500 uppercase tracking-wider truncate">{activeTenant.name} · ATTENTION COMMAND CENTER</div>
+          <h1 className="text-lg sm:text-xl font-bold text-neutral-100 mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="inline-flex items-center gap-2">
+              <Eye className="w-5 h-5 text-rose-500 shrink-0" />
+              <span>WATCHTOWER</span>
+            </span>
             <span className="text-xs font-normal text-amber-400 tabular-nums">{totalAlerts} Attention Signals</span>
           </h1>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar sm:flex-wrap pb-1 sm:pb-0 max-w-full">
           {Object.keys(visibleCards).map(k => (
             <button
               key={k}
               onClick={() => toggleCard(k)}
-              className={`px-2.5 py-1 border uppercase text-[10px] transition-colors ${
+              className={`min-h-[34px] sm:min-h-0 px-2.5 py-1 border uppercase text-[10px] transition-colors whitespace-nowrap shrink-0 ${
                 visibleCards[k]
                   ? 'border-neutral-600 bg-neutral-800 text-neutral-100 font-bold'
                   : 'border-neutral-800 bg-neutral-950 text-neutral-500'
@@ -86,8 +88,8 @@ export const WatchtowerPage: React.FC = () => {
         </div>
       )}
 
-      {/* Watchtower Attention Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      {/* Watchtower Attention Cards (1-col narrow phone, 2-col large phone/tablet, 4-col desktop) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
         {visibleCards.incidents && (
           <Link to="/incidents" className="p-4 border border-neutral-800 bg-neutral-900/30 hover:border-neutral-600 transition-colors space-y-3">
             <div className="flex items-center justify-between text-neutral-400">

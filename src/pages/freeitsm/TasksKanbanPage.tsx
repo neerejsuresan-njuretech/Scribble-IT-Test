@@ -18,6 +18,7 @@ export const TasksKanbanPage: React.FC = () => {
   const [priority, setPriority] = useState<'high' | 'medium' | 'low'>('medium');
   const [dueDate, setDueDate] = useState('2026-11-24');
   const [linkedRecordId, setLinkedRecordId] = useState('');
+  const [colFilter, setColFilter] = useState<'all' | TaskColumn>('all');
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,14 +50,14 @@ export const TasksKanbanPage: React.FC = () => {
       </div>
 
       {showNew && (
-        <form onSubmit={handleAdd} className="p-4 border border-neutral-700 bg-neutral-900/50 grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
+        <form onSubmit={handleAdd} className="p-4 border border-neutral-700 bg-neutral-900/50 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
           <div className="sm:col-span-2">
             <label className="block text-neutral-400 mb-1">Task Title *</label>
-            <input required value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Patch nginx ingress nodes" className="w-full bg-neutral-950 border border-neutral-700 px-3 py-2 text-neutral-100" />
+            <input required value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Patch nginx ingress nodes" className="w-full min-h-[38px] bg-neutral-950 border border-neutral-700 px-3 py-2 text-neutral-100" />
           </div>
           <div>
             <label className="block text-neutral-400 mb-1">Priority</label>
-            <select value={priority} onChange={e => setPriority(e.target.value as 'high' | 'medium' | 'low')} className="w-full bg-neutral-950 border border-neutral-700 px-3 py-2 text-neutral-100">
+            <select value={priority} onChange={e => setPriority(e.target.value as 'high' | 'medium' | 'low')} className="w-full min-h-[38px] bg-neutral-950 border border-neutral-700 px-3 py-2 text-neutral-100">
               <option value="high">High</option>
               <option value="medium">Medium</option>
               <option value="low">Low</option>
@@ -64,26 +65,58 @@ export const TasksKanbanPage: React.FC = () => {
           </div>
           <div>
             <label className="block text-neutral-400 mb-1">Link Ticket / Project</label>
-            <select value={linkedRecordId} onChange={e => setLinkedRecordId(e.target.value)} className="w-full bg-neutral-950 border border-neutral-700 px-3 py-2 text-neutral-100">
+            <select value={linkedRecordId} onChange={e => setLinkedRecordId(e.target.value)} className="w-full min-h-[38px] bg-neutral-950 border border-neutral-700 px-3 py-2 text-neutral-100">
               <option value="">None</option>
               {incidents.map(i => <option key={i.id} value={i.id}>{i.id}</option>)}
               {projects.map(p => <option key={p.id} value={p.id}>{p.code}</option>)}
             </select>
           </div>
-          <div className="flex gap-2">
-            <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full bg-neutral-950 border border-neutral-700 px-2 py-2 text-neutral-100" />
-            <button type="submit" className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold shrink-0">Add</button>
+          <div className="flex gap-2 sm:col-span-2 lg:col-span-1">
+            <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full min-h-[38px] bg-neutral-950 border border-neutral-700 px-2 py-2 text-neutral-100" />
+            <button type="submit" className="min-h-[38px] px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold shrink-0">Add</button>
           </div>
         </form>
       )}
 
+      {/* Mobile & Tablet Column Filter Bar (< xl) */}
+      <div className="xl:hidden flex items-center gap-1 overflow-x-auto no-scrollbar border border-neutral-800 bg-neutral-950 p-1">
+        <button
+          type="button"
+          onClick={() => setColFilter('all')}
+          className={`min-h-[36px] px-3 py-1.5 text-[11px] uppercase whitespace-nowrap shrink-0 transition-colors ${
+            colFilter === 'all' ? 'bg-neutral-800 text-white font-bold' : 'text-neutral-400 hover:text-neutral-200'
+          }`}
+        >
+          All ({tasks.length})
+        </button>
+        {COLUMNS.map(col => {
+          const count = tasks.filter(t => t.column === col.id).length;
+          return (
+            <button
+              key={col.id}
+              type="button"
+              onClick={() => setColFilter(col.id)}
+              className={`min-h-[36px] px-3 py-1.5 text-[11px] uppercase whitespace-nowrap shrink-0 transition-colors ${
+                colFilter === col.id ? 'bg-neutral-800 text-white font-bold' : 'text-neutral-400 hover:text-neutral-200'
+              }`}
+            >
+              {col.label} ({count})
+            </button>
+          );
+        })}
+      </div>
+
       {/* 5-Column Kanban */}
-      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4 items-start">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 items-start">
         {COLUMNS.map((col, colIdx) => {
           const colTasks = tasks.filter(t => t.column === col.id);
           const nextCol = COLUMNS[colIdx + 1];
+          const hiddenOnCompact = colFilter !== 'all' && colFilter !== col.id;
           return (
-            <div key={col.id} className="border border-neutral-800 bg-neutral-950 flex flex-col">
+            <div
+              key={col.id}
+              className={`${hiddenOnCompact ? 'hidden xl:flex' : 'flex'} border border-neutral-800 bg-neutral-950 flex-col`}
+            >
               <div className="px-3 py-2.5 border-b border-neutral-800 bg-neutral-900/60 flex items-center justify-between font-bold text-neutral-200 uppercase">
                 <span>{col.label}</span>
                 <span className="text-neutral-500 tabular-nums">{colTasks.length}</span>

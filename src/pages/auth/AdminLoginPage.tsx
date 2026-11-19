@@ -50,17 +50,17 @@ export const AdminLoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100 dot-matrix-bg font-mono text-xs flex flex-col justify-between p-6">
-      <div className="max-w-md w-full mx-auto flex items-center justify-between border-b border-neutral-800 pb-4">
-        <Link to="/login" className="text-neutral-400 hover:text-white flex items-center gap-1.5">
+    <div className="min-h-screen bg-neutral-950 text-neutral-100 dot-matrix-bg font-mono text-xs flex flex-col justify-between p-4 sm:p-6 overflow-x-clip">
+      <div className="max-w-md w-full mx-auto flex flex-wrap items-center justify-between gap-2 border-b border-neutral-800 pb-3.5 sm:pb-4">
+        <Link to="/login" className="min-h-[36px] text-neutral-400 hover:text-white flex items-center gap-1.5 whitespace-nowrap">
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>All Portals</span>
         </Link>
         <span className="text-[10px] text-rose-500 font-bold uppercase tracking-wider">SUPER ADMIN AUTH</span>
       </div>
 
-      <div className="max-w-md w-full mx-auto my-auto py-8">
-        <div className="border border-neutral-800 bg-neutral-950 p-6 sm:p-8 space-y-6">
+      <div className="max-w-md w-full mx-auto my-auto py-6 sm:py-8">
+        <div className="border border-neutral-800 bg-neutral-950 p-5 sm:p-8 space-y-5 sm:space-y-6">
           <div className="space-y-1.5">
             <div className="flex items-center gap-2 text-rose-500">
               <ShieldAlert className="w-5 h-5" />
@@ -173,7 +173,7 @@ export const AdminLoginPage: React.FC = () => {
             </button>
           </div>
 
-          <div className="border-t border-neutral-900 pt-3 flex items-center justify-between text-[11px] text-neutral-500">
+          <div className="border-t border-neutral-900 pt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-[11px] text-neutral-500">
             <Link to="/login/employee" className="hover:text-neutral-300">Employee SSO &rarr;</Link>
             <Link to="/login/portal" className="hover:text-neutral-300">Self-Service Login &rarr;</Link>
           </div>

@@ -336,7 +336,7 @@ export const CORE_IAM_POLICIES: IamPolicy[] = [
     id: 'POL-SUPER-ADMIN',
     tenantId: 'tenant-default',
     name: 'Root Tenant Governance',
-    description: 'Full access across multi-tenant controls, IAM, workflows, incidents, and CMDB assets.',
+    description: 'Exclusive multi-tenant governance, company branding, module availability, and emergency approval override.',
     permissions: [
       'incidents:read', 'incidents:write', 'assets:read', 'assets:write',
       'requests:approve', 'changes:cab_vote', 'workflows:manage',
@@ -350,18 +350,28 @@ export const CORE_IAM_POLICIES: IamPolicy[] = [
     id: 'POL-EMPLOYEE-OPS',
     tenantId: 'tenant-default',
     name: 'ITIL Operations & CMDB Engineer',
-    description: 'Read/write access to incidents, requests, assets, and change reviews.',
-    permissions: ['incidents:read', 'incidents:write', 'assets:read', 'assets:write', 'requests:approve', 'changes:cab_vote'],
+    description: 'Standard IT operations access to incidents, requests, assets, and CMDB. Approvals require explicit assignment.',
+    permissions: ['incidents:read', 'incidents:write', 'assets:read', 'assets:write'],
     mfaRequired: false,
+    ssoOnly: false,
+    createdAt: '2026-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'POL-APPROVER-CAB',
+    tenantId: 'tenant-default',
+    name: 'Designated Approver & CAB Member',
+    description: 'Authorized to approve assigned service request stages and cast assigned CAB change votes.',
+    permissions: ['incidents:read', 'assets:read', 'requests:approve', 'changes:cab_vote'],
+    mfaRequired: true,
     ssoOnly: false,
     createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
     id: 'POL-IAM-ADMIN',
     tenantId: 'tenant-default',
-    name: 'IAM Directory & Policy Officer',
-    description: 'Create identity IDs, assign company IDs, roles, and access policies.',
-    permissions: ['iam:manage', 'incidents:read', 'assets:read', 'workflows:manage'],
+    name: 'IAM Directory & Device Trust Officer',
+    description: 'Manage corporate identities, access policies, and generate single-use MDM device enrollment verification codes.',
+    permissions: ['iam:manage', 'devices:enroll_code', 'incidents:read', 'assets:read'],
     mfaRequired: true,
     ssoOnly: false,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -1193,6 +1203,7 @@ export function generateEnterpriseSeedBundle(): EnterpriseSeedBundle {
       const tpl = REQUEST_CATALOG_TEMPLATES[i % REQUEST_CATALOG_TEMPLATES.length];
       const requester = pickUser(spec.id, i + 7, false);
       const approver = pickUser(spec.id, i + 2, true);
+      const secReviewer = pickUser(spec.id, i + 5, true);
       const st = reqStatuses[i % reqStatuses.length];
       const stage = st === 'submitted' ? 1 : st === 'manager_approved' ? 2 : st === 'security_review' ? 3 : 4;
       requests.push({
@@ -1211,13 +1222,15 @@ export function generateEnterpriseSeedBundle(): EnterpriseSeedBundle {
           {
             role: 'Line Manager',
             approver: approver.name,
+            approverEmail: approver.email,
             status: st === 'submitted' ? 'pending' : st === 'rejected' ? 'rejected' : 'approved',
             timestamp: st !== 'submitted' ? isoDaysAgo((i % 25)) : undefined,
             notes: st === 'rejected' ? 'Deferred to Q3 departmental budget cycle.' : 'Approved per standard role profile.',
           },
           {
             role: 'Security & FinOps Review',
-            approver: 'Elena Vance',
+            approver: secReviewer.name,
+            approverEmail: secReviewer.email,
             status: stage >= 3 && st !== 'rejected' ? 'approved' : 'pending',
             timestamp: stage >= 3 && st !== 'rejected' ? isoDaysAgo(Math.max(0, (i % 25) - 1)) : undefined,
           },
@@ -1304,8 +1317,8 @@ export function generateEnterpriseSeedBundle(): EnterpriseSeedBundle {
         scheduledStart: `${dateDaysFromNow((i % 14) + 1)}T02:00:00Z`,
         scheduledEnd: `${dateDaysFromNow((i % 14) + 1)}T04:00:00Z`,
         cabVotes: [
-          { member: 'Test Super Admin', role: 'CAB Chair', vote: st === 'draft' ? 'pending' : 'approved', notes: 'Rollback plan validated.' },
-          { member: eng.name, role: 'Security Reviewer', vote: st === 'draft' || st === 'cab_review' ? 'pending' : 'approved' },
+          { member: 'Test Super Admin', memberEmail: 'admin@njuretech.io', role: 'CAB Chair', vote: st === 'draft' ? 'pending' : 'approved', notes: 'Rollback plan validated.' },
+          { member: eng.name, memberEmail: eng.email, role: 'Security Reviewer', vote: st === 'draft' || st === 'cab_review' ? 'pending' : 'approved' },
         ],
         requestedBy: reqBy.name,
         assignedEngineer: eng.name,

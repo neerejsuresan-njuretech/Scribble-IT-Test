@@ -68,10 +68,10 @@ export const ProjectsPage: React.FC = () => {
           const linkedTasks = tasks.filter(t => t.projectId === p.id);
           const budgetPct = Math.min(100, Math.round((p.budgetSpent / Math.max(1, p.budgetTotal)) * 100));
           return (
-            <div key={p.id} className="border border-neutral-800 bg-neutral-950 p-5 space-y-4">
+            <div key={p.id} className="border border-neutral-800 bg-neutral-950 p-4 sm:p-5 space-y-4">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                <div>
-                  <div className="text-neutral-500 flex items-center gap-2">
+                <div className="min-w-0">
+                  <div className="text-neutral-500 flex flex-wrap items-center gap-x-2 gap-y-0.5">
                     <span>{p.code}</span>
                     <span>·</span>
                     <span>Owner: {p.owner}</span>
@@ -81,7 +81,7 @@ export const ProjectsPage: React.FC = () => {
                   <h2 className="text-base font-bold text-neutral-100 mt-1">{p.title}</h2>
                   <p className="text-neutral-400 mt-1">{p.summary}</p>
                 </div>
-                <div className="text-right shrink-0 tabular-nums">
+                <div className="text-left md:text-right shrink-0 tabular-nums border-t border-neutral-900 pt-2.5 md:border-t-0 md:pt-0">
                   <div className={p.health === 'on_track' ? 'text-emerald-400 font-bold' : p.health === 'at_risk' ? 'text-amber-400 font-bold' : 'text-rose-400 font-bold'}>
                     {p.health.replace('_', ' ').toUpperCase()}
                   </div>
@@ -91,7 +91,7 @@ export const ProjectsPage: React.FC = () => {
               </div>
 
               {/* Stage Gate Progress Strip */}
-              <div className="grid grid-cols-5 gap-1.5 pt-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 pt-2">
                 {STAGES.map((st, idx) => {
                   const currentIdx = STAGES.indexOf(p.stage);
                   const active = st === p.stage;
@@ -100,7 +100,7 @@ export const ProjectsPage: React.FC = () => {
                     <button
                       key={st}
                       onClick={() => updateProjectStage(p.id, st, Math.min(100, (idx + 1) * 20))}
-                      className={`py-2 px-2 border text-center uppercase text-[10px] transition-colors ${
+                      className={`min-h-[38px] py-2 px-2 border text-center uppercase text-[10px] transition-colors ${
                         active
                           ? 'border-rose-500 bg-rose-950/30 text-white font-bold'
                           : passed

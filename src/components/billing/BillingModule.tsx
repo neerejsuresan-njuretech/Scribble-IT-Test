@@ -124,9 +124,9 @@ export const BillingModule: React.FC<BillingModuleProps> = ({ onOpenCreate }) =>
 
         {/* Right Detail: Dot Matrix Printable Invoice Preview */}
         {selectedInvoice ? (
-          <div className="lg:col-span-7 border border-neutral-800 bg-neutral-950 p-6 space-y-6 font-mono text-xs">
+          <div className="lg:col-span-7 border border-neutral-800 bg-neutral-950 p-4 sm:p-6 space-y-5 sm:space-y-6 font-mono text-xs">
             {/* Header info */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-800 pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 border-b border-neutral-800 pb-4">
               <div className="space-y-1">
                 <div className="text-base font-bold text-neutral-100">{selectedInvoice.id}</div>
                 <div className="text-neutral-400">Issue Date: {selectedInvoice.issueDate} · Due: {selectedInvoice.dueDate}</div>
@@ -136,14 +136,14 @@ export const BillingModule: React.FC<BillingModuleProps> = ({ onOpenCreate }) =>
                 {selectedInvoice.status !== 'paid' ? (
                   <button
                     onClick={() => setShowCheckout(true)}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold tracking-wider transition-colors flex items-center gap-2"
+                    className="w-full sm:w-auto min-h-[40px] px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold tracking-wider transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
                   >
-                    <CreditCard className="w-4 h-4" />
+                    <CreditCard className="w-4 h-4 shrink-0" />
                     <span>Pay Now (${selectedInvoice.amount.toFixed(2)})</span>
                   </button>
                 ) : (
                   <div className="px-3 py-1.5 border border-emerald-800 bg-emerald-950/30 text-emerald-400 flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4" />
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
                     <span>PAID ON {selectedInvoice.paidAt ? new Date(selectedInvoice.paidAt).toLocaleDateString() : 'RECORD'}</span>
                   </div>
                 )}
@@ -151,7 +151,7 @@ export const BillingModule: React.FC<BillingModuleProps> = ({ onOpenCreate }) =>
             </div>
 
             {/* Bill To & Issuer Details */}
-            <div className="grid grid-cols-2 gap-4 border-b border-neutral-800 pb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-b border-neutral-800 pb-4">
               <div className="space-y-1">
                 <span className="text-neutral-500 uppercase text-[10px]">ISSUED BY</span>
                 <div className="font-bold text-neutral-200">NJURE TECH LTD</div>
@@ -163,31 +163,33 @@ export const BillingModule: React.FC<BillingModuleProps> = ({ onOpenCreate }) =>
                 <span className="text-neutral-500 uppercase text-[10px]">BILLED TO</span>
                 <div className="font-bold text-neutral-200">{selectedInvoice.customerName}</div>
                 <div className="text-neutral-400">{selectedInvoice.organization}</div>
-                <div className="text-neutral-500">{selectedInvoice.customerEmail}</div>
+                <div className="text-neutral-500 break-all">{selectedInvoice.customerEmail}</div>
               </div>
             </div>
 
             {/* Line Items Table */}
             <div className="space-y-2">
               <div className="text-neutral-400 uppercase text-[10px]">LINE ITEMS</div>
-              <div className="border border-neutral-800 divide-y divide-neutral-800">
-                <div className="p-2.5 bg-neutral-900/40 text-neutral-400 grid grid-cols-12 text-[11px] uppercase">
-                  <div className="col-span-7">Description</div>
-                  <div className="col-span-2 text-center">Qty</div>
-                  <div className="col-span-3 text-right">Price</div>
-                </div>
-                {selectedInvoice.lineItems.map((item, idx) => (
-                  <div key={idx} className="p-2.5 grid grid-cols-12 text-neutral-200">
-                    <div className="col-span-7">{item.description}</div>
-                    <div className="col-span-2 text-center tabular-nums">{item.quantity}</div>
-                    <div className="col-span-3 text-right tabular-nums">${(item.quantity * item.unitPrice).toFixed(2)}</div>
+              <div className="overflow-x-auto border border-neutral-800">
+                <div className="min-w-[320px] divide-y divide-neutral-800">
+                  <div className="p-2.5 bg-neutral-900/40 text-neutral-400 grid grid-cols-12 text-[11px] uppercase">
+                    <div className="col-span-7">Description</div>
+                    <div className="col-span-2 text-center">Qty</div>
+                    <div className="col-span-3 text-right">Price</div>
                   </div>
-                ))}
+                  {selectedInvoice.lineItems.map((item, idx) => (
+                    <div key={idx} className="p-2.5 grid grid-cols-12 gap-2 text-neutral-200">
+                      <div className="col-span-7">{item.description}</div>
+                      <div className="col-span-2 text-center tabular-nums">{item.quantity}</div>
+                      <div className="col-span-3 text-right tabular-nums">${(item.quantity * item.unitPrice).toFixed(2)}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {/* Total Row */}
               <div className="flex justify-end pt-2">
-                <div className="w-64 space-y-1 text-right">
+                <div className="w-full sm:w-64 space-y-1 text-right">
                   <div className="flex justify-between text-neutral-400">
                     <span>Subtotal</span>
                     <span className="tabular-nums">${selectedInvoice.amount.toFixed(2)}</span>
@@ -235,13 +237,13 @@ export const BillingModule: React.FC<BillingModuleProps> = ({ onOpenCreate }) =>
       {/* Checkout Modal Simulation */}
       {showCheckout && selectedInvoice && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-neutral-950 border border-neutral-800 p-6 space-y-5 font-mono text-xs">
+          <div className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-neutral-950 border border-neutral-800 p-5 sm:p-6 space-y-5 font-mono text-xs">
             <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
               <div className="space-y-0.5">
                 <div className="text-sm font-bold text-neutral-100">PAYMENT CHECKOUT</div>
                 <div className="text-neutral-500">Invoice {selectedInvoice.id} · ${selectedInvoice.amount.toFixed(2)}</div>
               </div>
-              <button onClick={() => setShowCheckout(false)} className="text-neutral-500 hover:text-neutral-200">
+              <button onClick={() => setShowCheckout(false)} className="p-1 text-neutral-500 hover:text-neutral-200">
                 ✕
               </button>
             </div>
@@ -249,7 +251,7 @@ export const BillingModule: React.FC<BillingModuleProps> = ({ onOpenCreate }) =>
             {/* Payment Method Selector */}
             <div className="space-y-2">
               <label className="text-neutral-400 block uppercase">Select Payment Channel</label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {[
                   { id: 'credit_card', label: 'Card' },
                   { id: 'wire_ach', label: 'Wire / ACH' },

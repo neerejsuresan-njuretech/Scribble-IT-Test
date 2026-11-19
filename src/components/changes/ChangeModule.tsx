@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useITSM } from '../../context/ITSMContext';
-import { ChangeRequest, ChangeStatus, RiskLevel, ChangeType } from '../../types/itsm';
+import { ChangeStatus } from '../../types/itsm';
 import { MinimalStatus } from '../common/DotMatrixDisplay';
 import { ActivityStreamPanel } from '../common/ActivityStreamPanel';
 import {
   ShieldCheck, Plus, Check, X, Calendar, AlertTriangle, FileCode,
   MessageSquare, HardDrive, Download, Search, CheckCircle2, Clock,
-  Layers, ArrowRight, ShieldAlert, Cpu, Sparkles, RefreshCw
+  Sparkles, RefreshCw, Lock
 } from 'lucide-react';
 import { chatService, driveService } from '../../services/workspaceService';
 import { aiService, type ChangeAssessResponse } from '../../services/aiService';
@@ -18,7 +18,30 @@ interface ChangeModuleProps {
 
 export const ChangeModule: React.FC<ChangeModuleProps> = ({ onOpenCreate }) => {
   const navigate = useNavigate();
-  const { changes, voteCab, updateChangeStatus, currentUser, googleToken, loginWithGoogle, showToast } = useITSM();
+  const {
+    changes,
+    voteCab,
+    canVoteCab,
+    reassignCabVoter,
+    updateChangeStatus,
+    authAccounts,
+    activeTenant,
+    isSuperAdmin,
+    isIamPortal,
+    role,
+    currentUser,
+    googleToken,
+    loginWithGoogle,
+    showToast
+  } = useITSM();
+
+  const corporateCabOptions = useMemo(
+    () =>
+      authAccounts
+        .filter(a => a.tenantId === activeTenant.id && a.portalType !== 'end_user' && a.status !== 'suspended')
+        .slice(0, 60),
+    [authAccounts, activeTenant.id]
+  );
 
   const [selectedId, setSelectedId] = useState<string>(changes[0]?.id || '');
   const [searchQuery, setSearchQuery] = useState('');
@@ -50,9 +73,10 @@ export const ChangeModule: React.FC<ChangeModuleProps> = ({ onOpenCreate }) => {
 
   const handleVote = (member: string, roleName: string, vote: 'approved' | 'rejected') => {
     if (!selectedChange) return;
-    voteCab(selectedChange.id, member, roleName, vote, voteNote || `Vote recorded in CAB session by ${currentUser.name}.`);
+    const res = voteCab(selectedChange.id, member, roleName, vote, voteNote || `Vote recorded in CAB session by ${currentUser.name}.`);
+    if (!res.ok) return;
     setVoteNote('');
-    setActionNotice(`CAB vote "${vote.toUpperCase()}" submitted for ${member}.`);
+    setActionNotice(`CAB vote "${vote.toUpperCase()}" submitted for ${roleName}.`);
     setTimeout(() => setActionNotice(null), 3000);
   };
 
@@ -376,8 +400,9 @@ export const ChangeModule: React.FC<ChangeModuleProps> = ({ onOpenCreate }) => {
                   <span className="text-neutral-500">State:</span>
                   <select
                     value={selectedChange.status}
+                    disabled={role === 'customer'}
                     onChange={e => updateChangeStatus(selectedChange.id, e.target.value as ChangeStatus)}
-                    className="bg-neutral-900 border border-neutral-700 text-neutral-200 px-2 py-1.5 focus:outline-none text-xs"
+                    className="bg-neutral-900 border border-neutral-700 text-neutral-200 px-2 py-1.5 focus:outline-none text-xs disabled:opacity-60"
                   >
                     <option value="draft">State: Draft</option>
                     <option value="cab_review">State: CAB Review</option>
@@ -545,71 +570,114 @@ export const ChangeModule: React.FC<ChangeModuleProps> = ({ onOpenCreate }) => {
                 />
               </div>
 
-              {/* Vote Note Input */}
-              <div className="p-3 border border-neutral-800 bg-neutral-900/20 space-y-2">
-                <label className="text-[10px] text-neutral-500 uppercase block">
-                  Casting Notes / RFC Conditions (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={voteNote}
-                  onChange={e => setVoteNote(e.target.value)}
-                  placeholder="e.g., Authorized on condition of secondary standby technician on call..."
-                  className="w-full bg-neutral-950 border border-neutral-700 text-neutral-200 px-3 py-1.5 text-xs focus:outline-none focus:border-neutral-500 placeholder:text-neutral-600"
-                />
-              </div>
+              {/* Vote Note Input (Enabled when user holds at least one authorized CAB vote or Super Admin) */}
+              {selectedChange.cabVotes.some(v => v.vote === 'pending' && canVoteCab(v).allowed) && (
+                <div className="p-3 border border-neutral-800 bg-neutral-900/20 space-y-2">
+                  <label className="text-[10px] text-neutral-500 uppercase block">
+                    Casting Notes / RFC Conditions (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={voteNote}
+                    onChange={e => setVoteNote(e.target.value)}
+                    placeholder="e.g., Authorized on condition of secondary standby technician on call..."
+                    className="w-full bg-neutral-950 border border-neutral-700 text-neutral-200 px-3 py-1.5 text-xs focus:outline-none focus:border-neutral-500 placeholder:text-neutral-600"
+                  />
+                </div>
+              )}
 
-              {/* CAB Member Vote Cards */}
+              {/* CAB Member Vote Cards (Strict Designated Account or Super Admin Governance) */}
               <div className="space-y-2">
-                {selectedChange.cabVotes.map((v, i) => (
-                  <div key={i} className="p-3 border border-neutral-800 bg-neutral-900/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                    <div>
-                      <div className="font-bold text-neutral-200 flex items-center gap-2">
-                        <span>{v.member}</span>
-                        <span className="text-neutral-600">·</span>
-                        <span className="text-[11px] font-normal text-neutral-400">{v.role}</span>
+                {selectedChange.cabVotes.map((v, i) => {
+                  const voteCheck = canVoteCab(v);
+                  return (
+                    <div key={i} className="p-3.5 border border-neutral-800 bg-neutral-900/30 space-y-2.5 text-xs">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-bold text-neutral-200 flex flex-wrap items-center gap-2">
+                            <span>{v.member}</span>
+                            <span className="text-neutral-600">·</span>
+                            <span className="text-[11px] font-normal text-neutral-400">{v.role}</span>
+                          </div>
+                          {v.memberEmail && (
+                            <div className="text-[10px] text-sky-400 font-mono-strict truncate">
+                              Designated CAB Account: {v.memberEmail}
+                            </div>
+                          )}
+                          {v.notes && (
+                            <div className="text-[11px] text-neutral-400 italic mt-0.5">
+                              "{v.notes}"
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-3 shrink-0">
+                          <span className={`uppercase font-bold text-[11px] ${
+                            v.vote === 'approved'
+                              ? 'text-emerald-400'
+                              : v.vote === 'rejected'
+                              ? 'text-rose-500'
+                              : 'text-amber-500'
+                          }`}>
+                            {v.vote}
+                          </span>
+
+                          {v.vote === 'pending' && voteCheck.allowed && (
+                            <div className="flex gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleVote(v.member, v.role, 'approved')}
+                                className="px-2.5 py-1 border border-emerald-700 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/60 flex items-center gap-1 font-bold"
+                                title={voteCheck.isSuperAdminOverride ? 'Approve via Super Admin Override' : 'Cast Approve Vote'}
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                                <span>{voteCheck.isSuperAdminOverride ? 'Approve (Admin)' : 'Approve'}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleVote(v.member, v.role, 'rejected')}
+                                className="px-2.5 py-1 border border-rose-800 bg-rose-950/40 text-rose-300 hover:bg-rose-900/60 flex items-center gap-1 font-bold"
+                                title="Cast Reject Vote"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                                <span>Reject</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      {v.notes && (
-                        <div className="text-[11px] text-neutral-400 italic mt-0.5">
-                          "{v.notes}"
+
+                      {v.vote === 'pending' && !voteCheck.allowed && (
+                        <div className="p-2 border border-neutral-800 bg-neutral-950/80 text-[11px] text-neutral-400 flex items-start gap-2">
+                          <Lock className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                          <span>{voteCheck.reason}</span>
+                        </div>
+                      )}
+
+                      {v.vote === 'pending' && (isSuperAdmin || isIamPortal) && (
+                        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-neutral-800/80">
+                          <span className="text-[10px] text-neutral-500 uppercase">Reassign CAB Voter:</span>
+                          <select
+                            defaultValue=""
+                            onChange={e => {
+                              if (!e.target.value) return;
+                              reassignCabVoter(selectedChange.id, v.role, e.target.value);
+                              e.target.value = '';
+                            }}
+                            className="bg-neutral-950 border border-neutral-700 text-neutral-200 px-2 py-1 text-[11px] focus:outline-none max-w-xs"
+                          >
+                            <option value="">Select specific corporate account...</option>
+                            {corporateCabOptions.map(acc => (
+                              <option key={acc.id} value={acc.id}>
+                                {acc.name} ({acc.email})
+                              </option>
+                            ))}
+                          </select>
                         </div>
                       )}
                     </div>
-
-                    <div className="flex items-center gap-3">
-                      <span className={`uppercase font-bold text-[11px] ${
-                        v.vote === 'approved'
-                          ? 'text-emerald-400'
-                          : v.vote === 'rejected'
-                          ? 'text-rose-500'
-                          : 'text-amber-500'
-                      }`}>
-                        {v.vote}
-                      </span>
-
-                      {v.vote === 'pending' && (
-                        <div className="flex gap-1.5">
-                          <button
-                            onClick={() => handleVote(v.member, v.role, 'approved')}
-                            className="px-2.5 py-1 border border-emerald-700 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/60 flex items-center gap-1 font-bold"
-                            title="Cast Approve Vote"
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                            <span>Approve</span>
-                          </button>
-                          <button
-                            onClick={() => handleVote(v.member, v.role, 'rejected')}
-                            className="px-2.5 py-1 border border-rose-800 bg-rose-950/40 text-rose-300 hover:bg-rose-900/60 flex items-center gap-1 font-bold"
-                            title="Cast Reject Vote"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                            <span>Reject</span>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 

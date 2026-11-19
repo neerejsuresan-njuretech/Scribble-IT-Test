@@ -44,6 +44,7 @@ export type IamPermissionScope =
   | 'changes:cab_vote'
   | 'workflows:manage'
   | 'iam:manage'
+  | 'devices:enroll_code'
   | 'tenants:admin'
   | 'billing:read';
 
@@ -97,8 +98,33 @@ export interface ManagedDeviceTrust {
   osPlatform: string;
   mdmProvider: string;
   domain: string;
+  tenantId?: string;
+  companyCode?: string;
+  enrollmentCode?: string;
+  enrolledByEmail?: string;
+  verifiedByIam?: boolean;
+  status?: 'active' | 'revoked';
   enrolledAt: string;
   certificateThumbprint: string;
+}
+
+export interface DeviceEnrollmentCode {
+  id: string;
+  code: string;
+  tenantId: string;
+  companyCode: string;
+  assignedEmail?: string;
+  assignedEmployeeName?: string;
+  targetHostname?: string;
+  mdmProvider: string;
+  status: 'active' | 'used' | 'revoked' | 'expired';
+  issuedBy: string;
+  issuedByEmail: string;
+  createdAt: string;
+  expiresAt: string;
+  usedAt?: string;
+  usedByDeviceId?: string;
+  usedByHostname?: string;
 }
 
 export type CustomPortalKey = 'employees' | 'enduser' | 'iam';
@@ -201,6 +227,7 @@ export type RequestStatus = 'submitted' | 'manager_approved' | 'security_review'
 export interface RequestApproval {
   role: string;
   approver: string;
+  approverEmail?: string;
   status: 'approved' | 'pending' | 'rejected';
   timestamp?: string;
   notes?: string;
@@ -251,6 +278,7 @@ export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
 
 export interface CabVote {
   member: string;
+  memberEmail?: string;
   role: string;
   vote: 'approved' | 'rejected' | 'pending';
   notes?: string;

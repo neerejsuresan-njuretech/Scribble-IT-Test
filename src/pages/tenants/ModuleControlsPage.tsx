@@ -2,11 +2,32 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useITSM } from '../../context/ITSMContext';
 import { ALL_FREEITSM_MODULES } from '../../data/freeitsmSeedData';
-import { Sliders, Check, X, ExternalLink } from 'lucide-react';
+import { Sliders, Check, X, ExternalLink, Lock } from 'lucide-react';
 
 export const ModuleControlsPage: React.FC = () => {
-  const { activeTenant, toggleTenantModule } = useITSM();
+  const { activeTenant, toggleTenantModule, isSuperAdmin } = useITSM();
   const groups = ['Command', 'ITSM', 'CMDB & Assets', 'Knowledge & Automation', 'Platform & Workspace'] as const;
+
+  if (!isSuperAdmin) {
+    return (
+      <div className="border border-rose-900/70 bg-neutral-950 p-8 font-mono text-xs space-y-4 max-w-xl mx-auto mt-10">
+        <div className="flex items-center gap-2 text-[10px] text-rose-500 uppercase font-bold tracking-wider">
+          <Lock className="w-3.5 h-3.5" />
+          <span>SUPER ADMIN PORTAL EXCLUSIVE</span>
+        </div>
+        <h2 className="text-base font-bold text-neutral-100">Module Governance Restricted</h2>
+        <p className="text-neutral-400">
+          Only authenticated Super Admin Portal sessions may toggle company module availability.
+        </p>
+        <Link
+          to="/login/admin"
+          className="inline-block px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold uppercase tracking-wider"
+        >
+          Sign In via Super Admin Portal
+        </Link>
+      </div>
+    );
+  }
 
   const enabledTotal = ALL_FREEITSM_MODULES.filter(m => activeTenant.enabledModules[m.id] !== false).length;
 
@@ -14,7 +35,9 @@ export const ModuleControlsPage: React.FC = () => {
     <div className="space-y-6 font-mono text-xs">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-800 pb-4">
         <div>
-          <div className="text-neutral-500 uppercase tracking-wider">SYSTEM · MODULES · AVAILABILITY ({activeTenant.name})</div>
+          <div className="text-neutral-500 uppercase tracking-wider">
+            SYSTEM · MODULES · AVAILABILITY ({activeTenant.name}) <span className="text-rose-400 font-bold">· SUPER ADMIN EXCLUSIVE</span>
+          </div>
           <h1 className="text-xl font-bold text-neutral-100 mt-0.5 flex items-center gap-3">
             <Sliders className="w-5 h-5 text-rose-500" />
             <span>FREEITSM MODULE CONTROLS</span>

@@ -44,36 +44,36 @@ export const DomainsRegisterPage: React.FC = () => {
       </div>
 
       {showNew && (
-        <form onSubmit={handleAdd} className="p-4 border border-neutral-700 bg-neutral-900/50 grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
+        <form onSubmit={handleAdd} className="p-4 border border-neutral-700 bg-neutral-900/50 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
           <div>
             <label className="block text-neutral-400 mb-1">FQDN *</label>
-            <input required value={domain} onChange={e => setDomain(e.target.value)} placeholder="portal.company.io" className="w-full bg-neutral-950 border border-neutral-700 px-3 py-2 text-neutral-100" />
+            <input required value={domain} onChange={e => setDomain(e.target.value)} placeholder="portal.company.io" className="w-full min-h-[38px] bg-neutral-950 border border-neutral-700 px-3 py-2 text-neutral-100" />
           </div>
           <div>
             <label className="block text-neutral-400 mb-1">Registrar</label>
-            <input value={registrar} onChange={e => setRegistrar(e.target.value)} className="w-full bg-neutral-950 border border-neutral-700 px-3 py-2 text-neutral-100" />
+            <input value={registrar} onChange={e => setRegistrar(e.target.value)} className="w-full min-h-[38px] bg-neutral-950 border border-neutral-700 px-3 py-2 text-neutral-100" />
           </div>
           <div>
             <label className="block text-neutral-400 mb-1">Domain Expiry</label>
-            <input type="date" value={domainExpiry} onChange={e => setDomainExpiry(e.target.value)} className="w-full bg-neutral-950 border border-neutral-700 px-3 py-2 text-neutral-100" />
+            <input type="date" value={domainExpiry} onChange={e => setDomainExpiry(e.target.value)} className="w-full min-h-[38px] bg-neutral-950 border border-neutral-700 px-3 py-2 text-neutral-100" />
           </div>
           <div>
             <label className="block text-neutral-400 mb-1">SSL Expiry</label>
-            <input type="date" value={sslExpiry} onChange={e => setSslExpiry(e.target.value)} className="w-full bg-neutral-950 border border-neutral-700 px-3 py-2 text-neutral-100" />
+            <input type="date" value={sslExpiry} onChange={e => setSslExpiry(e.target.value)} className="w-full min-h-[38px] bg-neutral-950 border border-neutral-700 px-3 py-2 text-neutral-100" />
           </div>
-          <div className="flex gap-2">
-            <select value={dmarcPolicy} onChange={e => setDmarcPolicy(e.target.value as 'reject' | 'quarantine' | 'none')} className="w-full bg-neutral-950 border border-neutral-700 px-2 py-2 text-neutral-100">
+          <div className="flex gap-2 sm:col-span-2 lg:col-span-1">
+            <select value={dmarcPolicy} onChange={e => setDmarcPolicy(e.target.value as 'reject' | 'quarantine' | 'none')} className="w-full min-h-[38px] bg-neutral-950 border border-neutral-700 px-2 py-2 text-neutral-100">
               <option value="reject">DMARC: reject</option>
               <option value="quarantine">DMARC: quarantine</option>
               <option value="none">DMARC: none</option>
             </select>
-            <button type="submit" className="px-4 py-2 bg-rose-600 text-white font-bold shrink-0">Add</button>
+            <button type="submit" className="min-h-[38px] px-4 py-2 bg-rose-600 text-white font-bold shrink-0">Add</button>
           </div>
         </form>
       )}
 
       <div className="border border-neutral-800 bg-neutral-950 overflow-x-auto">
-        <table className="w-full text-left border-collapse">
+        <table className="w-full min-w-[760px] text-left border-collapse">
           <thead>
             <tr className="border-b border-neutral-800 bg-neutral-900/50 text-neutral-400 uppercase text-[11px]">
               <th className="py-2.5 px-4">Domain / Registrar</th>

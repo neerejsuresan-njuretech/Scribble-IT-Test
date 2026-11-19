@@ -87,6 +87,7 @@ export const ProcessMapperPage: React.FC = () => {
 
   const [selectedMapId, setSelectedMapId] = useState<string>(processMaps[0]?.id || '');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [mobileStudioTab, setMobileStudioTab] = useState<'blueprints' | 'canvas' | 'inspector'>('canvas');
 
   const [showNewModal, setShowNewModal] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -379,10 +380,55 @@ export const ProcessMapperPage: React.FC = () => {
         </form>
       )}
 
-      {/* Main 3-Column Figma Studio Layout (Responsive: Stacks cleanly on Mobile/Tablet, 3 Columns on XL Desktop) */}
+      {/* Mobile & Tablet Studio Panel Switcher (< xl) */}
+      <div className="xl:hidden grid grid-cols-3 border border-neutral-800 bg-neutral-950 p-1 gap-1">
+        <button
+          type="button"
+          onClick={() => setMobileStudioTab('blueprints')}
+          className={`min-h-[40px] px-2 py-2 text-[11px] font-bold uppercase flex items-center justify-center gap-1.5 transition-colors ${
+            mobileStudioTab === 'blueprints'
+              ? 'bg-neutral-800 text-white'
+              : 'text-neutral-400 hover:text-neutral-200'
+          }`}
+        >
+          <Layers className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+          <span className="truncate">Blueprints ({processMaps.length})</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileStudioTab('canvas')}
+          className={`min-h-[40px] px-2 py-2 text-[11px] font-bold uppercase flex items-center justify-center gap-1.5 transition-colors ${
+            mobileStudioTab === 'canvas'
+              ? 'bg-neutral-800 text-white'
+              : 'text-neutral-400 hover:text-neutral-200'
+          }`}
+        >
+          <GitBranch className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+          <span className="truncate">Canvas</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileStudioTab('inspector')}
+          className={`min-h-[40px] px-2 py-2 text-[11px] font-bold uppercase flex items-center justify-center gap-1.5 transition-colors ${
+            mobileStudioTab === 'inspector'
+              ? 'bg-neutral-800 text-white'
+              : 'text-neutral-400 hover:text-neutral-200'
+          }`}
+        >
+          <Sliders className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+          <span className="truncate">Inspector</span>
+          {selectedNode && <span className="w-1.5 h-1.5 bg-sky-400 shrink-0" />}
+        </button>
+      </div>
+
+      {/* Main 3-Column Figma Studio Layout (Tabbed on Mobile/Tablet, 3 Columns on XL Desktop) */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
         {/* LEFT PANEL: Process Maps Library */}
-        <div className="xl:col-span-3 border border-neutral-800 bg-neutral-950 divide-y divide-neutral-900">
+        <div
+          className={`${
+            mobileStudioTab === 'blueprints' ? 'block' : 'hidden'
+          } xl:block xl:col-span-3 border border-neutral-800 bg-neutral-950 divide-y divide-neutral-900`}
+        >
           <div className="px-3 py-2.5 bg-neutral-900/60 flex items-center justify-between text-[10px] uppercase font-bold text-neutral-400">
             <span className="flex items-center gap-1.5">
               <Layers className="w-3.5 h-3.5 text-rose-500" />
@@ -396,14 +442,17 @@ export const ProcessMapperPage: React.FC = () => {
               <p>No process wireframes created yet.</p>
               <button
                 type="button"
-                onClick={() => handleCreateFromTemplate(WIREFRAME_TEMPLATES[0])}
+                onClick={() => {
+                  handleCreateFromTemplate(WIREFRAME_TEMPLATES[0]);
+                  setMobileStudioTab('canvas');
+                }}
                 className="w-full min-h-[38px] px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold"
               >
                 + Load Incident Lifecycle Blueprint
               </button>
             </div>
           ) : (
-            <div className="max-h-72 xl:max-h-[540px] overflow-y-auto divide-y divide-neutral-900">
+            <div className="max-h-80 xl:max-h-[540px] overflow-y-auto divide-y divide-neutral-900">
               {processMaps.map(m => {
                 const isSelected = selectedMap?.id === m.id;
                 const preCloseCount = m.nodes.filter(n => n.type !== 'start' && n.type !== 'end').length;
@@ -413,6 +462,7 @@ export const ProcessMapperPage: React.FC = () => {
                     onClick={() => {
                       setSelectedMapId(m.id);
                       setSelectedNodeId(null);
+                      setMobileStudioTab('canvas');
                     }}
                     className={`p-3 cursor-pointer transition-colors flex items-start justify-between gap-2 ${
                       isSelected ? 'bg-neutral-900 text-white' : 'hover:bg-neutral-900/40 text-neutral-300'
@@ -448,7 +498,7 @@ export const ProcessMapperPage: React.FC = () => {
         </div>
 
         {/* CENTER CANVAS: Interactive Figma Wireframe Board */}
-        <div className="xl:col-span-6 min-w-0">
+        <div className={`${mobileStudioTab === 'canvas' ? 'block' : 'hidden'} xl:block xl:col-span-6 min-w-0`}>
           {selectedMap ? (
             <FigmaWireframeCanvas
               nodes={selectedMap.nodes}
@@ -461,7 +511,7 @@ export const ProcessMapperPage: React.FC = () => {
               frameTitle={`${selectedMap.title} (${(selectedMap.recordScope || 'incident').toUpperCase()})`}
             />
           ) : (
-            <div className="border border-neutral-800 bg-neutral-950 p-10 text-center space-y-4">
+            <div className="border border-neutral-800 bg-neutral-950 p-6 sm:p-10 text-center space-y-4">
               <GitBranch className="w-8 h-8 text-neutral-600 mx-auto" />
               <div className="space-y-1">
                 <div className="font-bold text-neutral-100 text-sm">
@@ -477,7 +527,7 @@ export const ProcessMapperPage: React.FC = () => {
                     key={tpl.id}
                     type="button"
                     onClick={() => handleCreateFromTemplate(tpl)}
-                    className="min-h-[40px] px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold"
+                    className="w-full sm:w-auto min-h-[40px] px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold"
                   >
                     + {tpl.label}
                   </button>
@@ -488,7 +538,11 @@ export const ProcessMapperPage: React.FC = () => {
         </div>
 
         {/* RIGHT PANEL: Figma Node Properties Inspector */}
-        <div className="xl:col-span-3 border border-neutral-800 bg-neutral-950 flex flex-col">
+        <div
+          className={`${
+            mobileStudioTab === 'inspector' ? 'flex' : 'hidden'
+          } xl:flex xl:col-span-3 border border-neutral-800 bg-neutral-950 flex-col`}
+        >
           <div className="px-3 py-2.5 bg-neutral-900/60 border-b border-neutral-800 flex items-center justify-between text-[10px] uppercase font-bold text-neutral-400">
             <span className="flex items-center gap-1.5">
               <Sliders className="w-3.5 h-3.5 text-sky-400" />

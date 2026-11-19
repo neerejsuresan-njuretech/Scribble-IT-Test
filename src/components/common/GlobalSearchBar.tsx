@@ -230,7 +230,7 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
   return (
     <div
       ref={containerRef}
-      className={isMobileOverlay ? 'w-full relative' : 'hidden md:block flex-1 max-w-lg mx-2 relative'}
+      className={isMobileOverlay ? 'w-full relative' : 'hidden lg:block flex-1 max-w-md xl:max-w-lg mx-2 relative min-w-0'}
     >
       <form onSubmit={handleSubmit} className="relative">
         <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />

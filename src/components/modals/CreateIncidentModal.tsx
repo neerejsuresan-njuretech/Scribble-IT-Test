@@ -89,7 +89,7 @@ export const CreateIncidentModal: React.FC<CreateIncidentModalProps> = ({ isOpen
           </div>
 
           {/* Row 2: Impact, Urgency, Priority */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="text-neutral-400 block mb-1 text-[11px]">Impact</label>
               <select

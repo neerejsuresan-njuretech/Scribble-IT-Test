@@ -655,26 +655,26 @@ export const WorkflowManagementPage: React.FC = () => {
       </div>
 
       {/* KPI Summary Strip */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 border border-neutral-800 divide-y lg:divide-y-0 lg:divide-x divide-neutral-800 bg-neutral-950">
-        <div className="p-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-neutral-800 border border-neutral-800">
+        <div className="p-3.5 sm:p-4 bg-neutral-950">
           <div className="text-[11px] text-neutral-500 uppercase">Total Flows</div>
-          <div className="text-2xl font-bold text-neutral-100 mt-1 tabular-nums">{workflows.length}</div>
+          <div className="text-xl sm:text-2xl font-bold text-neutral-100 mt-1 tabular-nums">{workflows.length}</div>
         </div>
-        <div className="p-4">
+        <div className="p-3.5 sm:p-4 bg-neutral-950">
           <div className="text-[11px] text-neutral-500 uppercase">Active Flows</div>
-          <div className="text-2xl font-bold text-emerald-400 mt-1 tabular-nums">
+          <div className="text-xl sm:text-2xl font-bold text-emerald-400 mt-1 tabular-nums">
             {workflows.filter(w => w.status === 'active').length}
           </div>
         </div>
-        <div className="p-4">
+        <div className="p-3.5 sm:p-4 bg-neutral-950">
           <div className="text-[11px] text-neutral-500 uppercase">Total Executions</div>
-          <div className="text-2xl font-bold text-neutral-100 mt-1 tabular-nums">
+          <div className="text-xl sm:text-2xl font-bold text-neutral-100 mt-1 tabular-nums">
             {workflows.reduce((sum, w) => sum + w.executionCount, 0)}
           </div>
         </div>
-        <div className="p-4">
+        <div className="p-3.5 sm:p-4 bg-neutral-950">
           <div className="text-[11px] text-neutral-500 uppercase">Total Connected Steps</div>
-          <div className="text-2xl font-bold text-neutral-100 mt-1 tabular-nums">
+          <div className="text-xl sm:text-2xl font-bold text-neutral-100 mt-1 tabular-nums">
             {workflows.reduce((sum, w) => sum + w.stages.length, 0)}
           </div>
         </div>

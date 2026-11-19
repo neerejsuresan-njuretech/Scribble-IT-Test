@@ -69,24 +69,24 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({ onOpenCreate }
       </div>
 
       {/* Filter and Search */}
-      <div className="flex flex-wrap items-center gap-3 text-xs font-mono">
-        <div className="relative flex-1 min-w-[200px]">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 text-xs font-mono">
+        <div className="relative flex-1 min-w-0">
           <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
           <input
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search SKU, name, bin location..."
-            className="w-full bg-neutral-900 border border-neutral-800 text-neutral-200 pl-8 pr-3 py-1.5 focus:border-neutral-600 focus:outline-none"
+            className="w-full min-h-[40px] sm:min-h-0 bg-neutral-900 border border-neutral-800 text-neutral-200 pl-8 pr-3 py-1.5 focus:border-neutral-600 focus:outline-none"
           />
         </div>
 
-        <div className="flex items-center gap-1 border border-neutral-800 bg-neutral-900/60 p-0.5">
+        <div className="flex items-center gap-1 border border-neutral-800 bg-neutral-900/60 p-0.5 overflow-x-auto no-scrollbar max-w-full">
           {['all', 'cabling', 'components', 'peripherals', 'accessories'].map(cat => (
             <button
               key={cat}
               onClick={() => setCategoryFilter(cat)}
-              className={`px-2.5 py-1 uppercase tracking-wider transition-colors ${
+              className={`min-h-[36px] sm:min-h-0 px-2.5 py-1 uppercase tracking-wider transition-colors whitespace-nowrap shrink-0 ${
                 categoryFilter === cat ? 'bg-neutral-800 text-neutral-100 font-bold' : 'text-neutral-400 hover:text-neutral-200'
               }`}
             >
@@ -96,8 +96,73 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({ onOpenCreate }
         </div>
       </div>
 
-      {/* High Density Inventory Data Grid */}
-      <div className="border border-neutral-800 bg-neutral-950 overflow-x-auto">
+      {/* Mobile Inventory Card List (< md) */}
+      <div className="md:hidden space-y-2.5 font-mono text-xs">
+        {filteredItems.length === 0 ? (
+          <div className="p-6 border border-neutral-800 bg-neutral-950 text-center text-neutral-500">
+            {inventory.length === 0
+              ? 'No inventory SKUs registered yet. Tap "Add SKU Item" to start tracking stock.'
+              : 'No inventory SKUs match the current filter.'}
+          </div>
+        ) : (
+          filteredItems.map(item => {
+            const isLow = item.quantity <= item.minThreshold;
+            return (
+              <div key={item.id} className="p-3.5 border border-neutral-800 bg-neutral-950 space-y-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-bold text-neutral-100 truncate">{item.sku}</div>
+                    <div className="text-neutral-300 mt-0.5">{item.name}</div>
+                  </div>
+                  {isLow ? (
+                    <span className="text-rose-500 font-bold inline-flex items-center gap-1 shrink-0">
+                      <AlertTriangle className="w-3 h-3" />
+                      <span>LOW</span>
+                    </span>
+                  ) : (
+                    <span className="text-emerald-400 shrink-0">NOMINAL</span>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-neutral-400">
+                  <span className="uppercase">{item.category} · {item.location}</span>
+                  <span className="tabular-nums text-neutral-200 font-semibold">${item.unitCost.toFixed(2)}</span>
+                </div>
+                <div className="pt-2 border-t border-neutral-800/80 flex items-center justify-between gap-2">
+                  <div className="text-neutral-400">
+                    In Stock: <span className="text-sm font-bold text-neutral-100 tabular-nums">{item.quantity}</span>
+                  </div>
+                  <div className="inline-flex items-center gap-1 border border-neutral-800 bg-neutral-900">
+                    <button
+                      onClick={() => updateInventoryQuantity(item.id, -1)}
+                      className="min-h-[38px] min-w-[38px] flex items-center justify-center text-neutral-300 hover:text-white hover:bg-neutral-800"
+                      title="Check out 1 unit"
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => updateInventoryQuantity(item.id, 1)}
+                      className="min-h-[38px] min-w-[38px] flex items-center justify-center text-neutral-300 hover:text-white hover:bg-neutral-800"
+                      title="Restock +1 unit"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => updateInventoryQuantity(item.id, 10)}
+                      className="min-h-[38px] px-2.5 text-[11px] font-bold text-neutral-300 hover:text-white hover:bg-neutral-800 border-l border-neutral-800"
+                      title="Batch Restock +10"
+                    >
+                      +10
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* High Density Inventory Data Grid (md+) */}
+      <div className="hidden md:block border border-neutral-800 bg-neutral-950 overflow-x-auto">
         <table className="w-full text-left text-xs font-mono">
           <thead className="bg-neutral-900/60 text-neutral-400 uppercase border-b border-neutral-800">
             <tr>
@@ -179,7 +244,7 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({ onOpenCreate }
       {/* Add Item Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-neutral-950 border border-neutral-800 p-6 space-y-4 font-mono text-xs">
+          <div className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-neutral-950 border border-neutral-800 p-5 sm:p-6 space-y-4 font-mono text-xs">
             <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
               <span className="text-sm font-bold text-neutral-100 uppercase">Add Consumable / Stock Item</span>
               <button onClick={() => setShowAddModal(false)} className="text-neutral-500 hover:text-neutral-200">
@@ -227,7 +292,7 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({ onOpenCreate }
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="text-neutral-400 block mb-1">Initial Qty</label>
                   <input

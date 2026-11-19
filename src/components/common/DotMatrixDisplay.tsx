@@ -89,12 +89,15 @@ export const DotMatrixText: React.FC<DotMatrixTextProps> = ({
   const totalWidth = chars.length * charSpacing;
   const totalHeight = 7 * rowSpacing + 4;
 
+  const maxHeightPx = size === 'xs' ? 14 : size === 'sm' ? 18 : size === 'md' ? 24 : 32;
+
   return (
-    <span className={`inline-flex items-center select-none overflow-hidden ${className}`}>
+    <span className={`inline-flex items-center select-none overflow-hidden max-w-full ${className}`}>
       <svg
         viewBox={`0 0 ${totalWidth} ${totalHeight}`}
-        style={{ height: size === 'xs' ? '14px' : size === 'sm' ? '18px' : size === 'md' ? '24px' : '32px' }}
-        className="w-auto block"
+        preserveAspectRatio="xMinYMid meet"
+        style={{ maxHeight: `${maxHeightPx}px`, width: `${totalWidth}px` }}
+        className="max-w-full h-auto block"
         aria-label={text}
       >
         {useGlow && (

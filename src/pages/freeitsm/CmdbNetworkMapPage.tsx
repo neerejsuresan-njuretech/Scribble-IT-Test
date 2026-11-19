@@ -55,16 +55,16 @@ export const CmdbNetworkMapPage: React.FC = () => {
       </div>
 
       {/* Add Relationship Form */}
-      <form onSubmit={handleAddLink} className="p-4 border border-neutral-800 bg-neutral-900/40 grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
+      <form onSubmit={handleAddLink} className="p-4 border border-neutral-800 bg-neutral-900/40 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
         <div>
           <label className="block text-neutral-400 mb-1">Source CI</label>
-          <select value={sourceId} onChange={e => setSourceId(e.target.value)} className="w-full bg-neutral-950 border border-neutral-700 px-2.5 py-2 text-neutral-100">
+          <select value={sourceId} onChange={e => setSourceId(e.target.value)} className="w-full min-h-[38px] bg-neutral-950 border border-neutral-700 px-2.5 py-2 text-neutral-100">
             {nodes.map(n => <option key={n.id} value={n.id}>{n.label} ({n.kind})</option>)}
           </select>
         </div>
         <div>
           <label className="block text-neutral-400 mb-1">Relationship</label>
-          <select value={relationType} onChange={e => setRelationType(e.target.value as CmdbRelation['relationType'])} className="w-full bg-neutral-950 border border-neutral-700 px-2.5 py-2 text-neutral-100">
+          <select value={relationType} onChange={e => setRelationType(e.target.value as CmdbRelation['relationType'])} className="w-full min-h-[38px] bg-neutral-950 border border-neutral-700 px-2.5 py-2 text-neutral-100">
             <option value="depends_on">depends_on</option>
             <option value="connects_to">connects_to</option>
             <option value="hosts">hosts</option>
@@ -74,19 +74,19 @@ export const CmdbNetworkMapPage: React.FC = () => {
         </div>
         <div>
           <label className="block text-neutral-400 mb-1">Target CI</label>
-          <select value={targetId} onChange={e => setTargetId(e.target.value)} className="w-full bg-neutral-950 border border-neutral-700 px-2.5 py-2 text-neutral-100">
+          <select value={targetId} onChange={e => setTargetId(e.target.value)} className="w-full min-h-[38px] bg-neutral-950 border border-neutral-700 px-2.5 py-2 text-neutral-100">
             {nodes.map(n => <option key={n.id} value={n.id}>{n.label} ({n.kind})</option>)}
           </select>
         </div>
         <div>
           <label className="block text-neutral-400 mb-1">Criticality</label>
-          <select value={criticality} onChange={e => setCriticality(e.target.value as CmdbRelation['criticality'])} className="w-full bg-neutral-950 border border-neutral-700 px-2.5 py-2 text-neutral-100">
+          <select value={criticality} onChange={e => setCriticality(e.target.value as CmdbRelation['criticality'])} className="w-full min-h-[38px] bg-neutral-950 border border-neutral-700 px-2.5 py-2 text-neutral-100">
             <option value="critical">Critical</option>
             <option value="high">High</option>
             <option value="standard">Standard</option>
           </select>
         </div>
-        <button type="submit" className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold flex items-center justify-center gap-1.5">
+        <button type="submit" className="sm:col-span-2 lg:col-span-1 min-h-[38px] px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold flex items-center justify-center gap-1.5">
           <Plus className="w-3.5 h-3.5" />
           <span>Link CIs</span>
         </button>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useITSM } from '../../context/ITSMContext';
-import { FreeITSMModuleId } from '../../types/itsm';
+import { FreeITSMModuleId, IamPermissionScope } from '../../types/itsm';
 import {
   AlertTriangle, Package, ShieldCheck, Server, RefreshCw,
   Phone, DollarSign, Database, FileText, MessageSquare,
@@ -26,8 +26,10 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   badge: number | string | null;
   newPath: string | null;
+  newPathScope?: IamPermissionScope;
   adminOnly?: boolean;
   iamOnly?: boolean;
+  requiredScope?: IamPermissionScope;
 }
 
 export const ServiceNowNavigator: React.FC<ServiceNowNavigatorProps> = ({ isOpen, onCloseMobile }) => {
@@ -35,7 +37,7 @@ export const ServiceNowNavigator: React.FC<ServiceNowNavigatorProps> = ({ isOpen
   const {
     incidents, changes, inventory, calls, tasks, projects,
     warRooms, softwareLicenses, contracts, domains,
-    activeTenant, isModuleEnabled, role, hasPermission
+    activeTenant, isModuleEnabled, isSuperAdmin, isIamPortal, hasPermission
   } = useITSM();
 
   const [filterText, setFilterText] = useState('');
@@ -70,11 +72,11 @@ export const ServiceNowNavigator: React.FC<ServiceNowNavigatorProps> = ({ isOpen
       id: 'itsm',
       title: 'ITSM & Delivery',
       items: [
-        { id: 'incidents', moduleId: 'incidents', path: '/incidents', label: 'Tickets / Incidents', code: 'incident.list', icon: AlertTriangle, badge: openIncidents || null, newPath: '/incidents/new' },
-        { id: 'ticket_workflow', moduleId: 'ticket_workflow', path: '/ticket-workflows', label: 'Ticket Workflow Mgmt', code: 'wf_ticket.do', icon: GitCommitHorizontal, badge: null, newPath: null },
+        { id: 'incidents', moduleId: 'incidents', path: '/incidents', label: 'Tickets / Incidents', code: 'incident.list', icon: AlertTriangle, badge: openIncidents || null, newPath: '/incidents/new', newPathScope: 'incidents:write' },
+        { id: 'ticket_workflow', moduleId: 'ticket_workflow', path: '/ticket-workflows', label: 'Ticket Workflow Mgmt', code: 'wf_ticket.do', icon: GitCommitHorizontal, badge: null, newPath: null, requiredScope: 'workflows:manage' },
         { id: 'requests', moduleId: 'requests', path: '/requests', label: 'Service Requests', code: 'sc_request.list', icon: Package, badge: null, newPath: '/requests/new' },
-        { id: 'problems', moduleId: 'problems', path: '/problems', label: 'Problem Mgmt', code: 'problem.list', icon: ShieldCheck, badge: null, newPath: '/problems/new' },
-        { id: 'changes', moduleId: 'changes', path: '/changes', label: 'Change (CAB)', code: 'change_request.list', icon: ShieldCheck, badge: pendingChanges || null, newPath: '/changes/new' },
+        { id: 'problems', moduleId: 'problems', path: '/problems', label: 'Problem Mgmt', code: 'problem.list', icon: ShieldCheck, badge: null, newPath: '/problems/new', newPathScope: 'incidents:write' },
+        { id: 'changes', moduleId: 'changes', path: '/changes', label: 'Change (CAB)', code: 'change_request.list', icon: ShieldCheck, badge: pendingChanges || null, newPath: '/changes/new', newPathScope: 'incidents:write' },
         { id: 'tasks', moduleId: 'tasks', path: '/tasks', label: 'Tasks (Kanban)', code: 'pm_task.list', icon: KanbanSquare, badge: openTasks || null, newPath: null },
         { id: 'projects', moduleId: 'projects', path: '/projects', label: 'Projects Portfolio', code: 'pm_project.list', icon: FolderKanban, badge: projects.length || null, newPath: null }
       ]
@@ -83,9 +85,9 @@ export const ServiceNowNavigator: React.FC<ServiceNowNavigatorProps> = ({ isOpen
       id: 'cmdb',
       title: 'CMDB, Assets & Vendors',
       items: [
-        { id: 'assets', moduleId: 'assets', path: '/assets', label: 'Assets Register', code: 'cmdb_ci.list', icon: Server, badge: null, newPath: '/assets/new' },
+        { id: 'assets', moduleId: 'assets', path: '/assets', label: 'Assets Register', code: 'cmdb_ci.list', icon: Server, badge: null, newPath: '/assets/new', newPathScope: 'assets:write' },
         { id: 'network_map', moduleId: 'network_map', path: '/cmdb/network-map', label: 'CMDB Network Map', code: 'cmdb_map.do', icon: GitFork, badge: null, newPath: null },
-        { id: 'inventory', moduleId: 'inventory', path: '/inventory', label: 'Hardware Inventory', code: 'alm_consumable.list', icon: RefreshCw, badge: lowStock || null, newPath: '/inventory/new' },
+        { id: 'inventory', moduleId: 'inventory', path: '/inventory', label: 'Hardware Inventory', code: 'alm_consumable.list', icon: RefreshCw, badge: lowStock || null, newPath: '/inventory/new', newPathScope: 'assets:write' },
         { id: 'software', moduleId: 'software', path: '/software', label: 'Software & Licences', code: 'sam_software.list', icon: KeyRound, badge: flaggedSoftware || null, newPath: null },
         { id: 'contracts', moduleId: 'contracts', path: '/contracts', label: 'Contracts & RFP', code: 'ast_contract.list', icon: FileSpreadsheet, badge: expiringContracts || null, newPath: null },
         { id: 'domains', moduleId: 'domains', path: '/domains', label: 'Domains & SSL', code: 'cmdb_domain.list', icon: Globe, badge: domains.length || null, newPath: null }
@@ -97,9 +99,9 @@ export const ServiceNowNavigator: React.FC<ServiceNowNavigatorProps> = ({ isOpen
       items: [
         { id: 'knowledge', moduleId: 'knowledge', path: '/knowledge', label: 'Knowledge Base', code: 'kb_knowledge.list', icon: BookOpen, badge: null, newPath: null },
         { id: 'wiki', moduleId: 'wiki', path: '/wiki', label: 'System Wiki', code: 'sys_wiki.do', icon: Library, badge: null, newPath: null },
-        { id: 'workflow_management', moduleId: 'workflow_management', path: '/workflows', label: 'Workflow Management', code: 'wf_engine.do', icon: Workflow, badge: null, newPath: null },
-        { id: 'process_mapper', moduleId: 'process_mapper', path: '/process-mapper', label: 'Process Mapper', code: 'wf_process.do', icon: Workflow, badge: null, newPath: null },
-        { id: 'custom_forms', moduleId: 'custom_forms', path: '/forms-builder', label: 'Custom Forms Builder', code: 'sc_form_builder.do', icon: FormInput, badge: null, newPath: null },
+        { id: 'workflow_management', moduleId: 'workflow_management', path: '/workflows', label: 'Workflow Management', code: 'wf_engine.do', icon: Workflow, badge: null, newPath: null, requiredScope: 'workflows:manage' },
+        { id: 'process_mapper', moduleId: 'process_mapper', path: '/process-mapper', label: 'Process Mapper', code: 'wf_process.do', icon: Workflow, badge: null, newPath: null, requiredScope: 'workflows:manage' },
+        { id: 'custom_forms', moduleId: 'custom_forms', path: '/forms-builder', label: 'Custom Forms Builder', code: 'sc_form_builder.do', icon: FormInput, badge: null, newPath: null, requiredScope: 'workflows:manage' },
         { id: 'lms', moduleId: 'lms', path: '/lms', label: 'LMS Training', code: 'lms_course.list', icon: GraduationCap, badge: null, newPath: null }
       ]
     },
@@ -112,7 +114,7 @@ export const ServiceNowNavigator: React.FC<ServiceNowNavigatorProps> = ({ isOpen
         { id: 'iam', moduleId: 'iam', path: '/iam', label: 'IAM Portal', code: 'sys_iam.do', icon: Shield, badge: null, newPath: null, iamOnly: true },
         { id: 'reports', moduleId: 'reports', path: '/reports', label: 'Reporting & Audit', code: 'sys_report.do', icon: BarChart3, badge: null, newPath: null },
         { id: 'telephony', moduleId: 'telephony', path: '/telephony', label: 'Telephony Softphone', code: 'cti_console', icon: Phone, badge: calls.length || null, newPath: null },
-        { id: 'billing', moduleId: 'billing', path: '/billing', label: 'Invoices & Billing', code: 'fin_invoice.list', icon: DollarSign, badge: null, newPath: '/billing/new' },
+        { id: 'billing', moduleId: 'billing', path: '/billing', label: 'Invoices & Billing', code: 'fin_invoice.list', icon: DollarSign, badge: null, newPath: '/billing/new', requiredScope: 'billing:read', newPathScope: 'billing:read' },
         { id: 'database', moduleId: 'database', path: '/database', label: 'Database & Sync', code: 'sys_db_sync', icon: Database, badge: null, newPath: null, adminOnly: true }
       ]
     },
@@ -132,14 +134,14 @@ export const ServiceNowNavigator: React.FC<ServiceNowNavigatorProps> = ({ isOpen
 
   return (
     <>
-      {/* Mobile & Tablet Backdrop (< xl) */}
+      {/* Mobile & Tablet Backdrop (< lg) */}
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 xl:hidden"
+        className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 lg:hidden"
         onClick={onCloseMobile}
         aria-hidden="true"
       />
 
-      <aside className="fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] xl:static xl:sticky xl:top-14 xl:h-[calc(100vh-3.5rem)] xl:z-30 bg-neutral-950 border-r border-neutral-800 flex flex-col shrink-0 font-sans text-xs select-none shadow-2xl xl:shadow-none">
+      <aside className="fixed inset-y-0 left-0 z-50 w-[85vw] max-w-[300px] lg:static lg:sticky lg:top-14 lg:h-[calc(100vh-3.5rem)] lg:w-60 xl:w-64 lg:z-30 bg-neutral-950 border-r border-neutral-800 flex flex-col shrink-0 font-sans text-xs select-none shadow-2xl lg:shadow-none">
         {/* Navigator Filter Input */}
         <div className="p-3 border-b border-neutral-800 bg-neutral-900/40 space-y-2">
           <div className="flex items-center justify-between gap-2 text-[10px] text-neutral-500">
@@ -150,7 +152,7 @@ export const ServiceNowNavigator: React.FC<ServiceNowNavigatorProps> = ({ isOpen
             <button
               type="button"
               onClick={onCloseMobile}
-              className="xl:hidden min-h-[36px] min-w-[36px] -mr-1 flex items-center justify-center text-neutral-400 hover:text-white border border-neutral-800 bg-neutral-950"
+              className="lg:hidden min-h-[40px] min-w-[40px] -mr-1 flex items-center justify-center text-neutral-400 hover:text-white border border-neutral-800 bg-neutral-950"
               aria-label="Close module navigator"
             >
               <X className="w-4 h-4" />
@@ -163,7 +165,7 @@ export const ServiceNowNavigator: React.FC<ServiceNowNavigatorProps> = ({ isOpen
               value={filterText}
               onChange={e => setFilterText(e.target.value)}
               placeholder="Filter 30+ modules..."
-              className="w-full min-h-[38px] xl:min-h-0 bg-neutral-900 border border-neutral-700 text-neutral-200 pl-8 pr-3 py-1.5 text-xs focus:border-neutral-500 focus:outline-none placeholder:text-neutral-500"
+              className="w-full min-h-[40px] lg:min-h-0 bg-neutral-900 border border-neutral-700 text-neutral-200 pl-8 pr-3 py-1.5 text-xs focus:border-neutral-500 focus:outline-none placeholder:text-neutral-500"
             />
           </div>
         </div>
@@ -174,8 +176,9 @@ export const ServiceNowNavigator: React.FC<ServiceNowNavigatorProps> = ({ isOpen
           const enabledItems = section.items.filter(
             item =>
               (!item.moduleId || isModuleEnabled(item.moduleId)) &&
-              (!item.adminOnly || role === 'admin') &&
-              (!item.iamOnly || role === 'admin' || hasPermission('iam:manage'))
+              (!item.adminOnly || isSuperAdmin) &&
+              (!item.iamOnly || isSuperAdmin || isIamPortal || hasPermission('iam:manage')) &&
+              (!item.requiredScope || isSuperAdmin || hasPermission(item.requiredScope))
           );
           const matchingItems = enabledItems.filter(item =>
             !filterText ||
@@ -217,7 +220,7 @@ export const ServiceNowNavigator: React.FC<ServiceNowNavigatorProps> = ({ isOpen
                         <Link
                           to={item.path}
                           onClick={onCloseMobile}
-                          className="flex-1 min-h-[40px] xl:min-h-0 px-2.5 py-2 xl:py-1.5 flex items-center justify-between truncate"
+                          className="flex-1 min-h-[44px] lg:min-h-0 px-2.5 py-2 lg:py-1.5 flex items-center justify-between truncate"
                         >
                           <div className="flex items-center gap-2 truncate">
                             <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-rose-400' : 'text-neutral-500'}`} />
@@ -232,12 +235,12 @@ export const ServiceNowNavigator: React.FC<ServiceNowNavigatorProps> = ({ isOpen
                           )}
                         </Link>
 
-                        {item.newPath && (
+                        {item.newPath && (!item.newPathScope || isSuperAdmin || hasPermission(item.newPathScope)) && (
                           <Link
                             to={item.newPath}
                             onClick={onCloseMobile}
                             title={`Create new ${item.label.toLowerCase()}`}
-                            className={`p-2 xl:p-1.5 mr-1 border transition-colors ${
+                            className={`min-h-[36px] min-w-[36px] lg:min-h-0 lg:min-w-0 p-2 lg:p-1.5 mr-1 border flex items-center justify-center transition-colors ${
                               isNewActive
                                 ? 'bg-rose-600 border-rose-500 text-white'
                                 : 'border-neutral-800 bg-neutral-900/40 text-neutral-500 hover:text-white hover:border-neutral-600'
@@ -258,7 +261,9 @@ export const ServiceNowNavigator: React.FC<ServiceNowNavigatorProps> = ({ isOpen
 
       {/* Navigator Footer */}
       <div className="p-3 border-t border-neutral-900 bg-neutral-950 text-[10px] text-neutral-500 flex items-center justify-between">
-        <span>MULTI-TENANT ITSM</span>
+        <span className={isSuperAdmin ? 'text-rose-400 font-bold' : isIamPortal ? 'text-amber-400 font-bold' : 'text-sky-400 font-bold'}>
+          {isSuperAdmin ? 'SUPER ADMIN' : isIamPortal ? 'IAM PORTAL' : 'EMPLOYEE RBAC'}
+        </span>
         <span>NJURE TECH</span>
       </div>
     </aside>

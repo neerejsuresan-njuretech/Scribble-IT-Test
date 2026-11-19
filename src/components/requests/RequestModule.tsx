@@ -11,6 +11,8 @@ import {
   Search,
   Table2,
   Columns3,
+  Lock,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface RequestModuleProps {
@@ -19,12 +21,30 @@ interface RequestModuleProps {
 
 export const RequestModule: React.FC<RequestModuleProps> = ({ onOpenCreate }) => {
   const navigate = useNavigate();
-  const { requests, approveRequestStage, currentUser, activeTenant } = useITSM();
+  const {
+    requests,
+    approveRequestStage,
+    canApproveRequestStage,
+    reassignRequestApprover,
+    authAccounts,
+    isSuperAdmin,
+    isIamPortal,
+    currentUser,
+    activeTenant
+  } = useITSM();
   const [selectedId, setSelectedId] = useState<string>(requests[0]?.id || '');
   const [approvalNote, setApprovalNote] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [slaFilter, setSlaFilter] = useState<'all' | 'breach_critical' | 'warning' | 'healthy'>('all');
   const [viewMode, setViewMode] = useState<'table' | 'split'>('table');
+
+  const corporateApproverOptions = useMemo(
+    () =>
+      authAccounts
+        .filter(a => a.tenantId === activeTenant.id && a.portalType !== 'end_user' && a.status !== 'suspended')
+        .slice(0, 60),
+    [authAccounts, activeTenant.id]
+  );
 
   const filteredRequests = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -173,63 +193,136 @@ export const RequestModule: React.FC<RequestModuleProps> = ({ onOpenCreate }) =>
           </div>
         </div>
 
-        {/* Approvals Checklist */}
+        {/* Approvals Checklist (Strict Designated Account or Super Admin Governance) */}
         <div className="space-y-3">
-          <div className="text-xs text-neutral-400 font-semibold">
-            Required Governance Approvals
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="text-xs text-neutral-400 font-semibold flex items-center gap-2">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Required Governance Approvals</span>
+            </div>
+            <span className="text-[10px] text-neutral-500 uppercase tracking-wider">
+              Designated Account or Super Admin Only
+            </span>
           </div>
 
           <div className="space-y-3">
-            {selectedRequest.approvals.map((app, idx) => (
-              <div key={idx} className="p-4 border border-neutral-800 bg-neutral-900/30 space-y-3 text-xs">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <UserCheck className="w-4 h-4 text-neutral-400 shrink-0" />
-                    <span className="font-bold text-neutral-200 truncate">{app.role}</span>
-                    <span className="text-neutral-500">·</span>
-                    <span className="text-neutral-400 truncate">{app.approver}</span>
+            {selectedRequest.approvals.map((app, idx) => {
+              const authCheck = canApproveRequestStage(app, selectedRequest.requesterEmail);
+              const isPending = app.status === 'pending' && selectedRequest.status !== 'rejected';
+              return (
+                <div key={idx} className="p-4 border border-neutral-800 bg-neutral-900/30 space-y-3 text-xs">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="flex items-start gap-2 min-w-0">
+                      <UserCheck className="w-4 h-4 text-neutral-400 shrink-0 mt-0.5" />
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-bold text-neutral-200">{app.role}</span>
+                          <span className="text-neutral-500">·</span>
+                          <span className="text-neutral-300">{app.approver}</span>
+                        </div>
+                        {app.approverEmail && (
+                          <div className="text-[10px] text-sky-400 font-mono-strict truncate">
+                            Designated Account: {app.approverEmail}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <span
+                      className={`uppercase font-bold text-[11px] shrink-0 ${
+                        app.status === 'approved'
+                          ? 'text-emerald-400'
+                          : app.status === 'rejected'
+                          ? 'text-rose-500'
+                          : 'text-amber-400'
+                      }`}
+                    >
+                      {app.status}
+                    </span>
                   </div>
-                  <span
-                    className={`uppercase font-bold text-[11px] ${
-                      app.status === 'approved'
-                        ? 'text-emerald-400'
-                        : app.status === 'rejected'
-                        ? 'text-rose-500'
-                        : 'text-amber-400'
-                    }`}
-                  >
-                    {app.status}
-                  </span>
+
+                  {app.notes && (
+                    <div className="text-[11px] text-neutral-400 bg-neutral-950 p-2 border border-neutral-900">
+                      "{app.notes}"
+                    </div>
+                  )}
+
+                  {isPending && (
+                    <div className="space-y-2.5 pt-1">
+                      {authCheck.allowed ? (
+                        <div className="space-y-2.5">
+                          <div
+                            className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                              authCheck.isSuperAdminOverride ? 'text-rose-400' : 'text-emerald-400'
+                            }`}
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                            <span>
+                              {authCheck.isSuperAdminOverride
+                                ? 'Super Admin Governance Override Authorized'
+                                : 'Authorized Designated Approver Account'}
+                            </span>
+                          </div>
+                          <input
+                            type="text"
+                            value={approvalNote}
+                            onChange={e => setApprovalNote(e.target.value)}
+                            placeholder="Optional approval / rejection audit justification..."
+                            className="w-full bg-neutral-950 border border-neutral-800 px-2.5 py-1.5 text-[11px] text-neutral-200 placeholder:text-neutral-600 focus:outline-none focus:border-neutral-600"
+                          />
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleApprove(app.role)}
+                              className="min-h-[36px] px-3 py-1 bg-neutral-100 text-neutral-950 hover:bg-white font-bold transition-colors flex items-center gap-1.5 whitespace-nowrap"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              <span>
+                                {authCheck.isSuperAdminOverride ? 'Approve (Super Admin)' : 'Approve Stage'}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleReject(app.role)}
+                              className="min-h-[36px] px-3 py-1 border border-neutral-700 text-rose-400 hover:bg-neutral-800 transition-colors flex items-center gap-1.5 whitespace-nowrap"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              <span>Reject</span>
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-2.5 border border-neutral-800 bg-neutral-950/80 text-[11px] text-neutral-400 flex items-start gap-2">
+                          <Lock className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                          <span>{authCheck.reason}</span>
+                        </div>
+                      )}
+
+                      {(isSuperAdmin || isIamPortal) && (
+                        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-neutral-800/80">
+                          <span className="text-[10px] text-neutral-500 uppercase">Reassign Approver:</span>
+                          <select
+                            defaultValue=""
+                            onChange={e => {
+                              if (!e.target.value) return;
+                              reassignRequestApprover(selectedRequest.id, app.role, e.target.value);
+                              e.target.value = '';
+                            }}
+                            className="bg-neutral-950 border border-neutral-700 text-neutral-200 px-2 py-1 text-[11px] focus:outline-none max-w-xs"
+                          >
+                            <option value="">Select specific corporate account...</option>
+                            {corporateApproverOptions.map(acc => (
+                              <option key={acc.id} value={acc.id}>
+                                {acc.name} ({acc.email})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-
-                {app.notes && (
-                  <div className="text-[11px] text-neutral-400 bg-neutral-950 p-2 border border-neutral-900">
-                    "{app.notes}"
-                  </div>
-                )}
-
-                {app.status === 'pending' && selectedRequest.status !== 'rejected' && (
-                  <div className="flex flex-wrap items-center gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => handleApprove(app.role)}
-                      className="min-h-[36px] px-3 py-1 bg-neutral-100 text-neutral-950 hover:bg-white font-bold transition-colors flex items-center gap-1.5 whitespace-nowrap"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      <span>Approve Stage</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleReject(app.role)}
-                      className="min-h-[36px] px-3 py-1 border border-neutral-700 text-rose-400 hover:bg-neutral-800 transition-colors flex items-center gap-1.5 whitespace-nowrap"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                      <span>Reject</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>

@@ -2,7 +2,7 @@
 <html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Scribble IT — Enterprise ITSM</title>
     <meta name="description" content="Minimal dot-matrix IT Service Management suite by Njure Tech featuring Incidents, Service Requests, Problems, Changes, CMDB, Inventory, Telephony integration, Self-Service, and Payments." />
     <meta property="og:title" content="Scribble IT — Enterprise ITSM" />
@@ -12,7 +12,9 @@
     <script>
       (function () {
         try {
-          var saved = localStorage.getItem('SCRIBBLE_ITSM_DB_V4_BLANK_THEME');
+          var saved =
+            localStorage.getItem('SCRIBBLE_ITSM_DB_V5_ENTERPRISE_THEME') ||
+            localStorage.getItem('SCRIBBLE_ITSM_DB_V4_BLANK_THEME');
           var mode = saved && JSON.parse(saved) === 'light' ? 'light' : 'dark';
           var root = document.documentElement;
           root.classList.remove('dark', 'light');

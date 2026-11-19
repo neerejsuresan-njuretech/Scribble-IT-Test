@@ -8,7 +8,8 @@ import {
   MorningCheckRun, MorningCheckItem, CalendarEvent, WarRoomSession,
   LmsCourse, WikiPage, ProcessMap, ProcessNodeType, CustomFormDefinition, CmdbRelation,
   AuditLogEntry, AuthPortalType, AuthAccount, AuthSession,
-  ManagedDeviceTrust, WorkflowDefinition, TicketWorkflowRule,
+  ManagedDeviceTrust, DeviceEnrollmentCode, RequestApproval, CabVote,
+  WorkflowDefinition, TicketWorkflowRule,
   IamPolicy, IamPermissionScope, CustomPortalKey, PortalBrandConfig,
   WorkflowRunStepTrace, ToastMessage, ThemeMode,
   TelephonyProviderConfig, TelephonyProviderType
@@ -60,14 +61,28 @@ interface ITSMContextType {
   setActiveTab: (tab: string) => void;
   currentUser: { name: string; email: string; department: string; phone: string };
 
-  // Portal Auth & Company Device SSO
+  // Portal Auth, Corporate Clearance & IAM-Verified Company Device SSO
   authSession: AuthSession | null;
   authAccounts: AuthAccount[];
+  isSuperAdmin: boolean;
+  isIamPortal: boolean;
   managedDevice: ManagedDeviceTrust | null;
+  isManagedDeviceVerified: boolean;
+  deviceEnrollmentCodes: DeviceEnrollmentCode[];
+  enrolledDevices: ManagedDeviceTrust[];
   registerAccount: (portalType: AuthPortalType, data: { name: string; email: string; password: string; department?: string }) => { ok: boolean; error?: string };
   loginWithCredentials: (portalType: AuthPortalType, email: string, password: string) => { ok: boolean; error?: string };
   loginAsTestAccount: (portalType: AuthPortalType) => void;
-  enrollCompanyDevice: (hostname?: string, mdmProvider?: string) => ManagedDeviceTrust;
+  generateDeviceEnrollmentCode: (options: {
+    tenantId?: string;
+    assignedEmail?: string;
+    targetHostname?: string;
+    mdmProvider?: string;
+    validHours?: number;
+  }) => { ok: boolean; record?: DeviceEnrollmentCode; error?: string };
+  revokeDeviceEnrollmentCode: (id: string) => { ok: boolean; error?: string };
+  revokeEnrolledDevice: (deviceId: string) => { ok: boolean; error?: string };
+  enrollCompanyDevice: (verificationCode: string, hostname?: string, mdmProvider?: string, employeeEmail?: string) => { ok: boolean; device?: ManagedDeviceTrust; error?: string };
   unenrollCompanyDevice: () => void;
   loginEmployeeDeviceSso: (email?: string, name?: string) => { ok: boolean; error?: string };
   loginViaGooglePortal: (portalType: AuthPortalType) => Promise<{ ok: boolean; error?: string }>;
@@ -146,11 +161,15 @@ interface ITSMContextType {
   simulateEmailToTicket: (fromEmail: string, subject: string, body: string) => Incident;
 
   createServiceRequest: (req: Partial<ServiceRequest>) => ServiceRequest;
-  approveRequestStage: (requestId: string, roleName: string, approver: string, status: 'approved' | 'rejected', notes?: string) => void;
+  canApproveRequestStage: (approval: RequestApproval, requesterEmail?: string) => { allowed: boolean; reason: string; isSuperAdminOverride?: boolean };
+  approveRequestStage: (requestId: string, roleName: string, approver: string, status: 'approved' | 'rejected', notes?: string) => { ok: boolean; error?: string };
+  reassignRequestApprover: (requestId: string, roleName: string, accountId: string) => { ok: boolean; error?: string };
   createProblem: (prob: Partial<Problem>) => Problem;
   updateProblem: (id: string, updates: Partial<Problem>) => void;
   createChangeRequest: (change: Partial<ChangeRequest>) => ChangeRequest;
-  voteCab: (changeId: string, member: string, roleName: string, vote: 'approved' | 'rejected', notes?: string) => void;
+  canVoteCab: (vote: CabVote) => { allowed: boolean; reason: string; isSuperAdminOverride?: boolean };
+  voteCab: (changeId: string, member: string, roleName: string, vote: 'approved' | 'rejected', notes?: string) => { ok: boolean; error?: string };
+  reassignCabVoter: (changeId: string, roleName: string, accountId: string) => { ok: boolean; error?: string };
   updateChangeStatus: (id: string, status: ChangeStatus) => void;
   addRecordActivity: (recordId: string, recordType: 'incident' | 'change', note: string, type: 'work_note' | 'comment' | 'field_change' | 'system_alert' | 'audit', action?: string, fieldChanges?: { field: string; from: string; to: string }[]) => void;
 
@@ -304,11 +323,42 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return saved.length > 0 ? saved : initialSeed.iamPolicies;
   });
   const [managedDevice, setManagedDevice] = useState<ManagedDeviceTrust | null>(() => loadState('MANAGED_DEVICE', null));
+  const [deviceEnrollmentCodes, setDeviceEnrollmentCodes] = useState<DeviceEnrollmentCode[]>(() =>
+    loadState('DEVICE_ENROLLMENT_CODES', [])
+  );
+  const [enrolledDevices, setEnrolledDevices] = useState<ManagedDeviceTrust[]>(() =>
+    loadState('ENROLLED_DEVICES', [])
+  );
 
   const role: Role = authSession?.isAuthenticated ? authSession.role : 'customer';
+  const isSuperAdmin = Boolean(
+    authSession?.isAuthenticated && authSession.portalType === 'super_admin' && authSession.role === 'admin'
+  );
+  const isIamPortal = Boolean(authSession?.isAuthenticated && authSession.portalType === 'iam');
+
+  const isManagedDeviceVerified = useMemo(() => {
+    if (!managedDevice || !managedDevice.verifiedByIam || managedDevice.status === 'revoked') {
+      return false;
+    }
+    const registryRecord = enrolledDevices.find(d => d.deviceId === managedDevice.deviceId);
+    if (registryRecord && registryRecord.status === 'revoked') {
+      return false;
+    }
+    return true;
+  }, [managedDevice, enrolledDevices]);
+
   const setRole = (nextRole: Role) => {
     if (!authSession) return;
-    const portalType: AuthPortalType = nextRole === 'admin' ? 'super_admin' : nextRole === 'technician' ? 'employee' : 'end_user';
+    if (!isSuperAdmin && nextRole === 'admin') {
+      showToast({
+        variant: 'error',
+        title: 'Privilege Escalation Blocked',
+        description: 'Only authenticated Super Admin Portal sessions can hold Super Admin privileges.',
+      });
+      return;
+    }
+    const portalType: AuthPortalType =
+      nextRole === 'admin' ? 'super_admin' : nextRole === 'technician' ? 'employee' : 'end_user';
     setAuthSession({ ...authSession, role: nextRole, portalType });
   };
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -529,8 +579,8 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
           : portalType === 'employee'
           ? 'employee_password'
           : 'portal_login',
-      deviceManaged: Boolean(managedDevice),
-      deviceId: managedDevice?.deviceId,
+      deviceManaged: isManagedDeviceVerified,
+      deviceId: isManagedDeviceVerified ? managedDevice?.deviceId : undefined,
       companyId: newAccount.companyId,
       policyIds: newAccount.policyIds,
       authenticatedAt: new Date().toISOString()
@@ -555,7 +605,7 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         (a.portalType === portalType || (portalType === 'iam' && a.portalType === 'super_admin'))
     );
     if (!matched) {
-      const msg = 'Account not found for this portal. Register first to create credentials.';
+      const msg = 'Account not found for this portal. Verify your portal or contact IAM Team.';
       showToast({ variant: 'error', title: 'Authentication Failed', description: msg });
       return { ok: false, error: msg };
     }
@@ -569,6 +619,19 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
       showToast({ variant: 'error', title: 'Authentication Failed', description: msg });
       return { ok: false, error: msg };
     }
+
+    // Enforce Corporate SSO-Only IAM Policy for Employee accounts on unmanaged devices
+    if (portalType === 'employee') {
+      const accountPolicies = allIamPolicies.filter(p => (matched.policyIds || []).includes(p.id));
+      const requiresSsoOnly = accountPolicies.some(p => p.ssoOnly);
+      if (requiresSsoOnly && !isManagedDeviceVerified) {
+        const msg =
+          'Corporate Policy Enforcement: Your identity requires an IAM-verified Company Managed Device & SSO. Request a unique enrollment code from the IAM Team.';
+        showToast({ variant: 'error', title: 'Managed Device & SSO Required', description: msg });
+        return { ok: false, error: msg };
+      }
+    }
+
     if (matched.tenantId && tenants.some(t => t.id === matched.tenantId)) {
       setActiveTenantId(matched.tenantId);
     }
@@ -587,8 +650,8 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
           : portalType === 'employee'
           ? 'employee_password'
           : 'portal_login',
-      deviceManaged: Boolean(managedDevice),
-      deviceId: managedDevice?.deviceId,
+      deviceManaged: isManagedDeviceVerified,
+      deviceId: isManagedDeviceVerified ? managedDevice?.deviceId : undefined,
       companyId: matched.companyId,
       policyIds: matched.policyIds,
       authenticatedAt: new Date().toISOString()
@@ -626,27 +689,269 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
           : portalType === 'employee'
           ? 'employee_password'
           : 'portal_login',
-      deviceManaged: Boolean(managedDevice),
-      deviceId: managedDevice?.deviceId,
+      deviceManaged: isManagedDeviceVerified,
+      deviceId: isManagedDeviceVerified ? managedDevice?.deviceId : undefined,
       companyId: preset.companyId,
       policyIds: preset.policyIds,
       authenticatedAt: new Date().toISOString()
     });
   };
 
-  const enrollCompanyDevice = (hostname?: string, mdmProvider?: string): ManagedDeviceTrust => {
+  const generateUniqueEnrollmentCodeString = (): string => {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const randomBlock = (len: number) => {
+      let out = '';
+      if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+        const bytes = new Uint8Array(len);
+        crypto.getRandomValues(bytes);
+        for (let i = 0; i < len; i++) {
+          out += alphabet[bytes[i] % alphabet.length];
+        }
+      } else {
+        for (let i = 0; i < len; i++) {
+          out += alphabet[Math.floor(Math.random() * alphabet.length)];
+        }
+      }
+      return out;
+    };
+    let candidate = `IAM-${randomBlock(4)}-${randomBlock(4)}`;
+    let guard = 0;
+    while (deviceEnrollmentCodes.some(c => c.code === candidate) && guard < 20) {
+      candidate = `IAM-${randomBlock(4)}-${randomBlock(4)}`;
+      guard++;
+    }
+    return candidate;
+  };
+
+  const generateDeviceEnrollmentCode: ITSMContextType['generateDeviceEnrollmentCode'] = options => {
+    if (!isIamPortal) {
+      const err = 'Device enrollment verification codes can ONLY be generated through the IAM Portal.';
+      showToast({ variant: 'error', title: 'IAM Portal Exclusive Action', description: err });
+      return { ok: false, error: err };
+    }
+    const targetTenant = tenants.find(t => t.id === options.tenantId) || activeTenant;
+    const cleanEmail = options.assignedEmail?.trim().toLowerCase() || undefined;
+    const matchedEmployee = cleanEmail
+      ? authAccounts.find(a => a.email.toLowerCase() === cleanEmail)
+      : undefined;
+    const validHours = Math.max(1, Math.min(168, options.validHours || 24));
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + validHours * 3600 * 1000).toISOString();
+
+    const record: DeviceEnrollmentCode = {
+      id: `ENRL-${Date.now()}-${Math.floor(100 + Math.random() * 899)}`,
+      code: generateUniqueEnrollmentCodeString(),
+      tenantId: targetTenant.id,
+      companyCode: targetTenant.companyCode || `COMP-${targetTenant.slug.toUpperCase()}`,
+      assignedEmail: cleanEmail,
+      assignedEmployeeName: matchedEmployee?.name,
+      targetHostname: options.targetHostname?.trim() || undefined,
+      mdmProvider: options.mdmProvider?.trim() || 'Njure Endpoint Trust MDM',
+      status: 'active',
+      issuedBy: authSession?.name || 'IAM Officer',
+      issuedByEmail: authSession?.email || 'iam@njuretech.io',
+      createdAt: now.toISOString(),
+      expiresAt,
+    };
+
+    setDeviceEnrollmentCodes(prev => [record, ...prev]);
+    setAllAuditLogs(prev => [
+      {
+        id: `AUD-${Date.now()}-${Math.floor(Math.random() * 99)}`,
+        tenantId: targetTenant.id,
+        timestamp: now.toISOString(),
+        actor: authSession?.name || 'IAM Officer',
+        module: 'IAM Device Trust',
+        action: 'GENERATE_ENROLLMENT_CODE',
+        targetId: record.code,
+        detail: `Issued single-use device enrollment code (${validHours}h TTL)${cleanEmail ? ` bound to ${cleanEmail}` : ' (company-wide)'}`,
+      },
+      ...prev,
+    ].slice(0, 200));
+    showToast({
+      variant: 'success',
+      title: `Enrollment Code Issued: ${record.code}`,
+      description: `Valid for ${validHours}h · ${targetTenant.name}${cleanEmail ? ` · Bound to ${cleanEmail}` : ''}`,
+    });
+    return { ok: true, record };
+  };
+
+  const revokeDeviceEnrollmentCode = (id: string): { ok: boolean; error?: string } => {
+    if (!isIamPortal) {
+      const err = 'Only the IAM Portal can revoke device enrollment verification codes.';
+      showToast({ variant: 'error', title: 'IAM Portal Exclusive Action', description: err });
+      return { ok: false, error: err };
+    }
+    const target = deviceEnrollmentCodes.find(c => c.id === id);
+    if (!target) return { ok: false, error: 'Enrollment code not found.' };
+    setDeviceEnrollmentCodes(prev =>
+      prev.map(c => (c.id === id ? { ...c, status: 'revoked' } : c))
+    );
+    setAllAuditLogs(prev => [
+      {
+        id: `AUD-${Date.now()}-${Math.floor(Math.random() * 99)}`,
+        tenantId: target.tenantId,
+        timestamp: new Date().toISOString(),
+        actor: authSession?.name || 'IAM Officer',
+        module: 'IAM Device Trust',
+        action: 'REVOKE_ENROLLMENT_CODE',
+        targetId: target.code,
+        detail: 'Revoked pending device enrollment verification code',
+      },
+      ...prev,
+    ].slice(0, 200));
+    showToast({ variant: 'warning', title: `Code Revoked: ${target.code}` });
+    return { ok: true };
+  };
+
+  const revokeEnrolledDevice = (deviceId: string): { ok: boolean; error?: string } => {
+    if (!isIamPortal) {
+      const err = 'Only the IAM Portal can revoke corporate MDM device trust.';
+      showToast({ variant: 'error', title: 'IAM Portal Exclusive Action', description: err });
+      return { ok: false, error: err };
+    }
+    const target = enrolledDevices.find(d => d.deviceId === deviceId);
+    setEnrolledDevices(prev =>
+      prev.map(d => (d.deviceId === deviceId ? { ...d, status: 'revoked' } : d))
+    );
+    if (managedDevice?.deviceId === deviceId) {
+      setManagedDevice(null);
+    }
+    setAllAuditLogs(prev => [
+      {
+        id: `AUD-${Date.now()}-${Math.floor(Math.random() * 99)}`,
+        tenantId: target?.tenantId || activeTenant.id,
+        timestamp: new Date().toISOString(),
+        actor: authSession?.name || 'IAM Officer',
+        module: 'IAM Device Trust',
+        action: 'REVOKE_DEVICE_TRUST',
+        targetId: deviceId,
+        detail: `Revoked corporate MDM certificate & SSO trust for ${target?.hostname || deviceId}`,
+      },
+      ...prev,
+    ].slice(0, 200));
+    showToast({
+      variant: 'warning',
+      title: `Device Trust Revoked: ${deviceId}`,
+      description: 'SSO access has been disabled for this workstation.',
+    });
+    return { ok: true };
+  };
+
+  const enrollCompanyDevice = (
+    verificationCode: string,
+    hostname?: string,
+    mdmProvider?: string,
+    employeeEmail?: string
+  ): { ok: boolean; device?: ManagedDeviceTrust; error?: string } => {
+    const cleanCode = verificationCode.trim().toUpperCase();
+    if (!cleanCode) {
+      const err = 'An IAM-issued Device Enrollment Verification Code (e.g. IAM-XXXX-XXXX) is mandatory.';
+      showToast({ variant: 'error', title: 'Verification Code Required', description: err });
+      return { ok: false, error: err };
+    }
+
+    const matchedCode = deviceEnrollmentCodes.find(c => c.code.toUpperCase() === cleanCode);
+    if (!matchedCode) {
+      const err = 'Invalid enrollment verification code. Request a valid unique code from the IAM Team via the IAM Portal.';
+      showToast({ variant: 'error', title: 'Enrollment Denied', description: err });
+      return { ok: false, error: err };
+    }
+
+    if (matchedCode.status === 'used') {
+      const err = `Code ${matchedCode.code} has already been redeemed on workstation ${matchedCode.usedByHostname || matchedCode.usedByDeviceId || 'another device'}.`;
+      showToast({ variant: 'error', title: 'Code Already Used', description: err });
+      return { ok: false, error: err };
+    }
+
+    if (matchedCode.status === 'revoked') {
+      const err = `Code ${matchedCode.code} was revoked by the IAM Team.`;
+      showToast({ variant: 'error', title: 'Code Revoked', description: err });
+      return { ok: false, error: err };
+    }
+
+    if (matchedCode.status === 'expired' || new Date(matchedCode.expiresAt).getTime() <= Date.now()) {
+      setDeviceEnrollmentCodes(prev =>
+        prev.map(c => (c.id === matchedCode.id ? { ...c, status: 'expired' } : c))
+      );
+      const err = `Code ${matchedCode.code} has expired. Contact the IAM Team for a new verification code.`;
+      showToast({ variant: 'error', title: 'Code Expired', description: err });
+      return { ok: false, error: err };
+    }
+
+    const cleanEmployeeEmail = employeeEmail?.trim().toLowerCase() || '';
+    if (matchedCode.assignedEmail) {
+      if (!cleanEmployeeEmail) {
+        const err = 'This IAM enrollment code is bound to a specific corporate employee email. Enter your corporate email to verify.';
+        showToast({ variant: 'error', title: 'Employee Email Required', description: err });
+        return { ok: false, error: err };
+      }
+      if (cleanEmployeeEmail !== matchedCode.assignedEmail.toLowerCase()) {
+        const err = 'Corporate email does not match the identity bound to this IAM enrollment verification code.';
+        showToast({ variant: 'error', title: 'Identity Mismatch', description: err });
+        return { ok: false, error: err };
+      }
+    }
+
+    const targetTenant = tenants.find(t => t.id === matchedCode.tenantId) || activeTenant;
     const ua = typeof navigator !== 'undefined' ? navigator.platform || 'Managed Workstation' : 'Managed Workstation';
+    const resolvedHostname =
+      hostname?.trim() ||
+      matchedCode.targetHostname ||
+      `${targetTenant.slug.toUpperCase()}-WS-${Math.floor(100 + Math.random() * 899)}`;
+    const nowIso = new Date().toISOString();
+
     const trust: ManagedDeviceTrust = {
       deviceId: `DEV-${Math.floor(10000 + Math.random() * 89999)}`,
-      hostname: hostname?.trim() || `${activeTenant.slug.toUpperCase()}-WS-${Math.floor(100 + Math.random() * 899)}`,
+      hostname: resolvedHostname,
       osPlatform: ua,
-      mdmProvider: mdmProvider?.trim() || 'Njure Endpoint Trust MDM',
-      domain: activeTenant.domain,
-      enrolledAt: new Date().toISOString(),
-      certificateThumbprint: `SHA256:${Math.random().toString(16).slice(2, 10).toUpperCase()}${Math.random().toString(16).slice(2, 10).toUpperCase()}`
+      mdmProvider: mdmProvider?.trim() || matchedCode.mdmProvider || 'Njure Endpoint Trust MDM',
+      domain: targetTenant.domain,
+      tenantId: targetTenant.id,
+      companyCode: matchedCode.companyCode,
+      enrollmentCode: matchedCode.code,
+      enrolledByEmail: matchedCode.assignedEmail || cleanEmployeeEmail || undefined,
+      verifiedByIam: true,
+      status: 'active',
+      enrolledAt: nowIso,
+      certificateThumbprint: `SHA256:${Math.random().toString(16).slice(2, 10).toUpperCase()}${Math.random().toString(16).slice(2, 10).toUpperCase()}`,
     };
+
+    setDeviceEnrollmentCodes(prev =>
+      prev.map(c =>
+        c.id === matchedCode.id
+          ? {
+              ...c,
+              status: 'used',
+              usedAt: nowIso,
+              usedByDeviceId: trust.deviceId,
+              usedByHostname: trust.hostname,
+            }
+          : c
+      )
+    );
+    setEnrolledDevices(prev => [trust, ...prev]);
     setManagedDevice(trust);
-    return trust;
+    setActiveTenantId(targetTenant.id);
+    setAllAuditLogs(prev => [
+      {
+        id: `AUD-${Date.now()}-${Math.floor(Math.random() * 99)}`,
+        tenantId: targetTenant.id,
+        timestamp: nowIso,
+        actor: trust.enrolledByEmail || 'Workstation Onboarding',
+        module: 'IAM Device Trust',
+        action: 'DEVICE_ENROLLED',
+        targetId: trust.deviceId,
+        detail: `Verified & onboarded ${trust.hostname} using IAM code ${matchedCode.code} (${trust.mdmProvider})`,
+      },
+      ...prev,
+    ].slice(0, 200));
+    showToast({
+      variant: 'success',
+      title: 'Device Onboarded & SSO Activated',
+      description: `${trust.hostname} (${trust.deviceId}) verified via IAM code ${matchedCode.code}.`,
+    });
+    return { ok: true, device: trust };
   };
 
   const unenrollCompanyDevice = () => {
@@ -654,15 +959,39 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginEmployeeDeviceSso = (email?: string, name?: string): { ok: boolean; error?: string } => {
-    if (!managedDevice) {
-      return { ok: false, error: 'This device is not enrolled as a managed company workstation.' };
+    if (!managedDevice || !isManagedDeviceVerified) {
+      return {
+        ok: false,
+        error:
+          'This workstation is unmanaged or its corporate MDM certificate was revoked. Obtain a unique verification code from the IAM Team to enroll.',
+      };
     }
-    const employeeAccount = email
-      ? authAccounts.find(a => a.portalType === 'employee' && a.email === email.trim().toLowerCase())
-      : authAccounts.find(a => a.portalType === 'employee');
+
+    const cleanInputEmail = email?.trim().toLowerCase();
+    if (managedDevice.enrolledByEmail && cleanInputEmail && cleanInputEmail !== managedDevice.enrolledByEmail.toLowerCase()) {
+      return {
+        ok: false,
+        error: `This managed workstation is bound by IAM to ${managedDevice.enrolledByEmail}.`,
+      };
+    }
+
+    const targetEmail = managedDevice.enrolledByEmail || cleanInputEmail;
+    const employeeAccount = targetEmail
+      ? authAccounts.find(a => a.portalType === 'employee' && a.email.toLowerCase() === targetEmail.toLowerCase())
+      : authAccounts.find(
+          a => a.portalType === 'employee' && (!managedDevice.tenantId || a.tenantId === managedDevice.tenantId)
+        ) || authAccounts.find(a => a.portalType === 'employee');
+
+    if (employeeAccount?.status === 'suspended') {
+      return { ok: false, error: 'This employee identity has been suspended in the IAM Portal.' };
+    }
+
+    if (managedDevice.tenantId && tenants.some(t => t.id === managedDevice.tenantId)) {
+      setActiveTenantId(managedDevice.tenantId);
+    }
 
     const resolvedName = name?.trim() || employeeAccount?.name || `Corporate Employee (${managedDevice.hostname})`;
-    const resolvedEmail = email?.trim().toLowerCase() || employeeAccount?.email || `employee@${managedDevice.domain}`;
+    const resolvedEmail = targetEmail || employeeAccount?.email || `employee@${managedDevice.domain}`;
     setAuthSession({
       isAuthenticated: true,
       portalType: 'employee',
@@ -673,6 +1002,8 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
       authMethod: 'employee_sso',
       deviceManaged: true,
       deviceId: managedDevice.deviceId,
+      companyId: managedDevice.companyCode || employeeAccount?.companyId || activeTenant.companyCode,
+      policyIds: employeeAccount?.policyIds || ['POL-EMPLOYEE-OPS'],
       authenticatedAt: new Date().toISOString()
     });
     return { ok: true };
@@ -823,6 +1154,8 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     safeSaveLocal('AUTH_ACCOUNTS', authAccounts);
     safeSaveLocal('IAM_POLICIES', allIamPolicies);
     safeSaveLocal('MANAGED_DEVICE', managedDevice);
+    safeSaveLocal('DEVICE_ENROLLMENT_CODES', deviceEnrollmentCodes);
+    safeSaveLocal('ENROLLED_DEVICES', enrolledDevices);
     safeSaveLocal('ACTIVE_TENANT', activeTenantId);
     safeSaveLocal('INCIDENTS', allIncidents);
     safeSaveLocal('REQUESTS', allRequests);
@@ -853,7 +1186,7 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     safeSaveLocal('TELEPHONY_CONFIGS', telephonyConfigsByTenant);
     safeSaveLocal('TENANTS', tenants);
   }, [
-    authSession, authAccounts, allIamPolicies, managedDevice,
+    authSession, authAccounts, allIamPolicies, managedDevice, deviceEnrollmentCodes, enrolledDevices,
     tenants, activeTenantId, allIncidents, allRequests, allProblems, allChanges,
     allAssets, allInventory, allCalls, allInvoices, allSoftware, allTasks,
     allProjects, allKb, allContracts, allDomains, allStatusComponents,
@@ -900,6 +1233,8 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
       workflows: { items: allWorkflows },
       ticket_workflows: { items: allTicketWorkflows },
       iam_policies: { items: allIamPolicies },
+      device_enrollment_codes: { items: deviceEnrollmentCodes.slice(0, 300) },
+      enrolled_devices: { items: enrolledDevices.slice(0, 300) },
       ...accountShards,
       telephony_configs: { settingsMap: telephonyConfigsByTenant as unknown as Record<string, unknown> },
     };
@@ -908,7 +1243,8 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     allSoftware, allTasks, allProjects, allKb, allContracts, allDomains,
     allStatusComponents, allMorningChecks, allCalendarEvents, allWarRooms,
     allLmsCourses, allWikiPages, allProcessMaps, allCustomForms, allCmdbRelations,
-    allAuditLogs, allWorkflows, allTicketWorkflows, allIamPolicies, authAccounts,
+    allAuditLogs, allWorkflows, allTicketWorkflows, allIamPolicies,
+    deviceEnrollmentCodes, enrolledDevices, authAccounts,
     telephonyConfigsByTenant
   ]);
 
@@ -1103,6 +1439,8 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 case 'workflows': if (rec.items) setAllWorkflows(rec.items as WorkflowDefinition[]); break;
                 case 'ticket_workflows': if (rec.items) setAllTicketWorkflows(rec.items as TicketWorkflowRule[]); break;
                 case 'iam_policies': if (rec.items && rec.items.length > 0) setAllIamPolicies(rec.items as IamPolicy[]); break;
+                case 'device_enrollment_codes': if (rec.items) setDeviceEnrollmentCodes(rec.items as DeviceEnrollmentCode[]); break;
+                case 'enrolled_devices': if (rec.items) setEnrolledDevices(rec.items as ManagedDeviceTrust[]); break;
                 case 'auth_accounts': if (rec.items && rec.items.length > 0) legacyAccounts = rec.items as AuthAccount[]; break;
                 case 'telephony_configs':
                   if (rec.settingsMap) {
@@ -1296,13 +1634,35 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setAllAuditLogs(prev => [entry, ...prev].slice(0, 200));
   };
 
-  // Multi-Tenant Operations
+  // Multi-Tenant Operations (Strictly Super Admin Portal Exclusive for Company Governance)
+  const requireSuperAdmin = (actionName: string): boolean => {
+    if (isSuperAdmin) return true;
+    recordAudit('Security Governance', 'SECURITY_DENIED', actionName, `Blocked non-Super-Admin (${authSession?.portalType || 'guest'} · ${currentUser.email}) from ${actionName}`);
+    showToast({
+      variant: 'error',
+      title: 'Super Admin Portal Clearance Required',
+      description: `Only the Super Admin Portal can perform: ${actionName}.`,
+    });
+    return false;
+  };
+
   const switchTenant = (tenantId: string) => {
+    if (authSession?.isAuthenticated && !isSuperAdmin && !isIamPortal) {
+      showToast({
+        variant: 'warning',
+        title: 'Corporate Tenant Isolation Active',
+        description: 'Employees and End-Users are locked to their assigned organization.',
+      });
+      return;
+    }
     setActiveTenantId(tenantId);
     setActiveCall(null);
   };
 
   const createTenant = (data: Partial<Tenant>): Tenant => {
+    if (!requireSuperAdmin('Provision New Company Tenant')) {
+      return activeTenant;
+    }
     const slug = (data.slug || data.name || 'new-tenant').toLowerCase().replace(/[^a-z0-9]+/g, '-');
     const id = `tenant-${slug}-${Math.floor(100 + Math.random() * 900)}`;
     const tenantDisplayName = data.name || 'New Enterprise Tenant';
@@ -1345,6 +1705,7 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateTenant = (tenantId: string, updates: Partial<Tenant>) => {
+    if (!requireSuperAdmin('Update Company Details & SLA Configuration')) return;
     setTenants(prev => prev.map(t => (t.id === tenantId ? { ...t, ...updates } : t)));
     recordAudit('Multi-Tenant', 'UPDATE_TENANT', tenantId, 'Updated tenant configuration / preference template');
     showToast({ variant: 'success', title: 'Tenant Changes Saved', description: 'Tenant configuration and templates updated.' });
@@ -1355,6 +1716,7 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     portalKey: CustomPortalKey,
     updates: Partial<PortalBrandConfig>
   ) => {
+    if (!requireSuperAdmin('Update Company Portal Branding & Logos')) return;
     setTenants(prev =>
       prev.map(t => {
         if (t.id !== tenantId) return t;
@@ -1382,6 +1744,7 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const applyCompanyLogoToAllPortals = (tenantId: string, logoDataUrl: string) => {
+    if (!requireSuperAdmin('Apply Company Logo Across Portals')) return;
     setTenants(prev =>
       prev.map(t => {
         if (t.id !== tenantId) return t;
@@ -1415,6 +1778,7 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const toggleTenantModule = (tenantId: string, moduleId: FreeITSMModuleId) => {
+    if (!requireSuperAdmin('Modify Tenant Module Availability')) return;
     setTenants(prev => prev.map(t => {
       if (t.id !== tenantId) return t;
       const nextVal = !t.enabledModules[moduleId];
@@ -1434,8 +1798,20 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return activeTenant.enabledModules?.[moduleId] !== false;
   };
 
-  // IAM Portal Operations
+  // IAM Portal Operations (Requires IAM Portal, Super Admin, or iam:manage policy)
+  const canManageIam = () => isSuperAdmin || isIamPortal || hasPermission('iam:manage');
+
   const createIamIdentity: ITSMContextType['createIamIdentity'] = data => {
+    if (!canManageIam()) {
+      const err = 'IAM Management clearance required to create corporate identities.';
+      showToast({ variant: 'error', title: 'Access Denied', description: err });
+      return { ok: false, error: err };
+    }
+    if (data.portalType === 'super_admin' && !isSuperAdmin) {
+      const err = 'Only Super Admin Portal can provision new Super Admin accounts.';
+      showToast({ variant: 'error', title: 'Privilege Guard', description: err });
+      return { ok: false, error: err };
+    }
     const cleanEmail = data.email.trim().toLowerCase();
     if (!cleanEmail || !data.password || !data.name.trim()) {
       const err = 'Identity Name, Email, and Password are required.';
@@ -1475,12 +1851,24 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateIamIdentity = (id: string, updates: Partial<AuthAccount>) => {
+    if (!canManageIam()) {
+      showToast({ variant: 'error', title: 'Access Denied', description: 'IAM Management clearance required.' });
+      return;
+    }
+    if (updates.role === 'admin' && !isSuperAdmin) {
+      showToast({ variant: 'error', title: 'Privilege Guard', description: 'Only Super Admin Portal can assign Super Admin role.' });
+      return;
+    }
     setAuthAccounts(prev => prev.map(a => (a.id === id ? { ...a, ...updates } : a)));
     recordAudit('IAM Portal', 'UPDATE_IDENTITY', id, 'Updated role, company ID, status, or policy assignments');
     showToast({ variant: 'success', title: `Identity Updated: ${id}`, description: 'IAM role, status, or policies saved.' });
   };
 
   const deleteIamIdentity = (id: string) => {
+    if (!canManageIam()) {
+      showToast({ variant: 'error', title: 'Access Denied', description: 'IAM Management clearance required.' });
+      return;
+    }
     setAuthAccounts(prev => prev.filter(a => a.id !== id));
     recordAudit('IAM Portal', 'DELETE_IDENTITY', id, 'Revoked IAM identity');
     showToast({ variant: 'info', title: `Identity Revoked: ${id}` });
@@ -1497,6 +1885,10 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ssoOnly: Boolean(policy.ssoOnly),
       createdAt: new Date().toISOString()
     };
+    if (!canManageIam()) {
+      showToast({ variant: 'error', title: 'Access Denied', description: 'IAM Management clearance required.' });
+      return newPolicy;
+    }
     setAllIamPolicies(prev => [newPolicy, ...prev]);
     recordAudit('IAM Portal', 'CREATE_POLICY', newPolicy.id, newPolicy.name);
     showToast({ variant: 'success', title: `IAM Policy Created: ${newPolicy.id}`, description: newPolicy.name });
@@ -1504,6 +1896,10 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const deleteIamPolicy = (id: string) => {
+    if (!canManageIam()) {
+      showToast({ variant: 'error', title: 'Access Denied', description: 'IAM Management clearance required.' });
+      return;
+    }
     setAllIamPolicies(prev => prev.filter(p => p.id !== id));
     setAuthAccounts(prev =>
       prev.map(a => ({ ...a, policyIds: (a.policyIds || []).filter(pid => pid !== id) }))
@@ -1514,14 +1910,22 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const hasPermission = (scope: IamPermissionScope): boolean => {
     if (!authSession?.isAuthenticated) return false;
-    if (authSession.role === 'admin') return true;
+    // Device enrollment verification code generation is strictly IAM Portal exclusive
+    if (scope === 'devices:enroll_code') {
+      return isIamPortal;
+    }
+    // Company tenant administration is strictly Super Admin Portal exclusive
+    if (scope === 'tenants:admin') {
+      return isSuperAdmin;
+    }
+    if (isSuperAdmin) return true;
     const assignedIds = authSession.policyIds || [];
     if (assignedIds.length === 0) {
-      if (authSession.portalType === 'iam') {
-        return scope === 'iam:manage' || scope === 'incidents:read' || scope === 'assets:read';
+      if (isIamPortal) {
+        return ['iam:manage', 'incidents:read', 'assets:read'].includes(scope);
       }
       if (authSession.role === 'technician') {
-        return ['incidents:read', 'incidents:write', 'assets:read', 'assets:write', 'requests:approve', 'changes:cab_vote'].includes(scope);
+        return ['incidents:read', 'incidents:write', 'assets:read', 'assets:write'].includes(scope);
       }
       return scope === 'incidents:read' || scope === 'assets:read';
     }
@@ -1690,10 +2094,27 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  // Service Requests
+  // Service Requests (Strict Designated Approver Account OR Super Admin Governance)
   const createServiceRequest = (req: Partial<ServiceRequest>): ServiceRequest => {
     const id = `REQ-${Math.floor(3030 + Math.random() * 800)}`;
     const now = new Date().toISOString();
+    const reqEmail = (req.requesterEmail || currentUser.email).toLowerCase();
+    const tenantCorpAccounts = authAccounts.filter(
+      a => a.tenantId === activeTenant.id && a.portalType !== 'end_user' && a.status === 'active'
+    );
+    const eligibleApprovers = tenantCorpAccounts.filter(a => a.email.toLowerCase() !== reqEmail);
+    const mgrAccount =
+      eligibleApprovers.find(a => a.portalType === 'employee') ||
+      tenantCorpAccounts.find(a => a.portalType === 'employee') ||
+      DEFAULT_TEST_ENV_ACCOUNTS[1];
+    const secAccount =
+      eligibleApprovers.find(a => a.portalType === 'iam') ||
+      eligibleApprovers.find(a => a.email !== mgrAccount.email) ||
+      DEFAULT_TEST_ENV_ACCOUNTS[2];
+    const fulfillAccount =
+      eligibleApprovers.find(a => a.email !== mgrAccount.email && a.email !== secAccount.email) ||
+      DEFAULT_TEST_ENV_ACCOUNTS[0];
+
     const newReq: ServiceRequest = {
       id,
       tenantId: activeTenant.id,
@@ -1706,10 +2127,10 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
       cost: req.cost || 0,
       status: 'submitted',
       currentStage: 1,
-      approvals: [
-        { role: 'Direct Manager', approver: 'Claire Sterling', status: 'pending' },
-        { role: 'Security Review', approver: 'Noah Bennett', status: 'pending' },
-        { role: 'IT Fulfillment', approver: 'Service Desk Logistics', status: 'pending' }
+      approvals: req.approvals || [
+        { role: 'Direct Manager', approver: mgrAccount.name, approverEmail: mgrAccount.email, status: 'pending' },
+        { role: 'Security Review', approver: secAccount.name, approverEmail: secAccount.email, status: 'pending' },
+        { role: 'IT Fulfillment', approver: fulfillAccount.name, approverEmail: fulfillAccount.email, status: 'pending' }
       ],
       deliveryEstimateDays: req.deliveryEstimateDays || 3,
       customFormValues: req.customFormValues,
@@ -1721,11 +2142,90 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return newReq;
   };
 
-  const approveRequestStage = (requestId: string, roleName: string, approver: string, status: 'approved' | 'rejected', notes?: string) => {
+  const canApproveRequestStage = (
+    approval: RequestApproval,
+    requesterEmail?: string
+  ): { allowed: boolean; reason: string; isSuperAdminOverride?: boolean } => {
+    if (!authSession?.isAuthenticated) {
+      return { allowed: false, reason: 'Corporate authentication is required to approve workflow stages.' };
+    }
+    if (isSuperAdmin) {
+      return { allowed: true, reason: 'Authorized via Super Admin Governance Override.', isSuperAdminOverride: true };
+    }
+    if (authSession.role === 'customer') {
+      return { allowed: false, reason: 'End-User Portal accounts cannot approve workflow stages.' };
+    }
+    const actorEmail = authSession.email.trim().toLowerCase();
+    if (requesterEmail && actorEmail === requesterEmail.trim().toLowerCase()) {
+      return {
+        allowed: false,
+        reason: 'Separation of Duties Violation: Requesters cannot approve their own service request.',
+      };
+    }
+    if (approval.approverEmail) {
+      if (actorEmail === approval.approverEmail.trim().toLowerCase()) {
+        return { allowed: true, reason: `Verified designated approver (${approval.approverEmail}).` };
+      }
+      return {
+        allowed: false,
+        reason: `Restricted to designated approver ${approval.approver} (${approval.approverEmail}) or Super Admin.`,
+      };
+    }
+    if (authSession.name.trim().toLowerCase() === approval.approver.trim().toLowerCase()) {
+      return { allowed: true, reason: `Verified designated approver (${approval.approver}).` };
+    }
+    return {
+      allowed: false,
+      reason: `Restricted to designated approver ${approval.approver} or Super Admin.`,
+    };
+  };
+
+  const approveRequestStage = (
+    requestId: string,
+    roleName: string,
+    approver: string,
+    status: 'approved' | 'rejected',
+    notes?: string
+  ): { ok: boolean; error?: string } => {
+    const targetReq = allRequests.find(r => r.id === requestId);
+    if (!targetReq) {
+      return { ok: false, error: 'Service request not found.' };
+    }
+    const targetStage = targetReq.approvals.find(a => a.role === roleName);
+    if (!targetStage) {
+      return { ok: false, error: 'Approval stage not found.' };
+    }
+    const check = canApproveRequestStage(targetStage, targetReq.requesterEmail);
+    if (!check.allowed) {
+      recordAudit('Service Requests', 'SECURITY_DENIED', requestId, `Blocked ${currentUser.email} from ${status} on ${roleName}: ${check.reason}`);
+      showToast({
+        variant: 'error',
+        title: 'Approval Authorization Denied',
+        description: check.reason,
+      });
+      return { ok: false, error: check.reason };
+    }
+
+    const actorLabel = check.isSuperAdminOverride
+      ? `${currentUser.name} (Super Admin Override)`
+      : currentUser.name || approver;
+    const enrichedNotes = check.isSuperAdminOverride
+      ? `${notes ? `${notes} · ` : ''}[Super Admin Override for ${targetStage.approver}]`
+      : notes;
+
     setAllRequests(prev => prev.map(req => {
       if (req.id !== requestId) return req;
       const newApprovals = req.approvals.map(a =>
-        a.role === roleName ? { ...a, status, approver, notes, timestamp: new Date().toISOString() } : a
+        a.role === roleName
+          ? {
+              ...a,
+              status,
+              approver: actorLabel,
+              approverEmail: a.approverEmail || currentUser.email,
+              notes: enrichedNotes,
+              timestamp: new Date().toISOString()
+            }
+          : a
       );
       let nextStatus = req.status;
       let nextStage = req.currentStage;
@@ -1739,12 +2239,50 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       return { ...req, status: nextStatus, currentStage: nextStage, approvals: newApprovals };
     }));
-    recordAudit('Service Requests', status.toUpperCase(), requestId, `${roleName} stage ${status}`);
+    recordAudit('Service Requests', status.toUpperCase(), requestId, `${roleName} stage ${status} by ${actorLabel}`);
     showToast({
       variant: status === 'approved' ? 'success' : 'warning',
       title: `Request ${status === 'approved' ? 'Approved' : 'Rejected'}: ${requestId}`,
-      description: `${roleName} by ${approver}`
+      description: `${roleName} by ${actorLabel}`
     });
+    return { ok: true };
+  };
+
+  const reassignRequestApprover = (
+    requestId: string,
+    roleName: string,
+    accountId: string
+  ): { ok: boolean; error?: string } => {
+    if (!isSuperAdmin && !isIamPortal) {
+      const err = 'Only Super Admin or IAM Governance Portal can reassign designated approver accounts.';
+      showToast({ variant: 'error', title: 'Clearance Required', description: err });
+      return { ok: false, error: err };
+    }
+    const targetAcc = authAccounts.find(a => a.id === accountId && a.portalType !== 'end_user');
+    if (!targetAcc) {
+      return { ok: false, error: 'Selected corporate approver account was not found.' };
+    }
+    setAllRequests(prev =>
+      prev.map(req =>
+        req.id === requestId
+          ? {
+              ...req,
+              approvals: req.approvals.map(a =>
+                a.role === roleName && a.status === 'pending'
+                  ? { ...a, approver: targetAcc.name, approverEmail: targetAcc.email }
+                  : a
+              ),
+            }
+          : req
+      )
+    );
+    recordAudit('Service Requests', 'REASSIGN_APPROVER', requestId, `${roleName} assigned to ${targetAcc.name} (${targetAcc.email})`);
+    showToast({
+      variant: 'success',
+      title: 'Designated Approver Updated',
+      description: `${roleName} on ${requestId} → ${targetAcc.name} (${targetAcc.email})`,
+    });
+    return { ok: true };
   };
 
   // Problem Operations
@@ -1779,10 +2317,21 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     showToast({ variant: 'success', title: `Problem Saved: ${id}` });
   };
 
-  // Change Management
+  // Change Management (Strict Designated CAB Voter OR Super Admin Governance)
   const createChangeRequest = (change: Partial<ChangeRequest>): ChangeRequest => {
     const id = `CHG-${Math.floor(600 + Math.random() * 300)}`;
     const now = new Date().toISOString();
+    const tenantCorpAccounts = authAccounts.filter(
+      a => a.tenantId === activeTenant.id && a.portalType !== 'end_user' && a.status === 'active'
+    );
+    const cabChair =
+      tenantCorpAccounts.find(a => a.portalType === 'super_admin') ||
+      DEFAULT_TEST_ENV_ACCOUNTS[0];
+    const secArch =
+      tenantCorpAccounts.find(a => a.portalType === 'iam' && a.email !== cabChair.email) ||
+      tenantCorpAccounts.find(a => a.portalType === 'employee' && a.email !== cabChair.email) ||
+      DEFAULT_TEST_ENV_ACCOUNTS[2];
+
     const newChg: ChangeRequest = {
       id,
       tenantId: activeTenant.id,
@@ -1796,9 +2345,9 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
       testPlan: change.testPlan || '',
       scheduledStart: change.scheduledStart || new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
       scheduledEnd: change.scheduledEnd || new Date(Date.now() + 28 * 3600 * 1000).toISOString(),
-      cabVotes: [
-        { member: 'David Miller', role: 'CAB Chair', vote: 'pending' },
-        { member: 'Noah Bennett', role: 'Security Architect', vote: 'pending' }
+      cabVotes: change.cabVotes || [
+        { member: cabChair.name, memberEmail: cabChair.email, role: 'CAB Chair', vote: 'pending' },
+        { member: secArch.name, memberEmail: secArch.email, role: 'Security Architect', vote: 'pending' }
       ],
       requestedBy: change.requestedBy || currentUser.name,
       assignedEngineer: change.assignedEngineer || currentUser.name,
@@ -1811,10 +2360,78 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return newChg;
   };
 
-  const voteCab = (changeId: string, member: string, roleName: string, vote: 'approved' | 'rejected', notes?: string) => {
+  const canVoteCab = (vote: CabVote): { allowed: boolean; reason: string; isSuperAdminOverride?: boolean } => {
+    if (!authSession?.isAuthenticated) {
+      return { allowed: false, reason: 'Corporate authentication is required to cast CAB votes.' };
+    }
+    if (isSuperAdmin) {
+      return { allowed: true, reason: 'Authorized via Super Admin CAB Override.', isSuperAdminOverride: true };
+    }
+    if (authSession.role === 'customer') {
+      return { allowed: false, reason: 'End-User Portal accounts cannot cast CAB votes.' };
+    }
+    const actorEmail = authSession.email.trim().toLowerCase();
+    if (vote.memberEmail) {
+      if (actorEmail === vote.memberEmail.trim().toLowerCase()) {
+        return { allowed: true, reason: `Verified designated CAB member (${vote.memberEmail}).` };
+      }
+      return {
+        allowed: false,
+        reason: `Restricted to designated CAB member ${vote.member} (${vote.memberEmail}) or Super Admin.`,
+      };
+    }
+    if (authSession.name.trim().toLowerCase() === vote.member.trim().toLowerCase()) {
+      return { allowed: true, reason: `Verified designated CAB member (${vote.member}).` };
+    }
+    return {
+      allowed: false,
+      reason: `Restricted to designated CAB member ${vote.member} or Super Admin.`,
+    };
+  };
+
+  const voteCab = (
+    changeId: string,
+    member: string,
+    roleName: string,
+    vote: 'approved' | 'rejected',
+    notes?: string
+  ): { ok: boolean; error?: string } => {
+    const targetChg = allChanges.find(c => c.id === changeId);
+    if (!targetChg) {
+      return { ok: false, error: 'Change request not found.' };
+    }
+    const targetVote = targetChg.cabVotes.find(v => v.role === roleName && v.member === member) || targetChg.cabVotes.find(v => v.member === member);
+    if (!targetVote) {
+      return { ok: false, error: 'CAB voter seat not found.' };
+    }
+    const check = canVoteCab(targetVote);
+    if (!check.allowed) {
+      recordAudit('Change (CAB)', 'SECURITY_DENIED', changeId, `Blocked ${currentUser.email} from CAB vote on ${roleName}: ${check.reason}`);
+      showToast({
+        variant: 'error',
+        title: 'CAB Vote Authorization Denied',
+        description: check.reason,
+      });
+      return { ok: false, error: check.reason };
+    }
+
+    const actorLabel = check.isSuperAdminOverride
+      ? `${currentUser.name} (Super Admin Override)`
+      : currentUser.name || member;
+
     setAllChanges(prev => prev.map(c => {
       if (c.id !== changeId) return c;
-      const votes = c.cabVotes.map(v => v.member === member ? { ...v, vote, notes } : v);
+      const votes = c.cabVotes.map(v =>
+        v.member === member && v.role === roleName
+          ? {
+              ...v,
+              vote,
+              notes: check.isSuperAdminOverride
+                ? `${notes ? `${notes} · ` : ''}[Super Admin Override for ${v.member}]`
+                : notes
+            }
+          : v
+      );
       const allApproved = votes.every(v => v.vote === 'approved');
       const now = new Date().toISOString();
       const newStatus = allApproved ? 'scheduled' : c.status;
@@ -1827,17 +2444,55 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
           {
             id: `act-${Date.now()}`,
             timestamp: now,
-            author: member,
+            author: actorLabel,
             type: 'audit',
             action: `CAB Vote: ${vote.toUpperCase()}`,
-            note: `${member} (${roleName}) voted ${vote.toUpperCase()}.`,
+            note: `${actorLabel} (${roleName}) voted ${vote.toUpperCase()}.`,
             fieldChanges: allApproved && c.status !== 'scheduled' ? [{ field: 'State', from: c.status, to: 'scheduled' }] : undefined
           }
         ]
       };
     }));
-    recordAudit('Change (CAB)', `CAB_${vote.toUpperCase()}`, changeId, `Vote by ${member}`);
-    showToast({ variant: vote === 'approved' ? 'success' : 'warning', title: `CAB Vote Recorded: ${changeId}`, description: `${member} voted ${vote.toUpperCase()}` });
+    recordAudit('Change (CAB)', `CAB_${vote.toUpperCase()}`, changeId, `Vote by ${actorLabel} (${roleName})`);
+    showToast({ variant: vote === 'approved' ? 'success' : 'warning', title: `CAB Vote Recorded: ${changeId}`, description: `${actorLabel} voted ${vote.toUpperCase()}` });
+    return { ok: true };
+  };
+
+  const reassignCabVoter = (
+    changeId: string,
+    roleName: string,
+    accountId: string
+  ): { ok: boolean; error?: string } => {
+    if (!isSuperAdmin && !isIamPortal) {
+      const err = 'Only Super Admin or IAM Governance Portal can reassign CAB voter seats.';
+      showToast({ variant: 'error', title: 'Clearance Required', description: err });
+      return { ok: false, error: err };
+    }
+    const targetAcc = authAccounts.find(a => a.id === accountId && a.portalType !== 'end_user');
+    if (!targetAcc) {
+      return { ok: false, error: 'Selected corporate CAB member account was not found.' };
+    }
+    setAllChanges(prev =>
+      prev.map(c =>
+        c.id === changeId
+          ? {
+              ...c,
+              cabVotes: c.cabVotes.map(v =>
+                v.role === roleName && v.vote === 'pending'
+                  ? { ...v, member: targetAcc.name, memberEmail: targetAcc.email }
+                  : v
+              ),
+            }
+          : c
+      )
+    );
+    recordAudit('Change (CAB)', 'REASSIGN_CAB_VOTER', changeId, `${roleName} assigned to ${targetAcc.name} (${targetAcc.email})`);
+    showToast({
+      variant: 'success',
+      title: 'CAB Seat Reassigned',
+      description: `${roleName} on ${changeId} → ${targetAcc.name} (${targetAcc.email})`,
+    });
+    return { ok: true };
   };
 
   const updateChangeStatus = (id: string, status: ChangeStatus) => {
@@ -2851,8 +3506,9 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  // Reset to Blank Workspace
+  // Reset to Blank Workspace (Super Admin Exclusive)
   const resetDatabase = () => {
+    if (!requireSuperAdmin('Reset Workspace Database')) return;
     localStorage.clear();
     setTenants([DEFAULT_BLANK_TENANT]);
     setActiveTenantId(DEFAULT_BLANK_TENANT.id);
@@ -2882,6 +3538,9 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setAllAuditLogs([]);
     setAllWorkflows([]);
     setAllTicketWorkflows([]);
+    setDeviceEnrollmentCodes([]);
+    setEnrolledDevices([]);
+    setManagedDevice(null);
     setAllIamPolicies(DEFAULT_IAM_POLICIES);
     setAuthAccounts(DEFAULT_TEST_ENV_ACCOUNTS);
     showToast({ variant: 'info', title: 'Workspace Reset', description: 'Tenant data restored to blank baseline.' });
@@ -2890,7 +3549,7 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const exportDatabaseJSON = (): string => {
     showToast({ variant: 'info', title: 'Export Generated', description: `Full workspace snapshot prepared for ${activeTenant.name}.` });
     return JSON.stringify({
-      version: '4.0-CloudSync-MultiTenant',
+      version: '4.1-CorporateGov-MultiTenant',
       exportedAt: new Date().toISOString(),
       activeTenant: activeTenant.id,
       tenantName: activeTenant.name,
@@ -2921,11 +3580,14 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
       workflows: allWorkflows,
       ticketWorkflows: allTicketWorkflows,
       telephonyConfigsByTenant,
+      deviceEnrollmentCodes,
+      enrolledDevices,
       auditLogs: allAuditLogs
     }, null, 2);
   };
 
   const importDatabaseJSON = (jsonStr: string): boolean => {
+    if (!requireSuperAdmin('Import Database Snapshot')) return false;
     try {
       const data = JSON.parse(jsonStr);
       if (Array.isArray(data.tenants) && data.tenants.length > 0) setTenants(data.tenants);
@@ -2938,6 +3600,8 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (Array.isArray(data.workflows)) setAllWorkflows(data.workflows);
       if (Array.isArray(data.ticketWorkflows)) setAllTicketWorkflows(data.ticketWorkflows);
       if (Array.isArray(data.processMaps)) setAllProcessMaps(data.processMaps);
+      if (Array.isArray(data.deviceEnrollmentCodes)) setDeviceEnrollmentCodes(data.deviceEnrollmentCodes);
+      if (Array.isArray(data.enrolledDevices)) setEnrolledDevices(data.enrolledDevices);
       if (data.telephonyConfigsByTenant && typeof data.telephonyConfigsByTenant === 'object') {
         setTelephonyConfigsByTenant(data.telephonyConfigsByTenant);
       }
@@ -2955,8 +3619,11 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         tenants, activeTenantId, activeTenant, switchTenant, createTenant, updateTenant, toggleTenantModule, isModuleEnabled,
         updateTenantPortalBranding, applyCompanyLogoToAllPortals, getPortalBranding,
         role, setRole, activeTab, setActiveTab, currentUser,
-        authSession, authAccounts, managedDevice,
-        registerAccount, loginWithCredentials, loginAsTestAccount, enrollCompanyDevice, unenrollCompanyDevice, loginEmployeeDeviceSso, loginViaGooglePortal, logoutSession,
+        authSession, authAccounts, isSuperAdmin, isIamPortal, managedDevice, isManagedDeviceVerified,
+        deviceEnrollmentCodes, enrolledDevices,
+        registerAccount, loginWithCredentials, loginAsTestAccount,
+        generateDeviceEnrollmentCode, revokeDeviceEnrollmentCode, revokeEnrolledDevice,
+        enrollCompanyDevice, unenrollCompanyDevice, loginEmployeeDeviceSso, loginViaGooglePortal, logoutSession,
         iamPolicies, createIamIdentity, updateIamIdentity, deleteIamIdentity, createIamPolicy, deleteIamPolicy, hasPermission,
         googleUser, googleToken, loginWithGoogle, loginWithGooglePortal, logoutGoogle, isFirebaseConnected,
         cloudSyncStatus, lastCloudSyncAt, cloudSyncError, forceCloudSync,
@@ -2965,8 +3632,8 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         morningChecks, calendarEvents, warRooms, lmsCourses, wikiPages, processMaps,
         customForms, cmdbRelations, auditLogs, workflows, ticketWorkflows,
         createIncident, updateIncidentStatus, assignIncident, logIncidentTime, setIncidentCsat, simulateEmailToTicket,
-        createServiceRequest, approveRequestStage, createProblem, updateProblem,
-        createChangeRequest, voteCab, updateChangeStatus, addRecordActivity,
+        createServiceRequest, canApproveRequestStage, approveRequestStage, reassignRequestApprover, createProblem, updateProblem,
+        createChangeRequest, canVoteCab, voteCab, reassignCabVoter, updateChangeStatus, addRecordActivity,
         createAsset, updateAssetStatus, addCmdbRelation, removeCmdbRelation,
         updateInventoryQuantity, createInventoryItem, createSoftwareLicense, adjustSoftwareSeats,
         createTask, moveTaskColumn, toggleSubtask, logTaskTime,

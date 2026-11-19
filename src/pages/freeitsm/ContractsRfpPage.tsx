@@ -46,13 +46,13 @@ export const ContractsRfpPage: React.FC = () => {
             </span>
           </h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="flex border border-neutral-800 bg-neutral-900/60 p-0.5">
-            <button onClick={() => setTab('contracts')} className={`px-3 py-1.5 ${tab === 'contracts' ? 'bg-neutral-800 text-white font-bold' : 'text-neutral-400'}`}>Contracts Register</button>
-            <button onClick={() => setTab('rfp')} className={`px-3 py-1.5 ${tab === 'rfp' ? 'bg-neutral-800 text-white font-bold' : 'text-neutral-400'}`}>RFP Builder</button>
+            <button onClick={() => setTab('contracts')} className={`min-h-[36px] px-3 py-1.5 whitespace-nowrap ${tab === 'contracts' ? 'bg-neutral-800 text-white font-bold' : 'text-neutral-400'}`}>Contracts Register</button>
+            <button onClick={() => setTab('rfp')} className={`min-h-[36px] px-3 py-1.5 whitespace-nowrap ${tab === 'rfp' ? 'bg-neutral-800 text-white font-bold' : 'text-neutral-400'}`}>RFP Builder</button>
           </div>
           {tab === 'contracts' && (
-            <button onClick={() => setShowNew(!showNew)} className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold flex items-center gap-1.5">
+            <button onClick={() => setShowNew(!showNew)} className="min-h-[38px] px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold flex items-center gap-1.5 whitespace-nowrap">
               <Plus className="w-3.5 h-3.5" />
               <span>Add Contract</span>
             </button>
@@ -63,7 +63,7 @@ export const ContractsRfpPage: React.FC = () => {
       {tab === 'contracts' && (
         <>
           {showNew && (
-            <form onSubmit={handleAdd} className="p-5 border border-neutral-700 bg-neutral-900/50 grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
+            <form onSubmit={handleAdd} className="p-4 sm:p-5 border border-neutral-700 bg-neutral-900/50 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
               <div className="sm:col-span-2">
                 <label className="block text-neutral-400 mb-1">Contract Title *</label>
                 <input required value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Cloudflare Enterprise DNS & WAF" className="w-full bg-neutral-950 border border-neutral-700 px-3 py-2 text-neutral-100" />
@@ -98,7 +98,7 @@ export const ContractsRfpPage: React.FC = () => {
           )}
 
           <div className="border border-neutral-800 bg-neutral-950 overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full min-w-[760px] text-left border-collapse">
               <thead>
                 <tr className="border-b border-neutral-800 bg-neutral-900/50 text-neutral-400 uppercase text-[11px]">
                   <th className="py-2.5 px-4">Contract / Vendor</th>

@@ -1,7 +1,11 @@
 import React, { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useITSM } from '../../context/ITSMContext';
 import { AuthPortalType, IamPermissionScope, Role } from '../../types/itsm';
-import { Shield, Plus, UserPlus, Building2, KeyRound, Trash2, Power, Check, Lock, ChevronLeft, ChevronRight, Phone } from 'lucide-react';
+import {
+  Shield, UserPlus, Building2, KeyRound, Trash2, Power, Check, Lock,
+  ChevronLeft, ChevronRight, Phone, Laptop, Copy, ShieldCheck, ShieldAlert, Ban, Clock
+} from 'lucide-react';
 
 const ALL_SCOPES: { id: IamPermissionScope; label: string }[] = [
   { id: 'incidents:read', label: 'Incidents Read' },
@@ -12,6 +16,7 @@ const ALL_SCOPES: { id: IamPermissionScope; label: string }[] = [
   { id: 'changes:cab_vote', label: 'CAB Change Voting' },
   { id: 'workflows:manage', label: 'Manage Workflows' },
   { id: 'iam:manage', label: 'IAM Directory Admin' },
+  { id: 'devices:enroll_code', label: 'Issue Device Enrollment Codes' },
   { id: 'tenants:admin', label: 'Tenant Governance' },
   { id: 'billing:read', label: 'Billing Read' }
 ];
@@ -22,16 +27,24 @@ export const IamPortalPage: React.FC = () => {
     tenants,
     authAccounts,
     iamPolicies,
+    isIamPortal,
+    isSuperAdmin,
+    deviceEnrollmentCodes,
+    enrolledDevices,
+    generateDeviceEnrollmentCode,
+    revokeDeviceEnrollmentCode,
+    revokeEnrolledDevice,
     createIamIdentity,
     updateIamIdentity,
     deleteIamIdentity,
     createIamPolicy,
     deleteIamPolicy,
-    getPortalBranding
+    getPortalBranding,
+    showToast
   } = useITSM();
 
   const iamBranding = getPortalBranding('iam');
-  const [activeTab, setActiveTab] = useState<'identities' | 'policies' | 'companies'>('identities');
+  const [activeTab, setActiveTab] = useState<'identities' | 'policies' | 'companies' | 'devices'>('identities');
   const [searchFilter, setSearchFilter] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | Role>('all');
   const [companyFilter, setCompanyFilter] = useState<string>('all');
@@ -41,6 +54,15 @@ export const IamPortalPage: React.FC = () => {
   const [expandedCompanies, setExpandedCompanies] = useState<Record<string, boolean>>({});
   const IDENTITIES_PER_PAGE = 25;
   const POLICIES_PER_PAGE = 16;
+
+  // Device Enrollment Code Generator State (IAM Portal Exclusive)
+  const [codeTenantId, setCodeTenantId] = useState<string>(activeTenant.id);
+  const [codeAssignedEmail, setCodeAssignedEmail] = useState<string>('');
+  const [codeTargetHostname, setCodeTargetHostname] = useState<string>('');
+  const [codeMdmProvider, setCodeMdmProvider] = useState<string>('Njure Endpoint Trust MDM');
+  const [codeValidHours, setCodeValidHours] = useState<number>(24);
+  const [latestIssuedCode, setLatestIssuedCode] = useState<string | null>(null);
+  const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
 
   // Create Identity Form
   const [showCreateId, setShowCreateId] = useState(false);
@@ -196,6 +218,53 @@ export const IamPortalPage: React.FC = () => {
     [authAccounts, tenants]
   );
 
+  const activeCodeCount = useMemo(
+    () =>
+      deviceEnrollmentCodes.filter(
+        c => c.status === 'active' && new Date(c.expiresAt).getTime() > Date.now()
+      ).length,
+    [deviceEnrollmentCodes]
+  );
+
+  const activeDeviceCount = useMemo(
+    () => enrolledDevices.filter(d => d.status !== 'revoked').length,
+    [enrolledDevices]
+  );
+
+  const tenantEmployeeOptions = useMemo(
+    () =>
+      authAccounts.filter(
+        a => a.tenantId === codeTenantId && a.portalType === 'employee' && a.status !== 'suspended'
+      ),
+    [authAccounts, codeTenantId]
+  );
+
+  const handleGenerateDeviceCode = (e: React.FormEvent) => {
+    e.preventDefault();
+    const res = generateDeviceEnrollmentCode({
+      tenantId: codeTenantId,
+      assignedEmail: codeAssignedEmail || undefined,
+      targetHostname: codeTargetHostname || undefined,
+      mdmProvider: codeMdmProvider,
+      validHours: codeValidHours,
+    });
+    if (res.ok && res.record) {
+      setLatestIssuedCode(res.record.code);
+      setCodeTargetHostname('');
+    }
+  };
+
+  const handleCopyCode = (code: string, id: string) => {
+    try {
+      navigator.clipboard?.writeText(code);
+    } catch {
+      // ignore clipboard restrictions
+    }
+    setCopiedCodeId(id);
+    showToast({ variant: 'info', title: 'Verification Code Copied', description: `${code} copied to clipboard.` });
+    setTimeout(() => setCopiedCodeId(prev => (prev === id ? null : prev)), 2500);
+  };
+
   return (
     <div className="space-y-6 font-mono text-xs">
       {/* Customized IAM Portal Header */}
@@ -213,17 +282,24 @@ export const IamPortalPage: React.FC = () => {
             <div className="text-neutral-500 uppercase tracking-wider">
               {activeTenant.name} · {iamBranding.subtitle}
             </div>
-            <h1 className="text-xl font-bold text-neutral-100 mt-0.5 flex items-center gap-3">
+            <h1 className="text-xl font-bold text-neutral-100 mt-0.5 flex flex-wrap items-center gap-3">
               <Shield className="w-5 h-5 text-rose-500 shrink-0" />
               <span>{iamBranding.portalName.toUpperCase()}</span>
               <span className="text-xs font-normal text-neutral-500 tabular-nums">
-                {authAccounts.length} Identities · {iamPolicies.length} Policies
+                {authAccounts.length} Identities · {iamPolicies.length} Policies · {activeDeviceCount} Managed Devices
               </span>
             </h1>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <button
+            onClick={() => setActiveTab('devices')}
+            className="px-3.5 py-2 border border-amber-700/80 bg-amber-950/30 hover:bg-amber-900/40 text-amber-300 font-bold flex items-center gap-2 whitespace-nowrap"
+          >
+            <Laptop className="w-3.5 h-3.5" />
+            <span>Device SSO Codes</span>
+          </button>
           <button
             onClick={() => {
               setActiveTab('policies');
@@ -248,38 +324,46 @@ export const IamPortalPage: React.FC = () => {
       </div>
 
       {/* KPI Strip */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 border border-neutral-800 divide-y lg:divide-y-0 lg:divide-x divide-neutral-800 bg-neutral-950">
-        <div className="p-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-px bg-neutral-800 border border-neutral-800">
+        <div className="p-3.5 sm:p-4 bg-neutral-950">
           <div className="text-[11px] text-neutral-500 uppercase">Provisioned IDs</div>
-          <div className="text-2xl font-bold text-neutral-100 mt-1 tabular-nums">{authAccounts.length}</div>
+          <div className="text-xl sm:text-2xl font-bold text-neutral-100 mt-1 tabular-nums">{authAccounts.length}</div>
         </div>
-        <div className="p-4">
+        <div className="p-3.5 sm:p-4 bg-neutral-950">
           <div className="text-[11px] text-neutral-500 uppercase">Active Access</div>
-          <div className="text-2xl font-bold text-emerald-400 mt-1 tabular-nums">
+          <div className="text-xl sm:text-2xl font-bold text-emerald-400 mt-1 tabular-nums">
             {authAccounts.filter(a => a.status !== 'suspended').length}
           </div>
         </div>
-        <div className="p-4">
+        <div className="p-3.5 sm:p-4 bg-neutral-950">
           <div className="text-[11px] text-neutral-500 uppercase">Company IDs Mapped</div>
-          <div className="text-2xl font-bold text-neutral-100 mt-1 tabular-nums">{companyGroups.length}</div>
+          <div className="text-xl sm:text-2xl font-bold text-neutral-100 mt-1 tabular-nums">{companyGroups.length}</div>
         </div>
-        <div className="p-4">
+        <div className="p-3.5 sm:p-4 bg-neutral-950">
           <div className="text-[11px] text-neutral-500 uppercase">Access Policies</div>
-          <div className="text-2xl font-bold text-neutral-100 mt-1 tabular-nums">{iamPolicies.length}</div>
+          <div className="text-xl sm:text-2xl font-bold text-neutral-100 mt-1 tabular-nums">{iamPolicies.length}</div>
+        </div>
+        <div className="p-3.5 sm:p-4 bg-neutral-950 col-span-2 md:col-span-1">
+          <div className="text-[11px] text-neutral-500 uppercase">Active Codes / Devices</div>
+          <div className="text-xl sm:text-2xl font-bold text-amber-400 mt-1 tabular-nums">
+            {activeCodeCount} <span className="text-neutral-600 font-normal">/</span>{' '}
+            <span className="text-emerald-400">{activeDeviceCount}</span>
+          </div>
         </div>
       </div>
 
       {/* Section Navigation Tabs */}
-      <div className="flex flex-wrap items-center gap-1 border-b border-neutral-800 pb-2">
+      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar border-b border-neutral-800 pb-2">
         {[
           { id: 'identities', label: 'Identities & Role Assignment' },
+          { id: 'devices', label: `Device Trust & SSO Codes (${activeCodeCount})` },
           { id: 'policies', label: 'Access Policies & Scopes' },
           { id: 'companies', label: 'Company ID Registry' }
         ].map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as typeof activeTab)}
-            className={`px-4 py-2 text-xs font-bold transition-colors whitespace-nowrap ${
+            className={`min-h-[38px] px-3.5 sm:px-4 py-2 text-xs font-bold transition-colors whitespace-nowrap shrink-0 ${
               activeTab === tab.id
                 ? 'bg-neutral-800 text-white'
                 : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50'
@@ -383,7 +467,7 @@ export const IamPortalPage: React.FC = () => {
                     onChange={e => setAssignedRole(e.target.value as Role)}
                     className="w-full bg-neutral-950 border border-neutral-700 px-3 py-2 text-neutral-100"
                   >
-                    <option value="admin">Admin (Full Privilege)</option>
+                    {isSuperAdmin && <option value="admin">Admin (Super Admin Only)</option>}
                     <option value="technician">Technician / Employee</option>
                     <option value="customer">Customer / End-User</option>
                   </select>
@@ -398,7 +482,7 @@ export const IamPortalPage: React.FC = () => {
                     <option value="employee">Employee Portal</option>
                     <option value="end_user">Self-Service Portal</option>
                     <option value="iam">IAM Portal</option>
-                    <option value="super_admin">Super Admin Console</option>
+                    {isSuperAdmin && <option value="super_admin">Super Admin Console</option>}
                   </select>
                 </div>
                 <div>
@@ -567,10 +651,11 @@ export const IamPortalPage: React.FC = () => {
                           <div className="flex flex-col gap-1">
                             <select
                               value={acc.role}
+                              disabled={acc.role === 'admin' && !isSuperAdmin}
                               onChange={e => updateIamIdentity(acc.id, { role: e.target.value as Role })}
-                              className="bg-neutral-900 border border-neutral-800 px-2 py-1 text-neutral-100 text-[11px] uppercase"
+                              className="bg-neutral-900 border border-neutral-800 px-2 py-1 text-neutral-100 text-[11px] uppercase disabled:opacity-60"
                             >
-                              <option value="admin">admin</option>
+                              {(isSuperAdmin || acc.role === 'admin') && <option value="admin">admin</option>}
                               <option value="technician">technician</option>
                               <option value="customer">customer</option>
                             </select>
@@ -927,6 +1012,349 @@ export const IamPortalPage: React.FC = () => {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* TAB 4: DEVICE TRUST & IAM-ONLY ENROLLMENT VERIFICATION CODES */}
+      {activeTab === 'devices' && (
+        <div className="space-y-6">
+          {!isIamPortal ? (
+            <div className="border border-amber-800/80 bg-amber-950/20 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 text-amber-400 font-bold uppercase tracking-wider">
+                  <ShieldAlert className="w-4 h-4 shrink-0" />
+                  <span>IAM Portal Session Required to Issue Device Enrollment Codes</span>
+                </div>
+                <p className="text-neutral-300 text-[11px] max-w-2xl">
+                  Per corporate Zero-Trust Endpoint Governance, unique device enrollment verification codes can ONLY be generated from an authenticated IAM Portal session. Sign in via the dedicated IAM Portal to generate or revoke codes and manage MDM device certificates.
+                </p>
+              </div>
+              <Link
+                to="/login/iam"
+                className="px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold uppercase tracking-wider whitespace-nowrap shrink-0 text-center"
+              >
+                Open IAM Portal Login &rarr;
+              </Link>
+            </div>
+          ) : (
+            <form onSubmit={handleGenerateDeviceCode} className="border border-amber-800/70 bg-neutral-900/40 p-5 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-800 pb-3">
+                <div>
+                  <div className="text-[11px] text-amber-400 font-bold uppercase tracking-wider flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>IAM-Exclusive Device Enrollment Verification Code Generator</span>
+                  </div>
+                  <p className="text-[11px] text-neutral-400 mt-0.5">
+                    Generate a single-use cryptographic code to authorize an unmanaged workstation onto the corporate network and enable Company Device SSO.
+                  </p>
+                </div>
+                <span className="px-2.5 py-1 border border-emerald-800 bg-emerald-950/40 text-emerald-300 text-[10px] font-bold uppercase">
+                  IAM Portal Verified Session
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+                <div>
+                  <label className="block text-neutral-400 mb-1">Target Company / Tenant *</label>
+                  <select
+                    value={codeTenantId}
+                    onChange={e => {
+                      setCodeTenantId(e.target.value);
+                      setCodeAssignedEmail('');
+                    }}
+                    className="w-full bg-neutral-950 border border-neutral-700 px-3 py-2 text-neutral-100"
+                  >
+                    {tenants.map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} ({t.companyCode})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-neutral-400 mb-1">Bind to Employee (Recommended)</label>
+                  <select
+                    value={codeAssignedEmail}
+                    onChange={e => setCodeAssignedEmail(e.target.value)}
+                    className="w-full bg-neutral-950 border border-neutral-700 px-3 py-2 text-neutral-100"
+                  >
+                    <option value="">Any Employee in Company</option>
+                    {tenantEmployeeOptions.slice(0, 60).map(emp => (
+                      <option key={emp.id} value={emp.email}>
+                        {emp.name} ({emp.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-neutral-400 mb-1">Target Hostname (Optional)</label>
+                  <input
+                    value={codeTargetHostname}
+                    onChange={e => setCodeTargetHostname(e.target.value)}
+                    placeholder="e.g. NJURE-LAP-402"
+                    className="w-full bg-neutral-950 border border-neutral-700 px-3 py-2 text-neutral-100 uppercase"
+                  />
+                </div>
+                <div>
+                  <label className="block text-neutral-400 mb-1">MDM Trust Authority</label>
+                  <select
+                    value={codeMdmProvider}
+                    onChange={e => setCodeMdmProvider(e.target.value)}
+                    className="w-full bg-neutral-950 border border-neutral-700 px-3 py-2 text-neutral-100"
+                  >
+                    <option value="Njure Endpoint Trust MDM">Njure Endpoint Trust MDM</option>
+                    <option value="Microsoft Intune Corporate">Microsoft Intune Corporate</option>
+                    <option value="Jamf Pro Enterprise">Jamf Pro Enterprise</option>
+                    <option value="CrowdStrike Falcon MDM">CrowdStrike Falcon MDM</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-neutral-400 mb-1">Validity Window</label>
+                  <select
+                    value={codeValidHours}
+                    onChange={e => setCodeValidHours(Number(e.target.value))}
+                    className="w-full bg-neutral-950 border border-neutral-700 px-3 py-2 text-neutral-100"
+                  >
+                    <option value={1}>1 Hour (Strict)</option>
+                    <option value={8}>8 Hours (Shift)</option>
+                    <option value={24}>24 Hours (Standard)</option>
+                    <option value={72}>72 Hours</option>
+                    <option value={168}>7 Days</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                <span className="text-[11px] text-neutral-500">
+                  Single-use only · Audited &amp; synced to Cloud Database across devices.
+                </span>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold uppercase tracking-wider flex items-center gap-2"
+                >
+                  <KeyRound className="w-3.5 h-3.5" />
+                  <span>Generate Unique Enrollment Code</span>
+                </button>
+              </div>
+
+              {latestIssuedCode && (
+                <div className="border border-emerald-700 bg-emerald-950/30 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">
+                      Ready to Share with Employee — Single-Use Verification Code
+                    </div>
+                    <div className="text-xl font-bold text-white tracking-[0.22em] mt-1 tabular-nums">
+                      {latestIssuedCode}
+                    </div>
+                    <div className="text-[11px] text-neutral-400 mt-1">
+                      Employee enters this code on <span className="text-neutral-200">/login/employee</span> under Corporate Workstation Onboarding to enable Managed Device SSO.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyCode(latestIssuedCode, 'latest')}
+                    className="px-4 py-2 border border-emerald-600 bg-emerald-900/40 hover:bg-emerald-800/60 text-emerald-200 font-bold flex items-center gap-2 shrink-0 self-start sm:self-center"
+                  >
+                    {copiedCodeId === 'latest' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedCodeId === 'latest' ? 'Copied' : 'Copy Code'}</span>
+                  </button>
+                </div>
+              )}
+            </form>
+          )}
+
+          {/* Issued Enrollment Verification Codes Table */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold text-neutral-100 uppercase tracking-wider flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-amber-400" />
+                <span>Issued Enrollment Verification Codes ({deviceEnrollmentCodes.length})</span>
+              </h2>
+            </div>
+            <div className="border border-neutral-800 bg-neutral-950 overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-neutral-800 bg-neutral-900/50 text-[11px] text-neutral-400 uppercase">
+                    <th className="py-3 px-4">Verification Code</th>
+                    <th className="py-3 px-4">Company</th>
+                    <th className="py-3 px-4">Bound Employee</th>
+                    <th className="py-3 px-4">Status / Expiry</th>
+                    <th className="py-3 px-4">Redeemed Device</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-900">
+                  {deviceEnrollmentCodes.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-8 px-4 text-center text-neutral-500">
+                        No device enrollment codes issued yet. Generate a unique code above to onboard an unmanaged workstation.
+                      </td>
+                    </tr>
+                  ) : (
+                    deviceEnrollmentCodes.map(rec => {
+                      const isExpired =
+                        rec.status === 'expired' ||
+                        (rec.status === 'active' && new Date(rec.expiresAt).getTime() <= Date.now());
+                      const effectiveStatus = isExpired ? 'expired' : rec.status;
+                      const tenantObj = tenants.find(t => t.id === rec.tenantId);
+                      return (
+                        <tr key={rec.id} className="hover:bg-neutral-900/30">
+                          <td className="py-3 px-4">
+                            <div className="font-bold text-neutral-100 tracking-widest tabular-nums">{rec.code}</div>
+                            <div className="text-[10px] text-neutral-500">Issued by {rec.issuedBy}</div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="text-neutral-200 font-semibold">{tenantObj?.name || rec.companyCode}</div>
+                            <div className="text-[10px] text-neutral-500">{rec.companyCode} · {rec.mdmProvider}</div>
+                          </td>
+                          <td className="py-3 px-4">
+                            {rec.assignedEmail ? (
+                              <div>
+                                <div className="text-neutral-200">{rec.assignedEmployeeName || 'Bound Account'}</div>
+                                <div className="text-[10px] text-sky-400">{rec.assignedEmail}</div>
+                              </div>
+                            ) : (
+                              <span className="text-neutral-400">Any Company Employee</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span
+                              className={`font-bold uppercase text-[11px] ${
+                                effectiveStatus === 'active'
+                                  ? 'text-emerald-400'
+                                  : effectiveStatus === 'used'
+                                  ? 'text-sky-400'
+                                  : effectiveStatus === 'revoked'
+                                  ? 'text-rose-400'
+                                  : 'text-amber-500'
+                              }`}
+                            >
+                              {effectiveStatus}
+                            </span>
+                            <div className="text-[10px] text-neutral-500 flex items-center gap-1 mt-0.5 tabular-nums">
+                              <Clock className="w-2.5 h-2.5" />
+                              <span>Exp: {new Date(rec.expiresAt).toLocaleString()}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-[11px]">
+                            {rec.usedByDeviceId ? (
+                              <div>
+                                <div className="text-neutral-200 font-bold">{rec.usedByHostname}</div>
+                                <div className="text-[10px] text-neutral-500 tabular-nums">{rec.usedByDeviceId}</div>
+                              </div>
+                            ) : (
+                              <span className="text-neutral-600">—</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <div className="inline-flex items-center gap-2">
+                              {effectiveStatus === 'active' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyCode(rec.code, rec.id)}
+                                  className="px-2.5 py-1 border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 flex items-center gap-1"
+                                >
+                                  {copiedCodeId === rec.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                                  <span>{copiedCodeId === rec.id ? 'Copied' : 'Copy'}</span>
+                                </button>
+                              )}
+                              {effectiveStatus === 'active' && isIamPortal && (
+                                <button
+                                  type="button"
+                                  onClick={() => revokeDeviceEnrollmentCode(rec.id)}
+                                  className="px-2.5 py-1 border border-rose-900 bg-rose-950/30 hover:bg-rose-900/40 text-rose-300 flex items-center gap-1"
+                                >
+                                  <Ban className="w-3 h-3" />
+                                  <span>Revoke</span>
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Verified Corporate Devices Registry */}
+          <div className="space-y-2.5">
+            <h2 className="text-sm font-bold text-neutral-100 uppercase tracking-wider flex items-center gap-2">
+              <Laptop className="w-4 h-4 text-emerald-400" />
+              <span>Verified Corporate Devices Registry ({enrolledDevices.length})</span>
+            </h2>
+            <div className="border border-neutral-800 bg-neutral-950 overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-neutral-800 bg-neutral-900/50 text-[11px] text-neutral-400 uppercase">
+                    <th className="py-3 px-4">Workstation / Device ID</th>
+                    <th className="py-3 px-4">Company &amp; Bound User</th>
+                    <th className="py-3 px-4">MDM &amp; IAM Code</th>
+                    <th className="py-3 px-4">Trust Status</th>
+                    <th className="py-3 px-4 text-right">Governance</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-900">
+                  {enrolledDevices.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 px-4 text-center text-neutral-500">
+                        No corporate workstations onboarded yet. Devices appear here once verified with an IAM code.
+                      </td>
+                    </tr>
+                  ) : (
+                    enrolledDevices.map(dev => {
+                      const isRevoked = dev.status === 'revoked';
+                      return (
+                        <tr key={dev.deviceId} className="hover:bg-neutral-900/30">
+                          <td className="py-3 px-4">
+                            <div className="font-bold text-neutral-100">{dev.hostname}</div>
+                            <div className="text-[10px] text-neutral-500 tabular-nums">
+                              {dev.deviceId} · {dev.osPlatform}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="text-neutral-200">{dev.companyCode || dev.domain}</div>
+                            <div className="text-[10px] text-sky-400">
+                              {dev.enrolledByEmail || 'Company-Wide Managed Workstation'}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="text-neutral-300">{dev.mdmProvider}</div>
+                            <div className="text-[10px] text-neutral-500 tabular-nums">
+                              Code: {dev.enrollmentCode || 'LEGACY'} · {new Date(dev.enrolledAt).toLocaleString()}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className={isRevoked ? 'text-rose-400 font-bold' : 'text-emerald-400 font-bold'}>
+                              {isRevoked ? 'TRUST REVOKED' : 'MDM VERIFIED · SSO ACTIVE'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            {!isRevoked && isIamPortal ? (
+                              <button
+                                type="button"
+                                onClick={() => revokeEnrolledDevice(dev.deviceId)}
+                                className="px-2.5 py-1 border border-rose-900 bg-rose-950/30 hover:bg-rose-900/50 text-rose-300 font-bold inline-flex items-center gap-1"
+                              >
+                                <Ban className="w-3 h-3" />
+                                <span>Revoke MDM Trust</span>
+                              </button>
+                            ) : (
+                              <span className="text-neutral-600 text-[10px] uppercase">
+                                {isRevoked ? 'Disabled' : 'IAM Portal Only'}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
     </div>

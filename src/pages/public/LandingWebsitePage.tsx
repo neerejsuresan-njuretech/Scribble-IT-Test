@@ -271,15 +271,15 @@ export const LandingWebsitePage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100 dot-matrix-bg font-sans selection:bg-rose-600 selection:text-white flex flex-col">
+    <div className="min-h-screen bg-neutral-950 text-neutral-100 dot-matrix-bg font-sans selection:bg-rose-600 selection:text-white flex flex-col overflow-x-clip">
       {/* Strict 3-Zone Top Bar Contract */}
-      <header className="sticky top-0 z-40 h-16 border-b border-neutral-800 bg-neutral-950/95 backdrop-blur-md">
-        <div className="max-w-[1200px] mx-auto h-full px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-8">
+      <header className="sticky top-0 z-40 h-14 sm:h-16 border-b border-neutral-800 bg-neutral-950/95 backdrop-blur-md">
+        <div className="max-w-[1200px] mx-auto h-full px-3 sm:px-6 lg:px-8 flex items-center justify-between gap-3 sm:gap-6 lg:gap-8">
           {/* Zone 1: Single text element Brand Wordmark */}
           <button
             type="button"
             onClick={() => scrollToSection('overview')}
-            className="text-lg font-bold tracking-tight text-neutral-100 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 rounded-sm"
+            className="text-base sm:text-lg font-bold tracking-tight text-neutral-100 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 rounded-sm"
           >
             Scribble IT
           </button>
@@ -327,9 +327,9 @@ export const LandingWebsitePage: React.FC = () => {
             <button
               type="button"
               onClick={() => handleLaunchDemo('super_admin', '/watchtower')}
-              className="px-4 py-2 min-h-[40px] bg-rose-600 hover:bg-rose-500 text-white text-xs sm:text-sm font-semibold transition-colors flex items-center gap-2 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
+              className="px-3 sm:px-4 py-2 min-h-[40px] bg-rose-600 hover:bg-rose-500 text-white text-xs sm:text-sm font-semibold transition-colors flex items-center gap-1.5 sm:gap-2 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
             >
-              <Play className="w-3.5 h-3.5 fill-current" />
+              <Play className="w-3.5 h-3.5 fill-current shrink-0" />
               <span>Launch Demo</span>
             </button>
             <button
@@ -337,7 +337,7 @@ export const LandingWebsitePage: React.FC = () => {
               onClick={() => setMobileMenuOpen(prev => !prev)}
               aria-label={mobileMenuOpen ? 'Close menu' : 'Open navigation menu'}
               aria-expanded={mobileMenuOpen}
-              className="md:hidden min-h-[40px] min-w-[40px] border border-neutral-800 bg-neutral-900 text-neutral-200 flex items-center justify-center"
+              className="md:hidden min-h-[40px] min-w-[40px] border border-neutral-800 bg-neutral-900 text-neutral-200 flex items-center justify-center shrink-0"
             >
               {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
             </button>
@@ -380,11 +380,11 @@ export const LandingWebsitePage: React.FC = () => {
         {/* HERO: WHAT IS SCRIBBLE IT                             */}
         {/* ===================================================== */}
         <section id="overview" className="border-b border-neutral-800">
-          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-16 sm:pt-16 sm:pb-20 space-y-12">
+          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-12 sm:pt-14 sm:pb-18 lg:pt-16 lg:pb-20 space-y-8 sm:space-y-12">
             {/* Editorial Copy + Primary Action */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-end">
-              <div className="lg:col-span-8 space-y-5">
-                <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-400">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 lg:gap-10 items-end">
+              <div className="lg:col-span-8 space-y-4 sm:space-y-5">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-400">
                   <span>Njure Tech</span>
                   <span aria-hidden="true">·</span>
                   <span>Multi-Tenant Enterprise ITSM</span>
@@ -393,16 +393,16 @@ export const LandingWebsitePage: React.FC = () => {
                 </div>
 
                 <h1
-                  className="font-bold text-neutral-100 tracking-tight leading-[1.08] max-w-3xl"
+                  className="font-bold text-neutral-100 tracking-tight leading-[1.1] max-w-3xl"
                   style={{
-                    fontSize: 'clamp(2.25rem, 4vw, 3.75rem)',
+                    fontSize: 'clamp(1.75rem, 4.2vw, 3.6rem)',
                     textWrap: 'balance',
                   }}
                 >
                   Unified IT service management, visual workflows, and telephony in one workspace.
                 </h1>
 
-                <p className="text-[15px] sm:text-base text-neutral-400 leading-relaxed max-w-2xl">
+                <p className="text-sm sm:text-base text-neutral-400 leading-relaxed max-w-2xl">
                   <strong className="text-neutral-200 font-semibold">Scribble IT</strong> is a modular IT Service
                   Management and operations platform built for service desks, MSPs, and internal IT teams. It brings
                   ITIL ticketing, CMDB asset tracking, Figma-style pre-close process modeling, AI-assisted incident
@@ -411,26 +411,26 @@ export const LandingWebsitePage: React.FC = () => {
                 </p>
               </div>
 
-              <div className="lg:col-span-4 flex flex-col items-start lg:items-end gap-4">
-                <div className="flex flex-wrap items-center gap-3 w-full lg:justify-end">
+              <div className="lg:col-span-4 flex flex-col items-stretch sm:items-start lg:items-end gap-3.5">
+                <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-2.5 sm:gap-3 w-full lg:justify-end">
                   <button
                     type="button"
                     onClick={() => handleLaunchDemo('super_admin', '/watchtower')}
-                    className="px-5 py-3 min-h-[44px] bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold transition-colors inline-flex items-center justify-center gap-2 whitespace-nowrap shrink-0"
+                    className="w-full sm:w-auto px-5 py-3 min-h-[44px] bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold transition-colors inline-flex items-center justify-center gap-2 whitespace-nowrap shrink-0"
                   >
                     <Play className="w-4 h-4 fill-current" />
                     <span>Launch Live Demo</span>
                   </button>
                   <Link
                     to="/login"
-                    className="px-4 py-3 min-h-[44px] border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-100 text-sm font-semibold transition-colors inline-flex items-center justify-center gap-2 whitespace-nowrap shrink-0"
+                    className="w-full sm:w-auto px-4 py-3 min-h-[44px] border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-100 text-sm font-semibold transition-colors inline-flex items-center justify-center gap-2 whitespace-nowrap shrink-0"
                   >
                     <span>Login Portals</span>
                     <ArrowRight className="w-4 h-4" />
                   </Link>
                 </div>
 
-                <div className="flex items-center gap-4 text-xs text-neutral-400">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-neutral-400">
                   <span>No signup required for interactive demo</span>
                   <span aria-hidden="true">·</span>
                   <button
@@ -457,7 +457,7 @@ export const LandingWebsitePage: React.FC = () => {
             {/* Dominant 16:9 Architectural Hero Frame */}
             <div className="border border-neutral-800 bg-neutral-900/40 overflow-hidden rounded-lg">
               {!brokenImages.hero ? (
-                <div className="relative aspect-16/9 w-full overflow-hidden">
+                <div className="relative aspect-[4/3] sm:aspect-16/9 w-full overflow-hidden">
                   <img
                     src={heroOpsImg}
                     alt="Scribble IT modern minimalist IT operations command center with dual monitors and glass partitions"
@@ -465,10 +465,10 @@ export const LandingWebsitePage: React.FC = () => {
                     onError={() => markImageBroken('hero')}
                     className="w-full h-full object-cover"
                   />
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-5 sm:p-7 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/55 to-transparent p-4 sm:p-7 flex flex-col sm:flex-row sm:items-end justify-between gap-2.5 sm:gap-3">
                     <div className="space-y-1">
-                      <div className="text-xs text-neutral-50/80">Operations Command &amp; Service Delivery</div>
-                      <div className="text-sm sm:text-base font-semibold text-neutral-50">
+                      <div className="text-[11px] sm:text-xs text-neutral-50/80">Operations Command &amp; Service Delivery</div>
+                      <div className="text-xs sm:text-base font-semibold text-neutral-50 leading-snug">
                         One operational surface for Watchtower monitoring, Incident triage, CMDB mapping, and voice queues.
                       </div>
                     </div>
@@ -482,7 +482,7 @@ export const LandingWebsitePage: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                <div className="aspect-16/9 w-full bg-neutral-900 flex flex-col items-center justify-center p-8 text-center gap-3">
+                <div className="aspect-[4/3] sm:aspect-16/9 w-full bg-neutral-900 flex flex-col items-center justify-center p-8 text-center gap-3">
                   <Layers className="w-10 h-10 text-neutral-500" />
                   <div className="text-sm font-semibold text-neutral-200">Scribble IT Operations Workspace</div>
                   <p className="text-xs text-neutral-400 max-w-md">
@@ -492,8 +492,8 @@ export const LandingWebsitePage: React.FC = () => {
               )}
             </div>
 
-            {/* Full-Width Platform Architecture Specification Strip */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 border border-neutral-800 bg-neutral-950 divide-y lg:divide-y-0 lg:divide-x divide-neutral-800 rounded-lg overflow-hidden">
+            {/* Full-Width Platform Architecture Specification Strip (Clean 1/2/4 col hairline grid) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-neutral-800 border border-neutral-800 rounded-lg overflow-hidden">
               {[
                 {
                   metric: '31',
@@ -516,7 +516,7 @@ export const LandingWebsitePage: React.FC = () => {
                   detail: 'Google Cloud Firestore persistence across desktop & mobile',
                 },
               ].map(item => (
-                <div key={item.label} className="p-5 sm:p-6 space-y-1.5">
+                <div key={item.label} className="bg-neutral-950 p-4 sm:p-5 lg:p-6 space-y-1.5">
                   <div className="text-2xl sm:text-3xl font-bold font-mono-strict tabular-nums text-neutral-100">
                     {item.metric}
                   </div>
@@ -532,11 +532,11 @@ export const LandingWebsitePage: React.FC = () => {
         {/* 01. PLATFORM FEATURES (ASYMMETRIC BENTO GRID)         */}
         {/* ===================================================== */}
         <section id="features" className="border-b border-neutral-800">
-          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 space-y-10">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20 space-y-8 sm:space-y-10">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-5 sm:gap-6">
               <div className="space-y-2 max-w-2xl">
                 <div className="text-xs text-neutral-400">Platform Capabilities</div>
-                <h2 className="text-2xl sm:text-3xl font-bold text-neutral-100 tracking-tight">
+                <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-neutral-100 tracking-tight">
                   01. Everything a modern IT desk runs daily
                 </h2>
                 <p className="text-sm sm:text-[15px] text-neutral-400 leading-relaxed">
@@ -544,11 +544,11 @@ export const LandingWebsitePage: React.FC = () => {
                 </p>
               </div>
 
-              {/* Interactive Functional Filter Control */}
+              {/* Interactive Functional Filter Control (scrollable strip on phones, inline on tablet+) */}
               <div
                 role="tablist"
                 aria-label="Filter platform features"
-                className="inline-flex flex-wrap items-center gap-1 p-1 border border-neutral-800 bg-neutral-900/70 rounded-lg self-start md:self-auto"
+                className="flex items-center gap-1 p-1 border border-neutral-800 bg-neutral-900/70 rounded-lg max-w-full overflow-x-auto no-scrollbar self-stretch md:self-auto"
               >
                 {[
                   { id: 'all' as const, label: 'All Capabilities' },
@@ -564,7 +564,7 @@ export const LandingWebsitePage: React.FC = () => {
                       role="tab"
                       aria-selected={active}
                       onClick={() => setFeatureFilter(tab.id)}
-                      className={`px-3 py-1.5 min-h-[36px] text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 ${
+                      className={`px-3 py-1.5 min-h-[38px] text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 ${
                         active
                           ? 'bg-rose-600 text-white'
                           : 'text-neutral-400 hover:text-neutral-100'
@@ -577,8 +577,8 @@ export const LandingWebsitePage: React.FC = () => {
               </div>
             </div>
 
-            {/* Asymmetric Bento Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Responsive Asymmetric Bento Grid (1-col phone, 2-col tablet, 12-col asymmetric desktop) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-5 sm:gap-6">
               {visibleFeatures.map(feature => {
                 const colSpanClass =
                   featureFilter !== 'all'
@@ -681,10 +681,10 @@ export const LandingWebsitePage: React.FC = () => {
         {/* 03. HONEST TRADE-OFFS: PLUS POINTS & MINUS POINTS     */}
         {/* ===================================================== */}
         <section id="tradeoffs" className="border-b border-neutral-800">
-          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 space-y-10">
+          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20 space-y-8 sm:space-y-10">
             <div className="space-y-2 max-w-2xl">
               <div className="text-xs text-neutral-400">Transparent Engineering Evaluation</div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-neutral-100 tracking-tight">
+              <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-neutral-100 tracking-tight">
                 03. Plus points &amp; minus points
               </h2>
               <p className="text-sm sm:text-[15px] text-neutral-400 leading-relaxed">
@@ -693,7 +693,7 @@ export const LandingWebsitePage: React.FC = () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6 items-stretch">
               {/* Plus Points Column */}
               <div className="border border-neutral-800 bg-neutral-950 rounded-lg p-6 sm:p-7 space-y-6 flex flex-col">
                 <div className="flex items-center justify-between gap-4 border-b border-neutral-800 pb-4">
@@ -761,12 +761,12 @@ export const LandingWebsitePage: React.FC = () => {
         {/* 04. DEMO LAUNCHER & PORTAL ACCESS                     */}
         {/* ===================================================== */}
         <section id="portals">
-          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 space-y-10">
-            <div className="border border-neutral-800 bg-neutral-950 rounded-lg p-6 sm:p-10 space-y-8">
-              <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 border-b border-neutral-800 pb-8">
+          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20 space-y-8 sm:space-y-10">
+            <div className="border border-neutral-800 bg-neutral-950 rounded-lg p-5 sm:p-8 lg:p-10 space-y-6 sm:space-y-8">
+              <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5 sm:gap-6 border-b border-neutral-800 pb-6 sm:pb-8">
                 <div className="space-y-2 max-w-2xl">
                   <div className="text-xs text-neutral-400">Interactive Sandbox</div>
-                  <h2 className="text-2xl sm:text-3xl font-bold text-neutral-100 tracking-tight">
+                  <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-neutral-100 tracking-tight">
                     04. Launch the live Scribble IT demo
                   </h2>
                   <p className="text-sm sm:text-[15px] text-neutral-400 leading-relaxed">
@@ -775,18 +775,18 @@ export const LandingWebsitePage: React.FC = () => {
                   </p>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3 shrink-0">
+                <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-2.5 sm:gap-3 shrink-0 w-full lg:w-auto">
                   <button
                     type="button"
                     onClick={() => handleLaunchDemo('super_admin', '/watchtower')}
-                    className="px-5 py-3 min-h-[44px] bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold transition-colors inline-flex items-center gap-2 whitespace-nowrap shrink-0"
+                    className="w-full sm:w-auto px-5 py-3 min-h-[44px] bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold transition-colors inline-flex items-center justify-center gap-2 whitespace-nowrap shrink-0"
                   >
                     <Play className="w-4 h-4 fill-current" />
                     <span>Launch Full Demo</span>
                   </button>
                   <Link
                     to="/login"
-                    className="px-4 py-3 min-h-[44px] border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-100 text-sm font-semibold transition-colors inline-flex items-center gap-2 whitespace-nowrap shrink-0"
+                    className="w-full sm:w-auto px-4 py-3 min-h-[44px] border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-100 text-sm font-semibold transition-colors inline-flex items-center justify-center gap-2 whitespace-nowrap shrink-0"
                   >
                     <span>Go to Login Screen</span>
                     <ArrowRight className="w-4 h-4" />

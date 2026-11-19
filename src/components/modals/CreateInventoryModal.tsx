@@ -96,7 +96,7 @@ export const CreateInventoryModal: React.FC<CreateInventoryModalProps> = ({ isOp
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="text-neutral-400 block mb-1 text-[11px]">Stock Qty</label>
               <input

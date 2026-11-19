@@ -73,14 +73,14 @@ export const CalendarRotaPage: React.FC = () => {
       </div>
 
       {showNew && (
-        <form onSubmit={handleAdd} className="p-4 border border-neutral-700 bg-neutral-900/50 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+        <form onSubmit={handleAdd} className="p-4 border border-neutral-700 bg-neutral-900/50 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
           <div className="sm:col-span-2">
             <label className="block text-neutral-400 mb-1">Event / Shift Title *</label>
-            <input required value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Primary L3 NetOps On-Call Shift" className="w-full bg-neutral-950 border border-neutral-700 px-3 py-2 text-neutral-100" />
+            <input required value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Primary L3 NetOps On-Call Shift" className="w-full min-h-[38px] bg-neutral-950 border border-neutral-700 px-3 py-2 text-neutral-100" />
           </div>
           <div>
             <label className="block text-neutral-400 mb-1">Type</label>
-            <select value={type} onChange={e => setType(e.target.value as CalendarEvent['type'])} className="w-full bg-neutral-950 border border-neutral-700 px-3 py-2 text-neutral-100">
+            <select value={type} onChange={e => setType(e.target.value as CalendarEvent['type'])} className="w-full min-h-[38px] bg-neutral-950 border border-neutral-700 px-3 py-2 text-neutral-100">
               <option value="duty_rota">Duty Rota</option>
               <option value="change">Change Window</option>
               <option value="project_milestone">Project Milestone</option>
@@ -88,20 +88,20 @@ export const CalendarRotaPage: React.FC = () => {
               <option value="ssl_expiry">SSL Expiry</option>
             </select>
           </div>
-          <div className="flex gap-2">
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full bg-neutral-950 border border-neutral-700 px-2 py-2 text-neutral-100" />
-            <input value={owner} onChange={e => setOwner(e.target.value)} placeholder="Owner" className="w-28 bg-neutral-950 border border-neutral-700 px-2 py-2 text-neutral-100" />
-            <button type="submit" className="px-3 py-2 bg-rose-600 text-white font-bold shrink-0">Add</button>
+          <div className="flex flex-wrap sm:flex-nowrap gap-2">
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="flex-1 min-w-[130px] min-h-[38px] bg-neutral-950 border border-neutral-700 px-2 py-2 text-neutral-100" />
+            <input value={owner} onChange={e => setOwner(e.target.value)} placeholder="Owner" className="w-28 min-h-[38px] bg-neutral-950 border border-neutral-700 px-2 py-2 text-neutral-100" />
+            <button type="submit" className="min-h-[38px] px-3 py-2 bg-rose-600 text-white font-bold shrink-0">Add</button>
           </div>
         </form>
       )}
 
-      <div className="flex flex-wrap gap-1 border border-neutral-800 bg-neutral-900/50 p-1 w-fit">
+      <div className="flex items-center gap-1 border border-neutral-800 bg-neutral-900/50 p-1 w-full sm:w-fit overflow-x-auto no-scrollbar">
         {(['all', 'duty_rota', 'change', 'ssl_expiry', 'contract_renewal', 'project_milestone'] as const).map(f => (
           <button
             key={f}
             onClick={() => setTypeFilter(f)}
-            className={`px-3 py-1 uppercase text-[10px] ${typeFilter === f ? 'bg-neutral-800 text-white font-bold' : 'text-neutral-400'}`}
+            className={`min-h-[34px] px-3 py-1 uppercase text-[10px] whitespace-nowrap shrink-0 ${typeFilter === f ? 'bg-neutral-800 text-white font-bold' : 'text-neutral-400'}`}
           >
             {f.replace('_', ' ')}
           </button>

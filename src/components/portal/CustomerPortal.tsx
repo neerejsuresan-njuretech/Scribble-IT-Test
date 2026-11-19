@@ -96,40 +96,40 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onOpenNewTicket 
   return (
     <div className="space-y-8 font-mono">
       {/* Top Banner / User Welcome */}
-      <div className="p-6 border border-neutral-800 bg-neutral-900/30 flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="flex items-start gap-4">
+      <div className="p-4 sm:p-6 border border-neutral-800 bg-neutral-900/30 flex flex-col md:flex-row md:items-center justify-between gap-5 sm:gap-6">
+        <div className="flex items-start gap-3 sm:gap-4 min-w-0">
           {endUserBrand.logoDataUrl && (
             <img
               src={endUserBrand.logoDataUrl}
               alt={endUserBrand.portalName}
               referrerPolicy="no-referrer"
-              className="w-12 h-12 object-contain border border-neutral-800 bg-neutral-950 p-1 shrink-0"
+              className="w-10 h-10 sm:w-12 sm:h-12 object-contain border border-neutral-800 bg-neutral-950 p-1 shrink-0"
             />
           )}
-          <div className="space-y-2">
-            <div className="text-xs text-neutral-400 flex flex-wrap items-center gap-2">
+          <div className="space-y-1.5 sm:space-y-2 min-w-0 flex-1">
+            <div className="text-[11px] sm:text-xs text-neutral-400 flex flex-wrap items-center gap-x-2 gap-y-0.5">
               <span className="font-bold text-neutral-200">{activeTenant.name.toUpperCase()}</span>
               <span aria-hidden="true">·</span>
               <span>{endUserBrand.subtitle}</span>
               <span aria-hidden="true">·</span>
               <span className="text-neutral-200">{currentUser.name}</span>
             </div>
-            <div>
+            <div className="max-w-full">
               <DotMatrixText text={endUserBrand.portalName.toUpperCase()} size="md" />
             </div>
-            <div className="text-xs text-neutral-400">
+            <div className="text-xs text-neutral-400 leading-relaxed">
               {activeTenant.preferenceTemplate.portalBannerTitle}
             </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-2.5 sm:gap-3 shrink-0">
           {isModuleEnabled('status_page') && (
             <button
               onClick={() => navigate('/status')}
-              className="px-3.5 py-2 text-xs border border-neutral-700 bg-neutral-900 text-neutral-200 hover:bg-neutral-800 transition-colors flex items-center gap-2 whitespace-nowrap"
+              className="w-full sm:w-auto min-h-[40px] px-3.5 py-2 text-xs border border-neutral-700 bg-neutral-900 text-neutral-200 hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
             >
-              <Activity className={`w-3.5 h-3.5 ${degradedCount > 0 ? 'text-amber-400' : statusComponents.length === 0 ? 'text-neutral-500' : 'text-emerald-400'}`} />
+              <Activity className={`w-3.5 h-3.5 shrink-0 ${degradedCount > 0 ? 'text-amber-400' : statusComponents.length === 0 ? 'text-neutral-500' : 'text-emerald-400'}`} />
               <span>
                 {statusComponents.length === 0
                   ? 'Service Status'
@@ -141,9 +141,9 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onOpenNewTicket 
           )}
           <button
             onClick={() => onOpenNewTicket ? onOpenNewTicket() : navigate('/portal/new')}
-            className="px-4 py-2 text-xs font-mono tracking-wider bg-rose-600 text-white hover:bg-rose-500 transition-colors flex items-center gap-2 whitespace-nowrap"
+            className="w-full sm:w-auto min-h-[40px] px-4 py-2 text-xs font-mono tracking-wider bg-rose-600 text-white hover:bg-rose-500 transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-3.5 h-3.5 shrink-0" />
             <span>Report Incident</span>
           </button>
         </div>

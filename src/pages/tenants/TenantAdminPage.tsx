@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { useITSM } from '../../context/ITSMContext';
 import {
   Building2,
@@ -16,6 +17,7 @@ import {
   Layers,
   AlertCircle,
   Loader2,
+  Lock,
 } from 'lucide-react';
 import { CustomPortalKey, Tenant } from '../../types/itsm';
 import { getDefaultTenantBranding } from '../../data/freeitsmSeedData';
@@ -23,6 +25,7 @@ import { processLogoFile } from '../../utils/logoProcessor';
 
 export const TenantAdminPage: React.FC = () => {
   const {
+    isSuperAdmin,
     tenants,
     activeTenant,
     switchTenant,
@@ -210,12 +213,36 @@ export const TenantAdminPage: React.FC = () => {
     t.portalBranding?.iam?.logoDataUrl ||
     '';
 
+  if (!isSuperAdmin) {
+    return (
+      <div className="border border-rose-900/70 bg-neutral-950 p-8 font-mono text-xs space-y-4 max-w-xl mx-auto mt-10">
+        <div className="flex items-center gap-2 text-[10px] text-rose-500 uppercase font-bold tracking-wider">
+          <Lock className="w-3.5 h-3.5" />
+          <span>SUPER ADMIN PORTAL EXCLUSIVE</span>
+        </div>
+        <h2 className="text-base font-bold text-neutral-100">Company Details Locked</h2>
+        <p className="text-neutral-400 leading-relaxed">
+          Updating company details, portal branding, logos, SLA targets, or provisioning new organizations is strictly restricted to the Super Admin Portal.
+        </p>
+        <Link
+          to="/login/admin"
+          className="inline-block px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold uppercase tracking-wider"
+        >
+          Sign In via Super Admin Portal
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 font-mono text-xs">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-800 pb-4">
         <div>
-          <div className="text-neutral-500 uppercase tracking-wider">MULTI-TENANT ARCHITECTURE · ISOLATED DATA PARTITIONS</div>
+          <div className="text-neutral-500 uppercase tracking-wider flex flex-wrap items-center gap-2">
+            <span>MULTI-TENANT ARCHITECTURE · ISOLATED DATA PARTITIONS</span>
+            <span className="text-rose-400 font-bold">· SUPER ADMIN EXCLUSIVE</span>
+          </div>
           <h1 className="text-xl font-bold text-neutral-100 mt-0.5 flex flex-wrap items-center gap-3">
             <span>TENANT DIRECTORY &amp; COMPANY BRANDING</span>
             <span className="text-xs font-normal text-neutral-500 tabular-nums">{tenants.length} Active Orgs</span>

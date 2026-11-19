@@ -5,7 +5,7 @@ import { ServiceNowHeader } from './components/common/ServiceNowHeader';
 import { ServiceNowNavigator } from './components/common/ServiceNowNavigator';
 import { ToastViewport } from './components/common/ToastViewport';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
-import { FreeITSMModuleId } from './types/itsm';
+import { FreeITSMModuleId, IamPermissionScope } from './types/itsm';
 import {
   Eye,
   AlertTriangle,
@@ -81,16 +81,16 @@ import { IamLoginPage } from './pages/auth/IamLoginPage';
 const ModuleGate: React.FC<{ moduleId: FreeITSMModuleId; label: string; children: React.ReactNode }> = ({
   moduleId, label, children
 }) => {
-  const { isModuleEnabled, activeTenant, role } = useITSM();
+  const { isModuleEnabled, activeTenant, isSuperAdmin } = useITSM();
   if (!isModuleEnabled(moduleId)) {
     return (
       <div className="border border-neutral-800 bg-neutral-950 p-8 font-mono text-xs space-y-4 max-w-xl mx-auto mt-10">
         <div className="text-[10px] text-neutral-500 uppercase">MODULE AVAILABILITY · {activeTenant.name}</div>
         <h2 className="text-base font-bold text-neutral-100">{label} Is Disabled</h2>
         <p className="text-neutral-400">
-          This FreeITSM module is currently turned off in System &rarr; Modules &rarr; Availability for tenant {activeTenant.name}.
+          This module is currently disabled by corporate administration for {activeTenant.name}.
         </p>
-        {role !== 'customer' && (
+        {isSuperAdmin && (
           <Link
             to="/system/modules"
             className="inline-block px-3.5 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold"
@@ -104,21 +104,23 @@ const ModuleGate: React.FC<{ moduleId: FreeITSMModuleId; label: string; children
   return <>{children}</>;
 };
 
-const AdminOnlyGate: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => {
-  const { role } = useITSM();
-  if (role !== 'admin') {
+const SuperAdminOnlyGate: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => {
+  const { isSuperAdmin } = useITSM();
+  if (!isSuperAdmin) {
     return (
-      <div className="border border-neutral-800 bg-neutral-950 p-8 font-mono text-xs space-y-4 max-w-xl mx-auto mt-10">
-        <div className="text-[10px] text-rose-500 uppercase font-bold">SUPER ADMIN CLEARANCE REQUIRED</div>
+      <div className="border border-rose-900/70 bg-neutral-950 p-8 font-mono text-xs space-y-4 max-w-xl mx-auto mt-10">
+        <div className="text-[10px] text-rose-500 uppercase font-bold tracking-wider">
+          SUPER ADMIN PORTAL CLEARANCE REQUIRED
+        </div>
         <h2 className="text-base font-bold text-neutral-100">{label} Access Restricted</h2>
-        <p className="text-neutral-400">
-          Multi-tenant directory governance, module controls, and database operations require signing in through the dedicated Super Admin login page.
+        <p className="text-neutral-400 leading-relaxed">
+          Corporate governance restricts company profile updates, branding, logos, SLA configurations, module availability, and database operations exclusively to authenticated <strong className="text-neutral-200">Super Admin Portal</strong> sessions.
         </p>
         <Link
           to="/login/admin"
-          className="inline-block px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold"
+          className="inline-block px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold uppercase tracking-wider"
         >
-          Go to Super Admin Login
+          Go to Super Admin Portal
         </Link>
       </div>
     );
@@ -126,16 +128,50 @@ const AdminOnlyGate: React.FC<{ label: string; children: React.ReactNode }> = ({
   return <>{children}</>;
 };
 
+const PermissionGate: React.FC<{ scope: IamPermissionScope; label: string; children: React.ReactNode }> = ({
+  scope, label, children
+}) => {
+  const { isSuperAdmin, hasPermission } = useITSM();
+  if (!isSuperAdmin && !hasPermission(scope)) {
+    return (
+      <div className="border border-neutral-800 bg-neutral-950 p-8 font-mono text-xs space-y-4 max-w-xl mx-auto mt-10">
+        <div className="text-[10px] text-amber-400 uppercase font-bold tracking-wider">
+          RBAC POLICY SCOPE REQUIRED · {scope}
+        </div>
+        <h2 className="text-base font-bold text-neutral-100">{label} Access Restricted</h2>
+        <p className="text-neutral-400 leading-relaxed">
+          Your current corporate role does not hold the <span className="text-neutral-200 font-bold">{scope}</span> permission scope required to access {label}. Contact the IAM Team to request an updated policy binding.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <Link
+            to="/watchtower"
+            className="inline-block px-4 py-2 border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 font-bold"
+          >
+            Return to Operations
+          </Link>
+          <Link
+            to="/login/iam"
+            className="inline-block px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold"
+          >
+            IAM Portal Login
+          </Link>
+        </div>
+      </div>
+    );
+  }
+  return <>{children}</>;
+};
+
 const IamAccessGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { role, authSession, hasPermission } = useITSM();
-  const allowed = role === 'admin' || authSession?.portalType === 'iam' || hasPermission('iam:manage');
+  const { isSuperAdmin, isIamPortal, hasPermission } = useITSM();
+  const allowed = isSuperAdmin || isIamPortal || hasPermission('iam:manage');
   if (!allowed) {
     return (
       <div className="border border-neutral-800 bg-neutral-950 p-8 font-mono text-xs space-y-4 max-w-xl mx-auto mt-10">
         <div className="text-[10px] text-amber-400 uppercase font-bold">IAM CLEARANCE REQUIRED</div>
         <h2 className="text-base font-bold text-neutral-100">IAM Portal Access Restricted</h2>
         <p className="text-neutral-400">
-          Identity creation, Company ID bindings, and policy assignments require an IAM Operator, Super Admin, or an account granted iam:manage scope.
+          Identity creation, Company ID bindings, device enrollment codes, and policy assignments require an IAM Portal operator, Super Admin, or an account granted iam:manage scope.
         </p>
         <div className="flex flex-wrap gap-3">
           <Link
@@ -161,12 +197,27 @@ function MainApp() {
   const { authSession, role, activeTenant, isModuleEnabled, getPortalBranding } = useITSM();
   const location = useLocation();
   const [isNavigatorOpen, setIsNavigatorOpen] = useState<boolean>(() =>
-    typeof window !== 'undefined' ? window.innerWidth >= 1280 : true
+    typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
   );
+
+  // Adapt navigator smoothly when crossing the 1024px desktop/tablet breakpoint
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    let lastDesktop = window.innerWidth >= 1024;
+    const handleResize = () => {
+      const isDesktop = window.innerWidth >= 1024;
+      if (isDesktop !== lastDesktop) {
+        lastDesktop = isDesktop;
+        setIsNavigatorOpen(isDesktop);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Close mobile/tablet overlay drawer automatically on navigation
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.innerWidth < 1280) {
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
       setIsNavigatorOpen(false);
     }
   }, [location.pathname]);
@@ -217,24 +268,24 @@ function MainApp() {
   const activeBrand = getPortalBranding(activePortalKey);
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col dot-matrix-bg selection:bg-rose-600 selection:text-white">
+    <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col dot-matrix-bg selection:bg-rose-600 selection:text-white overflow-x-clip">
       <ServiceNowHeader
         onToggleNavigator={() => setIsNavigatorOpen(!isNavigatorOpen)}
         isNavigatorOpen={isNavigatorOpen}
       />
 
       {role === 'customer' && (
-        <div className="bg-neutral-950 border-b border-neutral-800 px-4 py-2 flex flex-wrap items-center gap-4 font-mono text-xs">
+        <div className="bg-neutral-950 border-b border-neutral-800 px-3 sm:px-4 py-2 flex items-center gap-4 font-mono text-xs overflow-x-auto no-scrollbar whitespace-nowrap">
           <Link
             to="/portal"
-            className={location.pathname === '/portal' ? 'text-white font-bold' : 'text-neutral-400 hover:text-neutral-200'}
+            className={`min-h-[32px] inline-flex items-center shrink-0 ${location.pathname === '/portal' ? 'text-white font-bold' : 'text-neutral-400 hover:text-neutral-200'}`}
           >
             Self-Service Portal
           </Link>
           {isModuleEnabled('status_page') && (
             <Link
               to="/status"
-              className={location.pathname === '/status' ? 'text-white font-bold' : 'text-neutral-400 hover:text-neutral-200'}
+              className={`min-h-[32px] inline-flex items-center shrink-0 ${location.pathname === '/status' ? 'text-white font-bold' : 'text-neutral-400 hover:text-neutral-200'}`}
             >
               Service Status
             </Link>
@@ -242,32 +293,32 @@ function MainApp() {
           {isModuleEnabled('knowledge') && (
             <Link
               to="/knowledge"
-              className={location.pathname === '/knowledge' ? 'text-white font-bold' : 'text-neutral-400 hover:text-neutral-200'}
+              className={`min-h-[32px] inline-flex items-center shrink-0 ${location.pathname === '/knowledge' ? 'text-white font-bold' : 'text-neutral-400 hover:text-neutral-200'}`}
             >
               Knowledge Bank
             </Link>
           )}
           <Link
             to="/portal/new"
-            className={location.pathname === '/portal/new' ? 'text-rose-400 font-bold' : 'text-neutral-400 hover:text-neutral-200'}
+            className={`min-h-[32px] inline-flex items-center shrink-0 ${location.pathname === '/portal/new' ? 'text-rose-400 font-bold' : 'text-neutral-400 hover:text-neutral-200'}`}
           >
             + Report Ticket
           </Link>
         </div>
       )}
 
-      <div className="flex-1 flex overflow-x-clip">
+      <div className="flex-1 flex min-w-0 overflow-x-clip">
         {role !== 'customer' && (
           <ServiceNowNavigator
             isOpen={isNavigatorOpen}
             onCloseMobile={() => {
-              if (window.innerWidth < 1280) setIsNavigatorOpen(false);
+              if (window.innerWidth < 1024) setIsNavigatorOpen(false);
             }}
           />
         )}
 
         <main className="flex-1 min-w-0 overflow-y-auto px-3 sm:px-5 lg:px-6 xl:px-8 py-4 sm:py-5 pb-20 md:pb-6 max-w-full">
-          <div className="max-w-[1600px] mx-auto">
+          <div className="max-w-[1680px] mx-auto w-full min-w-0">
             {role === 'customer' ? (
               <Routes>
                 <Route path="/portal" element={<CustomerPortal />} />
@@ -291,7 +342,7 @@ function MainApp() {
 
                 {/* ITSM & Delivery */}
                 <Route path="/incidents" element={<ModuleGate moduleId="incidents" label="Incidents"><IncidentModule /></ModuleGate>} />
-                <Route path="/ticket-workflows" element={<ModuleGate moduleId="ticket_workflow" label="Ticket Workflow Management"><TicketWorkflowPage /></ModuleGate>} />
+                <Route path="/ticket-workflows" element={<PermissionGate scope="workflows:manage" label="Ticket Workflow Management"><ModuleGate moduleId="ticket_workflow" label="Ticket Workflow Management"><TicketWorkflowPage /></ModuleGate></PermissionGate>} />
                 <Route path="/changes" element={<ModuleGate moduleId="changes" label="Change (CAB)"><ChangeModule /></ModuleGate>} />
                 <Route path="/requests" element={<ModuleGate moduleId="requests" label="Service Requests"><RequestModule /></ModuleGate>} />
                 <Route path="/problems" element={<ModuleGate moduleId="problems" label="Problem Management"><ProblemModule /></ModuleGate>} />
@@ -309,19 +360,19 @@ function MainApp() {
                 {/* Knowledge, Forms & LMS */}
                 <Route path="/knowledge" element={<ModuleGate moduleId="knowledge" label="Knowledge Base"><KnowledgeBasePage /></ModuleGate>} />
                 <Route path="/wiki" element={<ModuleGate moduleId="wiki" label="System Wiki"><SystemWikiPage /></ModuleGate>} />
-                <Route path="/workflows" element={<ModuleGate moduleId="workflow_management" label="Workflow Management"><WorkflowManagementPage /></ModuleGate>} />
-                <Route path="/process-mapper" element={<ModuleGate moduleId="process_mapper" label="Process Mapper"><ProcessMapperPage /></ModuleGate>} />
-                <Route path="/forms-builder" element={<ModuleGate moduleId="custom_forms" label="Custom Forms Builder"><CustomFormsBuilderPage /></ModuleGate>} />
+                <Route path="/workflows" element={<PermissionGate scope="workflows:manage" label="Workflow Management"><ModuleGate moduleId="workflow_management" label="Workflow Management"><WorkflowManagementPage /></ModuleGate></PermissionGate>} />
+                <Route path="/process-mapper" element={<PermissionGate scope="workflows:manage" label="Process Mapper"><ModuleGate moduleId="process_mapper" label="Process Mapper"><ProcessMapperPage /></ModuleGate></PermissionGate>} />
+                <Route path="/forms-builder" element={<PermissionGate scope="workflows:manage" label="Custom Forms Builder"><ModuleGate moduleId="custom_forms" label="Custom Forms Builder"><CustomFormsBuilderPage /></ModuleGate></PermissionGate>} />
                 <Route path="/lms" element={<ModuleGate moduleId="lms" label="LMS Training"><LmsPage /></ModuleGate>} />
 
                 {/* Multi-Tenant Super Admin, IAM & Platform */}
-                <Route path="/tenants" element={<AdminOnlyGate label="Tenant Directory"><TenantAdminPage /></AdminOnlyGate>} />
-                <Route path="/system/modules" element={<AdminOnlyGate label="Module Availability"><ModuleControlsPage /></AdminOnlyGate>} />
+                <Route path="/tenants" element={<SuperAdminOnlyGate label="Company Details & Tenant Directory"><TenantAdminPage /></SuperAdminOnlyGate>} />
+                <Route path="/system/modules" element={<SuperAdminOnlyGate label="Module Availability"><ModuleControlsPage /></SuperAdminOnlyGate>} />
                 <Route path="/iam" element={<IamAccessGate><ModuleGate moduleId="iam" label="IAM Portal"><IamPortalPage /></ModuleGate></IamAccessGate>} />
                 <Route path="/reports" element={<ModuleGate moduleId="reports" label="Reporting & Audit"><ReportsAuditPage /></ModuleGate>} />
                 <Route path="/telephony" element={<ModuleGate moduleId="telephony" label="Telephony CTI"><TelephonyModule /></ModuleGate>} />
-                <Route path="/billing" element={<ModuleGate moduleId="billing" label="Invoices & Billing"><BillingModule /></ModuleGate>} />
-                <Route path="/database" element={<AdminOnlyGate label="Database & Sync"><DatabaseModule /></AdminOnlyGate>} />
+                <Route path="/billing" element={<PermissionGate scope="billing:read" label="Invoices & Billing"><ModuleGate moduleId="billing" label="Invoices & Billing"><BillingModule /></ModuleGate></PermissionGate>} />
+                <Route path="/database" element={<SuperAdminOnlyGate label="Database & Sync"><DatabaseModule /></SuperAdminOnlyGate>} />
                 <Route path="/portal" element={<CustomerPortal />} />
 
                 {/* Dedicated Form Pages */}
@@ -331,7 +382,7 @@ function MainApp() {
                 <Route path="/problems/new" element={<NewProblemPage />} />
                 <Route path="/assets/new" element={<NewAssetPage />} />
                 <Route path="/inventory/new" element={<NewInventoryPage />} />
-                <Route path="/billing/new" element={<NewInvoicePage />} />
+                <Route path="/billing/new" element={<PermissionGate scope="billing:read" label="New Invoice"><NewInvoicePage /></PermissionGate>} />
                 <Route path="/portal/new" element={<NewPortalTicketPage />} />
 
                 {/* Google Workspace Integrations */}
@@ -372,7 +423,7 @@ function MainApp() {
       {/* Mobile Thumb-Zone Bottom Navigation Bar (< md) */}
       <nav
         aria-label="Mobile Primary Navigation"
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 h-14 bg-neutral-950/95 backdrop-blur-md border-t border-neutral-800 px-1"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 min-h-[56px] pb-safe bg-neutral-950/95 backdrop-blur-md border-t border-neutral-800 px-1"
       >
         {role === 'customer' ? (
           <div className="grid grid-cols-4 h-full">

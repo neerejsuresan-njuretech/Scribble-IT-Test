@@ -102,7 +102,7 @@
     },
     "ModuleStateBucket": {
       "title": "ModuleStateBucket",
-      "description": "Synchronized module state bucket for workflows, process maps, telephony settings, CMDB assets, IAM policies, and operations records",
+      "description": "Synchronized module state bucket for workflows, process maps, telephony settings, CMDB assets, IAM policies, device enrollment verification codes, enrolled corporate devices, and operations records",
       "type": "object",
       "properties": {
         "id": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
@@ -132,11 +132,11 @@
     },
     "/workspaces/{ownerUid}/service_requests/{requestId}": {
       "schema": "ServiceRequestRecord",
-      "description": "Tenant-scoped ITIL service request records persisted across sessions and devices"
+      "description": "Tenant-scoped ITIL service request records with designated approver bindings persisted across sessions and devices"
     },
     "/workspaces/{ownerUid}/module_state/{bucketId}": {
       "schema": "ModuleStateBucket",
-      "description": "Per-module synchronized state buckets for workflows, process maps, telephony configs, assets, IAM policies, and settings"
+      "description": "Per-module synchronized state buckets for workflows, process maps, telephony configs, assets, IAM policies, device enrollment codes, enrolled devices, and settings"
     }
   }
 }
