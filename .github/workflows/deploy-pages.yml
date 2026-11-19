@@ -29,8 +29,8 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
-
+        run: npm install --legacy-peer-deps
+ 
       - name: Build static bundle for GitHub Pages
         env:
           # Relative base ('./') works for both username.github.io/repo-name and custom domains with HashRouter
