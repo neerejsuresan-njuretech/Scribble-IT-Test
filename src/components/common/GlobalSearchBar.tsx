@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useITSM } from '../../context/ITSMContext';
+import { canAccessNavId } from '../../config/navigationAccess';
 import { Search, X, AlertTriangle, Package, Server, ShieldCheck, ArrowRight, Lock } from 'lucide-react';
 
 interface SearchResultItem {
@@ -24,6 +25,9 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
   const navigate = useNavigate();
   const {
     role,
+    authSession,
+    isSuperAdmin,
+    isIamPortal,
     currentUser,
     activeTenant,
     incidents,
@@ -64,15 +68,16 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
           : incidents
         : [];
 
-    const reqPool = isModuleEnabled('requests') || isCustomer
-      ? isCustomer
+    const reqPool =
+      isCustomer
         ? requests.filter(
             r =>
               r.requesterEmail.toLowerCase() === currentUser.email.toLowerCase() ||
               r.requesterName.toLowerCase() === currentUser.name.toLowerCase()
           )
-        : requests
-      : [];
+        : isModuleEnabled('requests') && (hasPermission('incidents:read') || hasPermission('requests:approve'))
+        ? requests
+        : [];
 
     const assetPool =
       isModuleEnabled('assets') && hasPermission('assets:read')
@@ -83,8 +88,11 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
           : assets
         : [];
 
-    const prbPool = !isCustomer && isModuleEnabled('problems') ? problems : [];
-    const chgPool = !isCustomer && isModuleEnabled('changes') ? changes : [];
+    const prbPool = !isCustomer && isModuleEnabled('problems') && hasPermission('incidents:read') ? problems : [];
+    const chgPool =
+      !isCustomer && isModuleEnabled('changes') && (hasPermission('incidents:read') || hasPermission('changes:cab_vote'))
+        ? changes
+        : [];
 
     return { incPool, reqPool, assetPool, prbPool, chgPool, isCustomer };
   }, [role, currentUser, incidents, requests, assets, problems, changes, isModuleEnabled, hasPermission]);
@@ -191,15 +199,35 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
       return;
     }
 
-    if (q.includes('IAM') || q.includes('POLICY') || q.includes('IDENTITY')) navigate('/iam');
-    else if (q.includes('TICKET WORKFLOW') || q.includes('TRIAGE')) navigate('/ticket-workflows');
-    else if (q.includes('WORKFLOW') || q.startsWith('WF')) navigate('/workflows');
-    else if (q.startsWith('INC') || q.includes('TICKET')) navigate('/incidents');
-    else if (q.startsWith('REQ') || q.includes('CATALOG')) navigate('/requests');
-    else if (q.startsWith('AST') || q.includes('ASSET')) navigate('/assets');
-    else if (q.includes('TENANT') && role === 'admin') navigate('/tenants');
-    else if (q.includes('MOD') && role === 'admin') navigate('/system/modules');
-    else navigate('/incidents');
+    const rbacCtx = {
+      role,
+      portalType: authSession?.portalType,
+      isSuperAdmin,
+      isIamPortal,
+      isModuleEnabled,
+      hasPermission,
+    };
+
+    const routeIfAllowed = (navId: string, path: string): boolean => {
+      if (!canAccessNavId(navId, rbacCtx)) return false;
+      navigate(path);
+      return true;
+    };
+
+    let navigated = false;
+    if (q.includes('IAM') || q.includes('POLICY') || q.includes('IDENTITY')) navigated = routeIfAllowed('iam', '/iam');
+    else if (q.includes('TICKET WORKFLOW') || q.includes('TRIAGE')) navigated = routeIfAllowed('ticket_workflow', '/ticket-workflows');
+    else if (q.includes('WORKFLOW') || q.startsWith('WF')) navigated = routeIfAllowed('workflow_management', '/workflows');
+    else if (q.startsWith('INC') || q.includes('TICKET')) navigated = routeIfAllowed('incidents', '/incidents');
+    else if (q.startsWith('REQ') || q.includes('CATALOG')) navigated = routeIfAllowed('requests', '/requests');
+    else if (q.startsWith('AST') || q.includes('ASSET')) navigated = routeIfAllowed('assets', '/assets');
+    else if (q.includes('BILL') || q.includes('INV')) navigated = routeIfAllowed('billing', '/billing');
+    else if (q.includes('TENANT')) navigated = routeIfAllowed('tenants', '/tenants');
+    else if (q.includes('MOD')) navigated = routeIfAllowed('module_controls', '/system/modules');
+
+    if (!navigated) {
+      navigate(authSession?.portalType === 'iam' ? '/iam' : '/watchtower');
+    }
 
     setIsOpen(false);
     onResultSelected?.();

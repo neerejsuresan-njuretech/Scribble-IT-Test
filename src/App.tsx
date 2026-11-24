@@ -7,6 +7,11 @@ import { ToastViewport } from './components/common/ToastViewport';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { FreeITSMModuleId, IamPermissionScope } from './types/itsm';
 import {
+  NAV_MODULES_BY_ID,
+  canAccessNavId,
+  hasModuleRolePermission,
+} from './config/navigationAccess';
+import {
   Eye,
   AlertTriangle,
   Package,
@@ -193,8 +198,75 @@ const IamAccessGate: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   return <>{children}</>;
 };
 
+const NavAccessGate: React.FC<{ navId: string; children: React.ReactNode }> = ({ navId, children }) => {
+  const { role, authSession, isSuperAdmin, isIamPortal, isModuleEnabled, hasPermission, activeTenant } = useITSM();
+  const item = NAV_MODULES_BY_ID[navId];
+  if (!item) return <>{children}</>;
+
+  if (item.moduleId && !isModuleEnabled(item.moduleId)) {
+    return (
+      <div className="border border-neutral-800 bg-neutral-950 p-8 font-sans text-xs space-y-4 max-w-xl mx-auto mt-10 rounded-lg">
+        <div className="text-[11px] text-neutral-500 font-semibold">Module Availability · {activeTenant.name}</div>
+        <h2 className="text-base font-bold text-neutral-100">{item.label} Is Disabled</h2>
+        <p className="text-neutral-400 leading-relaxed">
+          This module is currently disabled by corporate administration for {activeTenant.name}.
+        </p>
+        {isSuperAdmin && (
+          <Link
+            to="/system/modules"
+            className="inline-block px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-semibold rounded-md"
+          >
+            Enable in Module Controls
+          </Link>
+        )}
+      </div>
+    );
+  }
+
+  const allowed = hasModuleRolePermission(item, {
+    role,
+    isSuperAdmin,
+    isIamPortal,
+    hasPermission,
+  });
+
+  if (!allowed) {
+    const isSuperOnly = Boolean(item.access.superAdminOnly);
+    const defaultReturnPath = authSession?.portalType === 'iam' ? '/iam' : '/watchtower';
+    return (
+      <div className="border border-neutral-800 bg-neutral-950 p-8 font-sans text-xs space-y-4 max-w-xl mx-auto mt-10 rounded-lg">
+        <div className={`text-[11px] font-semibold ${isSuperOnly ? 'text-rose-400' : 'text-amber-400'}`}>
+          {isSuperOnly ? 'Super Admin Portal Clearance Required' : 'Role-Based Access Restricted'}
+        </div>
+        <h2 className="text-base font-bold text-neutral-100">{item.label} Access Restricted</h2>
+        <p className="text-neutral-400 leading-relaxed">
+          Your current account role does not include permission for <strong className="text-neutral-200">{item.label}</strong> ({item.access.clearanceLabel}).
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <Link
+            to={defaultReturnPath}
+            className="inline-block px-4 py-2 border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 font-semibold rounded-md"
+          >
+            Return to Workspace
+          </Link>
+          <Link
+            to={isSuperOnly ? '/login/admin' : '/login/iam'}
+            className={`inline-block px-4 py-2 text-white font-semibold rounded-md ${
+              isSuperOnly ? 'bg-rose-600 hover:bg-rose-500' : 'bg-amber-600 hover:bg-amber-500'
+            }`}
+          >
+            {isSuperOnly ? 'Super Admin Login' : 'IAM Portal Login'}
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+};
+
 function MainApp() {
-  const { authSession, role, activeTenant, isModuleEnabled, getPortalBranding } = useITSM();
+  const { authSession, role, activeTenant, isModuleEnabled, isSuperAdmin, isIamPortal, hasPermission, getPortalBranding } = useITSM();
   const location = useLocation();
   const [isNavigatorOpen, setIsNavigatorOpen] = useState<boolean>(() =>
     typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
@@ -333,63 +405,63 @@ function MainApp() {
                 <Route path="/" element={<Navigate to={authSession?.portalType === 'iam' ? '/iam' : '/watchtower'} replace />} />
 
                 {/* Command & Operations */}
-                <Route path="/watchtower" element={<ModuleGate moduleId="watchtower" label="Watchtower"><WatchtowerPage /></ModuleGate>} />
-                <Route path="/dashboard" element={<ModuleGate moduleId="dashboard" label="Service Desk"><OverviewDashboard /></ModuleGate>} />
-                <Route path="/war-room" element={<ModuleGate moduleId="war_room" label="War Room"><WarRoomPage /></ModuleGate>} />
-                <Route path="/checks" element={<ModuleGate moduleId="morning_checks" label="Morning Checks"><MorningChecksPage /></ModuleGate>} />
-                <Route path="/status" element={<ModuleGate moduleId="status_page" label="Service Status"><ServiceStatusPage /></ModuleGate>} />
-                <Route path="/calendar" element={<ModuleGate moduleId="calendar" label="Calendar & Rota"><CalendarRotaPage /></ModuleGate>} />
+                <Route path="/watchtower" element={<NavAccessGate navId="watchtower"><WatchtowerPage /></NavAccessGate>} />
+                <Route path="/dashboard" element={<NavAccessGate navId="dashboard"><OverviewDashboard /></NavAccessGate>} />
+                <Route path="/war-room" element={<NavAccessGate navId="war_room"><WarRoomPage /></NavAccessGate>} />
+                <Route path="/checks" element={<NavAccessGate navId="morning_checks"><MorningChecksPage /></NavAccessGate>} />
+                <Route path="/status" element={<NavAccessGate navId="status_page"><ServiceStatusPage /></NavAccessGate>} />
+                <Route path="/calendar" element={<NavAccessGate navId="calendar"><CalendarRotaPage /></NavAccessGate>} />
 
                 {/* ITSM & Delivery */}
-                <Route path="/incidents" element={<ModuleGate moduleId="incidents" label="Incidents"><IncidentModule /></ModuleGate>} />
-                <Route path="/ticket-workflows" element={<PermissionGate scope="workflows:manage" label="Ticket Workflow Management"><ModuleGate moduleId="ticket_workflow" label="Ticket Workflow Management"><TicketWorkflowPage /></ModuleGate></PermissionGate>} />
-                <Route path="/changes" element={<ModuleGate moduleId="changes" label="Change (CAB)"><ChangeModule /></ModuleGate>} />
-                <Route path="/requests" element={<ModuleGate moduleId="requests" label="Service Requests"><RequestModule /></ModuleGate>} />
-                <Route path="/problems" element={<ModuleGate moduleId="problems" label="Problem Management"><ProblemModule /></ModuleGate>} />
-                <Route path="/tasks" element={<ModuleGate moduleId="tasks" label="Tasks (Kanban)"><TasksKanbanPage /></ModuleGate>} />
-                <Route path="/projects" element={<ModuleGate moduleId="projects" label="Projects Portfolio"><ProjectsPage /></ModuleGate>} />
+                <Route path="/incidents" element={<NavAccessGate navId="incidents"><IncidentModule /></NavAccessGate>} />
+                <Route path="/ticket-workflows" element={<NavAccessGate navId="ticket_workflow"><TicketWorkflowPage /></NavAccessGate>} />
+                <Route path="/changes" element={<NavAccessGate navId="changes"><ChangeModule /></NavAccessGate>} />
+                <Route path="/requests" element={<NavAccessGate navId="requests"><RequestModule /></NavAccessGate>} />
+                <Route path="/problems" element={<NavAccessGate navId="problems"><ProblemModule /></NavAccessGate>} />
+                <Route path="/tasks" element={<NavAccessGate navId="tasks"><TasksKanbanPage /></NavAccessGate>} />
+                <Route path="/projects" element={<NavAccessGate navId="projects"><ProjectsPage /></NavAccessGate>} />
 
                 {/* CMDB, Assets & Vendors */}
-                <Route path="/assets" element={<ModuleGate moduleId="assets" label="Assets Register"><AssetModule /></ModuleGate>} />
-                <Route path="/cmdb/network-map" element={<ModuleGate moduleId="network_map" label="CMDB Network Map"><CmdbNetworkMapPage /></ModuleGate>} />
-                <Route path="/inventory" element={<ModuleGate moduleId="inventory" label="Hardware Inventory"><InventoryModule /></ModuleGate>} />
-                <Route path="/software" element={<ModuleGate moduleId="software" label="Software & Licences"><SoftwareInventoryPage /></ModuleGate>} />
-                <Route path="/contracts" element={<ModuleGate moduleId="contracts" label="Contracts & RFP"><ContractsRfpPage /></ModuleGate>} />
-                <Route path="/domains" element={<ModuleGate moduleId="domains" label="Domains & SSL"><DomainsRegisterPage /></ModuleGate>} />
+                <Route path="/assets" element={<NavAccessGate navId="assets"><AssetModule /></NavAccessGate>} />
+                <Route path="/cmdb/network-map" element={<NavAccessGate navId="network_map"><CmdbNetworkMapPage /></NavAccessGate>} />
+                <Route path="/inventory" element={<NavAccessGate navId="inventory"><InventoryModule /></NavAccessGate>} />
+                <Route path="/software" element={<NavAccessGate navId="software"><SoftwareInventoryPage /></NavAccessGate>} />
+                <Route path="/contracts" element={<NavAccessGate navId="contracts"><ContractsRfpPage /></NavAccessGate>} />
+                <Route path="/domains" element={<NavAccessGate navId="domains"><DomainsRegisterPage /></NavAccessGate>} />
 
                 {/* Knowledge, Forms & LMS */}
-                <Route path="/knowledge" element={<ModuleGate moduleId="knowledge" label="Knowledge Base"><KnowledgeBasePage /></ModuleGate>} />
-                <Route path="/wiki" element={<ModuleGate moduleId="wiki" label="System Wiki"><SystemWikiPage /></ModuleGate>} />
-                <Route path="/workflows" element={<PermissionGate scope="workflows:manage" label="Workflow Management"><ModuleGate moduleId="workflow_management" label="Workflow Management"><WorkflowManagementPage /></ModuleGate></PermissionGate>} />
-                <Route path="/process-mapper" element={<PermissionGate scope="workflows:manage" label="Process Mapper"><ModuleGate moduleId="process_mapper" label="Process Mapper"><ProcessMapperPage /></ModuleGate></PermissionGate>} />
-                <Route path="/forms-builder" element={<PermissionGate scope="workflows:manage" label="Custom Forms Builder"><ModuleGate moduleId="custom_forms" label="Custom Forms Builder"><CustomFormsBuilderPage /></ModuleGate></PermissionGate>} />
-                <Route path="/lms" element={<ModuleGate moduleId="lms" label="LMS Training"><LmsPage /></ModuleGate>} />
+                <Route path="/knowledge" element={<NavAccessGate navId="knowledge"><KnowledgeBasePage /></NavAccessGate>} />
+                <Route path="/wiki" element={<NavAccessGate navId="wiki"><SystemWikiPage /></NavAccessGate>} />
+                <Route path="/workflows" element={<NavAccessGate navId="workflow_management"><WorkflowManagementPage /></NavAccessGate>} />
+                <Route path="/process-mapper" element={<NavAccessGate navId="process_mapper"><ProcessMapperPage /></NavAccessGate>} />
+                <Route path="/forms-builder" element={<NavAccessGate navId="custom_forms"><CustomFormsBuilderPage /></NavAccessGate>} />
+                <Route path="/lms" element={<NavAccessGate navId="lms"><LmsPage /></NavAccessGate>} />
 
                 {/* Multi-Tenant Super Admin, IAM & Platform */}
                 <Route path="/tenants" element={<SuperAdminOnlyGate label="Company Details & Tenant Directory"><TenantAdminPage /></SuperAdminOnlyGate>} />
                 <Route path="/system/modules" element={<SuperAdminOnlyGate label="Module Availability"><ModuleControlsPage /></SuperAdminOnlyGate>} />
-                <Route path="/iam" element={<IamAccessGate><ModuleGate moduleId="iam" label="IAM Portal"><IamPortalPage /></ModuleGate></IamAccessGate>} />
-                <Route path="/reports" element={<ModuleGate moduleId="reports" label="Reporting & Audit"><ReportsAuditPage /></ModuleGate>} />
-                <Route path="/telephony" element={<ModuleGate moduleId="telephony" label="Telephony CTI"><TelephonyModule /></ModuleGate>} />
-                <Route path="/billing" element={<PermissionGate scope="billing:read" label="Invoices & Billing"><ModuleGate moduleId="billing" label="Invoices & Billing"><BillingModule /></ModuleGate></PermissionGate>} />
+                <Route path="/iam" element={<IamAccessGate><NavAccessGate navId="iam"><IamPortalPage /></NavAccessGate></IamAccessGate>} />
+                <Route path="/reports" element={<NavAccessGate navId="reports"><ReportsAuditPage /></NavAccessGate>} />
+                <Route path="/telephony" element={<NavAccessGate navId="telephony"><TelephonyModule /></NavAccessGate>} />
+                <Route path="/billing" element={<NavAccessGate navId="billing"><BillingModule /></NavAccessGate>} />
                 <Route path="/database" element={<SuperAdminOnlyGate label="Database & Sync"><DatabaseModule /></SuperAdminOnlyGate>} />
                 <Route path="/portal" element={<CustomerPortal />} />
 
                 {/* Dedicated Form Pages */}
-                <Route path="/incidents/new" element={<NewIncidentPage />} />
-                <Route path="/changes/new" element={<NewChangePage />} />
-                <Route path="/requests/new" element={<NewRequestPage />} />
-                <Route path="/problems/new" element={<NewProblemPage />} />
-                <Route path="/assets/new" element={<NewAssetPage />} />
-                <Route path="/inventory/new" element={<NewInventoryPage />} />
+                <Route path="/incidents/new" element={<PermissionGate scope="incidents:write" label="New Incident"><NewIncidentPage /></PermissionGate>} />
+                <Route path="/changes/new" element={<PermissionGate scope="incidents:write" label="New Change Request"><NewChangePage /></PermissionGate>} />
+                <Route path="/requests/new" element={<PermissionGate scope="incidents:write" label="New Service Request"><NewRequestPage /></PermissionGate>} />
+                <Route path="/problems/new" element={<PermissionGate scope="incidents:write" label="New Problem Record"><NewProblemPage /></PermissionGate>} />
+                <Route path="/assets/new" element={<PermissionGate scope="assets:write" label="New Asset"><NewAssetPage /></PermissionGate>} />
+                <Route path="/inventory/new" element={<PermissionGate scope="assets:write" label="New Inventory Item"><NewInventoryPage /></PermissionGate>} />
                 <Route path="/billing/new" element={<PermissionGate scope="billing:read" label="New Invoice"><NewInvoicePage /></PermissionGate>} />
                 <Route path="/portal/new" element={<NewPortalTicketPage />} />
 
                 {/* Google Workspace Integrations */}
-                <Route path="/workspace/forms" element={<ModuleGate moduleId="google_workspace" label="Google Forms"><GoogleFormsModule /></ModuleGate>} />
-                <Route path="/workspace/chat" element={<ModuleGate moduleId="google_workspace" label="Google Chat"><GoogleChatModule /></ModuleGate>} />
-                <Route path="/workspace/sheets" element={<ModuleGate moduleId="google_workspace" label="Google Sheets"><GoogleSheetsModule /></ModuleGate>} />
-                <Route path="/workspace/drive" element={<ModuleGate moduleId="google_workspace" label="Google Drive"><GoogleDriveModule /></ModuleGate>} />
+                <Route path="/workspace/forms" element={<NavAccessGate navId="google_forms"><GoogleFormsModule /></NavAccessGate>} />
+                <Route path="/workspace/chat" element={<NavAccessGate navId="google_chat"><GoogleChatModule /></NavAccessGate>} />
+                <Route path="/workspace/sheets" element={<NavAccessGate navId="google_sheets"><GoogleSheetsModule /></NavAccessGate>} />
+                <Route path="/workspace/drive" element={<NavAccessGate navId="google_drive"><GoogleDriveModule /></NavAccessGate>} />
 
                 <Route path="*" element={<Navigate to={authSession?.portalType === 'iam' ? '/iam' : '/watchtower'} replace />} />
               </Routes>
@@ -450,43 +522,58 @@ function MainApp() {
             })}
           </div>
         ) : (
-          <div className="grid grid-cols-5 h-full">
-            {[
-              {
-                path: authSession?.portalType === 'iam' ? '/iam' : '/watchtower',
-                label: authSession?.portalType === 'iam' ? 'IAM' : 'Watch',
-                Icon: authSession?.portalType === 'iam' ? Shield : Eye,
-              },
-              { path: '/incidents', label: 'Incidents', Icon: AlertTriangle },
-              { path: '/requests', label: 'Requests', Icon: Package },
-              { path: '/knowledge', label: 'KB', Icon: BookOpen },
-            ].map(item => {
-              const active = location.pathname.startsWith(item.path);
-              const Icon = item.Icon;
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
+          (() => {
+            const rbacCtx = {
+              role,
+              portalType: authSession?.portalType,
+              isSuperAdmin,
+              isIamPortal,
+              isModuleEnabled,
+              hasPermission,
+            };
+            const mobileShortcuts = [
+              authSession?.portalType === 'iam'
+                ? { navId: 'iam', path: '/iam', label: 'IAM', Icon: Shield }
+                : { navId: 'watchtower', path: '/watchtower', label: 'Watch', Icon: Eye },
+              { navId: 'incidents', path: '/incidents', label: 'Incidents', Icon: AlertTriangle },
+              { navId: 'requests', path: '/requests', label: 'Requests', Icon: Package },
+              { navId: 'knowledge', path: '/knowledge', label: 'KB', Icon: BookOpen },
+            ].filter(item => canAccessNavId(item.navId, rbacCtx));
+
+            return (
+              <div
+                className="grid h-full"
+                style={{ gridTemplateColumns: `repeat(${mobileShortcuts.length + 1}, minmax(0, 1fr))` }}
+              >
+                {mobileShortcuts.map(item => {
+                  const active = location.pathname.startsWith(item.path);
+                  const Icon = item.Icon;
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      className={`min-h-[44px] flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors ${
+                        active ? 'text-rose-400' : 'text-neutral-400 hover:text-neutral-200'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      <span>{item.label}</span>
+                    </Link>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => setIsNavigatorOpen(prev => !prev)}
                   className={`min-h-[44px] flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors ${
-                    active ? 'text-rose-400' : 'text-neutral-400 hover:text-neutral-200'
+                    isNavigatorOpen ? 'text-sky-400' : 'text-neutral-400 hover:text-neutral-200'
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
-            <button
-              type="button"
-              onClick={() => setIsNavigatorOpen(prev => !prev)}
-              className={`min-h-[44px] flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors ${
-                isNavigatorOpen ? 'text-sky-400' : 'text-neutral-400 hover:text-neutral-200'
-              }`}
-            >
-              <LayoutGrid className="w-4 h-4" />
-              <span>Modules</span>
-            </button>
-          </div>
+                  <LayoutGrid className="w-4 h-4" />
+                  <span>Modules</span>
+                </button>
+              </div>
+            );
+          })()
         )}
       </nav>
     </div>

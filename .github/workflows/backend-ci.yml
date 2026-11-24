@@ -1,0 +1,100 @@
+name: Scribble-IT 2.0 CI (Backend Foundation & Preserved Frontend)
+
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+
+jobs:
+  backend-foundation:
+    name: FastAPI + PostgreSQL (RLS Roles) + Redis + Alembic
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: scribble_it_test
+          POSTGRES_USER: postgres_bootstrap
+          POSTGRES_PASSWORD: ci_bootstrap_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres_bootstrap -d scribble_it_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=15
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=10
+
+    env:
+      APP_ENV: test
+      POSTGRES_DB: scribble_it_test
+      POSTGRES_USER: postgres_bootstrap
+      PGPASSWORD: ci_bootstrap_password
+      POSTGRES_MIGRATOR_USER: scribble_migrator
+      POSTGRES_MIGRATOR_PASSWORD: ci_migrator_password
+      POSTGRES_APP_USER: scribble_app
+      POSTGRES_APP_PASSWORD: ci_app_password
+      DATABASE_URL: postgresql+asyncpg://scribble_app:ci_app_password@127.0.0.1:5432/scribble_it_test
+      MIGRATION_DATABASE_URL: postgresql+psycopg://scribble_migrator:ci_migrator_password@127.0.0.1:5432/scribble_it_test
+      REDIS_URL: redis://127.0.0.1:6379/0
+      RUN_LIVE_INTEGRATION_TESTS: "true"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PostgreSQL client & initialize separated DB roles
+        run: |
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+          PGHOST=127.0.0.1 PGPORT=5432 bash infrastructure/postgres/init-roles.sh
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify Alembic migrations (upgrade -> downgrade -> upgrade)
+        working-directory: backend
+        run: |
+          alembic upgrade head
+          alembic downgrade base
+          alembic upgrade head
+
+      - name: Run Pytest unit & live integration suite
+        working-directory: backend
+        run: pytest -v
+
+  frontend-preservation-check:
+    name: Preserved React Frontend Build & Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: TypeScript check
+        run: npm run lint
+
+      - name: Production Vite build
+        run: npm run build
