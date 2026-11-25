@@ -97,6 +97,12 @@ class AuditService:
         )
         db.add(entry)
         await db.flush()
+        # Security denials and failures are immediately followed by raising a domain exception
+        # (401/403/422), which causes the request session dependency to roll back uncommitted work.
+        # Commit here so immutable denial audit events and defensive state mutations (e.g., refresh
+        # token family revocation, failed-login lockouts, expired enrollment codes) always persist.
+        if outcome in {"denied", "failure", "blocked"}:
+            await db.commit()
         return entry
 
     @staticmethod

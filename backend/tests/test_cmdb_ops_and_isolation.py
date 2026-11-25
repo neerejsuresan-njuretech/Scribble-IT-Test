@@ -10,10 +10,16 @@ Covers:
 """
 from __future__ import annotations
 
+import os
+
 import pytest
 from httpx import AsyncClient
 
+LIVE_INTEGRATION = os.getenv("RUN_LIVE_INTEGRATION_TESTS", "").lower() in {"1", "true", "yes"}
 
+
+@pytest.mark.integration
+@pytest.mark.skipif(not LIVE_INTEGRATION, reason="Requires live PostgreSQL & Redis (RUN_LIVE_INTEGRATION_TESTS=true)")
 @pytest.mark.asyncio
 async def test_asset_assignment_cmdb_relations_inventory_and_software(
     client: AsyncClient,
@@ -119,6 +125,8 @@ async def test_asset_assignment_cmdb_relations_inventory_and_software(
     assert sw_resp.json()["compliance_status"] == "over_allocated"
 
 
+@pytest.mark.integration
+@pytest.mark.skipif(not LIVE_INTEGRATION, reason="Requires live PostgreSQL & Redis (RUN_LIVE_INTEGRATION_TESTS=true)")
 @pytest.mark.asyncio
 async def test_global_search_rbac_and_cross_tenant_itsm_isolation(
     client: AsyncClient,

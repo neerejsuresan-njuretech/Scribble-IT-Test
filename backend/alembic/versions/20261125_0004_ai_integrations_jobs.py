@@ -164,18 +164,18 @@ def upgrade() -> None:
     )
     op.create_index("ix_telephony_org_created", "telephony_call_logs", ["organization_id", "created_at"])
 
-    # Attach updated_at triggers on mutable tables
+    # Attach updated_at triggers on mutable tables (schema-qualified app.set_updated_at from 0001)
     for table in MUTABLE_TABLES:
         op.execute(
             f"""
             CREATE TRIGGER trg_{table}_updated_at
             BEFORE UPDATE ON {table}
             FOR EACH ROW
-            EXECUTE FUNCTION set_updated_at();
+            EXECUTE FUNCTION app.set_updated_at();
             """
         )
 
-    # Enforce PostgreSQL Row-Level Security on all 5 tenant tables
+    # Enforce PostgreSQL Row-Level Security on all 5 tenant tables using canonical fail-closed helpers
     for table in TENANT_TABLES:
         op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;")
         op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY;")
@@ -183,12 +183,12 @@ def upgrade() -> None:
             f"""
             CREATE POLICY {table}_tenant_isolation ON {table}
             USING (
-                current_setting('app.bypass_rls', true) = 'on'
-                OR organization_id = NULLIF(current_setting('app.current_organization_id', true), '')::uuid
+                app.is_rls_bypassed()
+                OR organization_id = app.current_organization_id()
             )
             WITH CHECK (
-                current_setting('app.bypass_rls', true) = 'on'
-                OR organization_id = NULLIF(current_setting('app.current_organization_id', true), '')::uuid
+                app.is_rls_bypassed()
+                OR organization_id = app.current_organization_id()
             );
             """
         )
@@ -217,6 +217,8 @@ def upgrade() -> None:
 def downgrade() -> None:
     for table in reversed(TENANT_TABLES):
         op.execute(f"DROP POLICY IF EXISTS {table}_tenant_isolation ON {table};")
+        op.execute(f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY;")
+        op.execute(f"ALTER TABLE {table} DISABLE ROW LEVEL SECURITY;")
     for table in reversed(MUTABLE_TABLES):
         op.execute(f"DROP TRIGGER IF EXISTS trg_{table}_updated_at ON {table};")
     for table in reversed(TENANT_TABLES):

@@ -22,7 +22,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base, TenantScopedMixin, TimestampMixin, UUIDPrimaryKeyMixin
 
 
-class AiInteractionLog(Base, UUIDPrimaryKeyMixin):
+class AiInteractionLog(UUIDPrimaryKeyMixin, Base):
     """
     Append-only tenant-scoped audit record of every AI invocation.
     PostgreSQL grants REVOKE UPDATE, DELETE, TRUNCATE for scribble_app.
@@ -69,7 +69,7 @@ class AiInteractionLog(Base, UUIDPrimaryKeyMixin):
     )
 
 
-class IntegrationConnection(Base, UUIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin):
+class IntegrationConnection(UUIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin, Base):
     """
     Tenant-scoped external integration configuration with encrypted credentials
     and OAuth token lifecycle tracking (Google Workspace, Twilio, Webhooks, Notifications).
@@ -89,6 +89,12 @@ class IntegrationConnection(Base, UUIDPrimaryKeyMixin, TenantScopedMixin, Timest
         Index("ix_integrations_org_provider", "organization_id", "provider"),
     )
 
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     provider: Mapped[str] = mapped_column(String(48), nullable=False)
     display_name: Mapped[str] = mapped_column(String(160), nullable=False)
     status: Mapped[str] = mapped_column(String(24), nullable=False, default="active")
@@ -108,7 +114,7 @@ class IntegrationConnection(Base, UUIDPrimaryKeyMixin, TenantScopedMixin, Timest
     last_error: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
 
-class WebhookEndpoint(Base, UUIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin):
+class WebhookEndpoint(UUIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin, Base):
     """SSRF-validated tenant outbound webhook subscription with encrypted HMAC signing secret."""
 
     __tablename__ = "webhook_endpoints"
@@ -117,6 +123,12 @@ class WebhookEndpoint(Base, UUIDPrimaryKeyMixin, TenantScopedMixin, TimestampMix
         Index("ix_webhooks_org_active", "organization_id", "is_active"),
     )
 
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     target_url: Mapped[str] = mapped_column(String(2048), nullable=False)
     encrypted_signing_secret: Mapped[str] = mapped_column(Text, nullable=False)
@@ -132,7 +144,7 @@ class WebhookEndpoint(Base, UUIDPrimaryKeyMixin, TenantScopedMixin, TimestampMix
     )
 
 
-class BackgroundJob(Base, UUIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin):
+class BackgroundJob(UUIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin, Base):
     """Durable tenant-scoped async job queue for webhooks, notifications, telephony sync, and retries."""
 
     __tablename__ = "background_jobs"
@@ -146,6 +158,12 @@ class BackgroundJob(Base, UUIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin
         Index("ix_bg_jobs_org_status", "organization_id", "status"),
     )
 
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     job_type: Mapped[str] = mapped_column(String(64), nullable=False)
     payload_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     status: Mapped[str] = mapped_column(String(24), nullable=False, default="queued")
@@ -163,7 +181,7 @@ class BackgroundJob(Base, UUIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
-class TelephonyCallLog(Base, UUIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin):
+class TelephonyCallLog(UUIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin, Base):
     """Persisted CTI/Twilio call record linked to organization incidents."""
 
     __tablename__ = "telephony_call_logs"
@@ -176,6 +194,12 @@ class TelephonyCallLog(Base, UUIDPrimaryKeyMixin, TenantScopedMixin, TimestampMi
         Index("ix_telephony_org_created", "organization_id", "created_at"),
     )
 
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     provider: Mapped[str] = mapped_column(String(32), nullable=False, default="twilio")
     provider_call_sid: Mapped[str | None] = mapped_column(String(128), nullable=True)
     direction: Mapped[str] = mapped_column(String(16), nullable=False, default="outbound")

@@ -59,7 +59,7 @@ def test_ai_output_validators_sanitize_and_constrain_enums() -> None:
             "recommendedCabGuidance": "Hold for peer review",
         }
     )
-    assert assessed["assessedRisk"] == "Medium"
+    assert assessed["assessedRisk"] == "medium"
     assert assessed["readinessScore"] == 100
 
     kb_draft = validate_draft_kb_output({}, fallback_topic="VPN Reset", fallback_category="Network")
@@ -178,19 +178,22 @@ def test_ssrf_allowlist_and_worker_backoff() -> None:
     assert compute_backoff_seconds(20) == 3600
 
 
+@pytest.mark.integration
 @pytest.mark.skipif(
     os.getenv("RUN_LIVE_INTEGRATION_TESTS") != "true",
     reason="Requires live PostgreSQL + Redis (RUN_LIVE_INTEGRATION_TESTS=true)",
 )
 @pytest.mark.asyncio
-async def test_live_ai_and_integrations_require_authentication() -> None:
+async def test_live_ai_and_integrations_require_authentication(test_settings) -> None:
     from httpx import ASGITransport, AsyncClient
-    from app.main import app
+    from app.main import create_app
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        r_ai = await client.post("/api/v1/ai/triage-incident", json={"title": "Test", "description": "Test"})
-        assert r_ai.status_code == 401
-        r_int = await client.get("/api/v1/integrations/connections")
-        assert r_int.status_code == 401
-        r_wh = await client.get("/api/v1/integrations/webhooks")
-        assert r_wh.status_code == 401
+    app = create_app(settings_override=test_settings)
+    async with app.router.lifespan_context(app):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
+            r_ai = await client.post("/api/v1/ai/triage-incident", json={"title": "Test", "description": "Test"})
+            assert r_ai.status_code == 401
+            r_int = await client.get("/api/v1/integrations/connections")
+            assert r_int.status_code == 401
+            r_wh = await client.get("/api/v1/integrations/webhooks")
+            assert r_wh.status_code == 401

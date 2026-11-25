@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.pagination import PaginatedResponse
@@ -112,13 +112,15 @@ async def link_problem_incident(
 @router.delete(
     "/{problem_id}/incidents/{incident_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
 )
 async def unlink_problem_incident(
     problem_id: uuid.UUID,
     incident_id: uuid.UUID,
     principal: AuthenticatedPrincipal = Depends(require_permissions("incidents:write")),
     db: AsyncSession = Depends(get_db_session),
-) -> None:
+) -> Response:
     await ProblemService.unlink_incident(
         db, principal=principal, problem_id=problem_id, incident_id=incident_id
     )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

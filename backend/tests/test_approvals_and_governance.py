@@ -38,7 +38,7 @@ async def test_live_designated_approvals_cab_voting_and_governance_auditing(
                 reg = await client.post(
                     "/api/v1/auth/register",
                     json={
-                        "email": f"super_apv_{suffix}@corp.test",
+                        "email": f"super_apv_{suffix}@corp.example.com",
                         "password": password,
                         "full_name": "Super Governance Admin",
                         "company_name": f"Governance Corp {suffix}",
@@ -52,7 +52,7 @@ async def test_live_designated_approvals_cab_voting_and_governance_auditing(
 
                 # Provision Requester, Approver 1, Approver 2 (CAB), and Bystander
                 async def add_user(prefix: str, role_slugs: list[str], portal: str = "employee") -> tuple[str, dict[str, str]]:
-                    email = f"{prefix}_{suffix}@corp.test"
+                    email = f"{prefix}_{suffix}@corp.example.com"
                     created = await client.post(
                         f"/api/v1/organizations/{org_id}/members",
                         headers=super_headers,

@@ -78,7 +78,7 @@ async def test_live_cross_tenant_isolation_rls_role_escalation_and_audit_immutab
                 reg = await client.post(
                     "/api/v1/auth/register",
                     json={
-                        "email": f"root_{suffix}@platform.test",
+                        "email": f"root_{suffix}@platform.example.com",
                         "password": password,
                         "full_name": "Platform Super Admin",
                         "company_name": f"Tenant Alpha {suffix}",
@@ -99,16 +99,16 @@ async def test_live_cross_tenant_isolation_rls_role_escalation_and_audit_immutab
                         "name": f"Tenant Beta {suffix}",
                         "slug": f"beta-{suffix}",
                         "company_code": f"BET{suffix[:4].upper()}",
-                        "domain": f"beta-{suffix}.test",
-                        "primary_contact_email": f"ops@beta-{suffix}.test",
+                        "domain": f"beta-{suffix}.example.com",
+                        "primary_contact_email": f"ops@beta-{suffix}.example.com",
                     },
                 )
                 assert org_b_resp.status_code == 201, org_b_resp.text
                 org_b_id = org_b_resp.json()["id"]
 
                 # Create IAM Officer in Org A and Employee in Org A
-                iam_a_email = f"iam_a_{suffix}@alpha.test"
-                emp_a_email = f"emp_a_{suffix}@alpha.test"
+                iam_a_email = f"iam_a_{suffix}@alpha.example.com"
+                emp_a_email = f"emp_a_{suffix}@alpha.example.com"
                 assert (
                     await client.post(
                         f"/api/v1/organizations/{org_a_id}/members",

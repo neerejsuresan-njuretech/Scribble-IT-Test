@@ -8,12 +8,15 @@ Covers:
 """
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta, timezone
 
 import pytest
 from httpx import AsyncClient
 
 from app.core.sla import calculate_priority, compute_sla_deadline, evaluate_sla_status
+
+LIVE_INTEGRATION = os.getenv("RUN_LIVE_INTEGRATION_TESTS", "").lower() in {"1", "true", "yes"}
 
 
 def test_sla_priority_matrix_and_deadline_calculations() -> None:
@@ -69,6 +72,8 @@ def test_sla_priority_matrix_and_deadline_calculations() -> None:
     assert breached_snap.remaining_minutes < 0
 
 
+@pytest.mark.integration
+@pytest.mark.skipif(not LIVE_INTEGRATION, reason="Requires live PostgreSQL & Redis (RUN_LIVE_INTEGRATION_TESTS=true)")
 @pytest.mark.asyncio
 async def test_incident_crud_lifecycle_activities_attachments_and_relations(
     client: AsyncClient,
@@ -155,6 +160,8 @@ async def test_incident_crud_lifecycle_activities_attachments_and_relations(
     assert close_resp.json()["status"] == "closed"
 
 
+@pytest.mark.integration
+@pytest.mark.skipif(not LIVE_INTEGRATION, reason="Requires live PostgreSQL & Redis (RUN_LIVE_INTEGRATION_TESTS=true)")
 @pytest.mark.asyncio
 async def test_service_request_designated_approvals_and_fulfillment_gate(
     client: AsyncClient,
@@ -236,6 +243,8 @@ async def test_service_request_designated_approvals_and_fulfillment_gate(
     assert fulfill_ok.json()["status"] == "completed"
 
 
+@pytest.mark.integration
+@pytest.mark.skipif(not LIVE_INTEGRATION, reason="Requires live PostgreSQL & Redis (RUN_LIVE_INTEGRATION_TESTS=true)")
 @pytest.mark.asyncio
 async def test_problem_kedb_and_change_cab_voting_gate(
     client: AsyncClient,

@@ -79,3 +79,17 @@ class TenantOwnedMixin:
         nullable=False,
         index=True,
     )
+
+
+# Canonical alias so both TenantOwnedMixin and TenantScopedMixin resolve to the single shared mixin
+TenantScopedMixin = TenantOwnedMixin
+
+__all__ = [
+    "Base",
+    "NAMING_CONVENTION",
+    "SoftDeleteMixin",
+    "TenantOwnedMixin",
+    "TenantScopedMixin",
+    "TimestampMixin",
+    "UUIDPrimaryKeyMixin",
+]

@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.pagination import PaginatedResponse
@@ -126,15 +126,20 @@ async def create_cmdb_relation(
     return CmdbRelationOut.model_validate(row)
 
 
-@router.delete("/cmdb/relations/{relation_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/cmdb/relations/{relation_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+)
 async def delete_cmdb_relation(
     relation_id: uuid.UUID,
     principal: AuthenticatedPrincipal = Depends(require_permissions("assets:write")),
     db: AsyncSession = Depends(get_db_session),
-) -> None:
+) -> Response:
     await CmdbService.delete_cmdb_relation(
         db, principal=principal, relation_id=relation_id
     )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/inventory", response_model=list[InventoryItemOut])

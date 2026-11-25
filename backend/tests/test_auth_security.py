@@ -209,9 +209,9 @@ async def test_live_auth_lifecycle_reuse_detection_suspension_and_device_trust(
     db_mgr.init(test_settings)
 
     suffix = uuid.uuid4().hex[:8]
-    admin_email = f"super_{suffix}@acme-sec.test"
-    iam_email = f"iam_{suffix}@acme-sec.test"
-    emp_email = f"emp_{suffix}@acme-sec.test"
+    admin_email = f"super_{suffix}@acme-sec.example.com"
+    iam_email = f"iam_{suffix}@acme-sec.example.com"
+    emp_email = f"emp_{suffix}@acme-sec.example.com"
     password = "Enterprise#Password2026!"
 
     try:
