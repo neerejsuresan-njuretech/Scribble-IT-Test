@@ -1,5 +1,6 @@
 import type { IncidentCategory, IncidentPriority, RiskLevel } from '../types/itsm';
 import { apiUrl, parseApiJson } from '../utils/apiClient';
+import { apiRequest, getAccessToken, isBackendApiConfigured } from './api/httpClient';
 
 export interface IncidentTriageResponse {
   recommendedPriority: IncidentPriority;
@@ -10,6 +11,7 @@ export interface IncidentTriageResponse {
   draftResolutionNote: string;
   draftCustomerReply: string;
   generatedAt: string;
+  requiresHumanApproval?: boolean;
 }
 
 export interface ChangeAssessResponse {
@@ -19,6 +21,7 @@ export interface ChangeAssessResponse {
   missingControls: string[];
   recommendedCabGuidance: string;
   generatedAt: string;
+  requiresHumanApproval?: boolean;
 }
 
 export interface DraftKbResponse {
@@ -27,6 +30,16 @@ export interface DraftKbResponse {
   tags: string[];
   content: string;
   generatedAt: string;
+  requiresHumanApproval?: boolean;
+}
+
+export interface WikiAssistResponse {
+  summary: string;
+  sources: Array<{ title: string; uri: string }>;
+  searchQueries: string[];
+  model: string;
+  generatedAt: string;
+  requiresHumanApproval?: boolean;
 }
 
 export interface CopilotTurnMessage {
@@ -38,6 +51,7 @@ export interface CopilotResponse {
   reply: string;
   model: string;
   generatedAt: string;
+  requiresHumanApproval?: boolean;
 }
 
 export interface MatchedKbSuggestion {
@@ -69,6 +83,7 @@ export interface TriageAssistantResponse {
   draftCustomerReply: string;
   model: string;
   generatedAt: string;
+  requiresHumanApproval?: boolean;
 }
 
 export interface TriageAssistantKbPayload {
@@ -79,8 +94,21 @@ export interface TriageAssistantKbPayload {
   excerpt: string;
 }
 
-async function postAiJson<TReq, TRes>(url: string, payload: TReq): Promise<TRes> {
-  const res = await fetch(apiUrl(url), {
+async function postAiJson<TReq, TRes>(
+  legacyUrl: string,
+  fastApiPath: string,
+  payload: TReq,
+): Promise<TRes> {
+  // Prefer authenticated, quota-enforced FastAPI /api/v1/ai/* whenever backend session is active
+  if (isBackendApiConfigured() && getAccessToken()) {
+    return apiRequest<TRes>(fastApiPath, {
+      method: 'POST',
+      body: payload,
+      timeoutMs: 35000,
+    });
+  }
+
+  const res = await fetch(apiUrl(legacyUrl), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -103,7 +131,11 @@ export const aiService = {
     recentActivity?: string[];
     availableQueues?: string[];
   }) {
-    return postAiJson<typeof payload, IncidentTriageResponse>('/api/ai/triage-incident', payload);
+    return postAiJson<typeof payload, IncidentTriageResponse>(
+      '/api/ai/triage-incident',
+      '/ai/triage-incident',
+      payload,
+    );
   },
 
   runTriageAssistant(payload: {
@@ -119,7 +151,11 @@ export const aiService = {
     recentActivity?: string[];
     kbArticles?: TriageAssistantKbPayload[];
   }) {
-    return postAiJson<typeof payload, TriageAssistantResponse>('/api/ai/triage-assistant', payload);
+    return postAiJson<typeof payload, TriageAssistantResponse>(
+      '/api/ai/triage-assistant',
+      '/ai/triage-assistant',
+      payload,
+    );
   },
 
   assessChange(payload: {
@@ -131,7 +167,11 @@ export const aiService = {
     rollbackPlan: string;
     testPlan: string;
   }) {
-    return postAiJson<typeof payload, ChangeAssessResponse>('/api/ai/assess-change', payload);
+    return postAiJson<typeof payload, ChangeAssessResponse>(
+      '/api/ai/assess-change',
+      '/ai/assess-change',
+      payload,
+    );
   },
 
   draftKbArticle(payload: {
@@ -141,7 +181,25 @@ export const aiService = {
     sourceIncidentDescription?: string;
     sourceResolution?: string;
   }) {
-    return postAiJson<typeof payload, DraftKbResponse>('/api/ai/draft-kb', payload);
+    return postAiJson<typeof payload, DraftKbResponse>(
+      '/api/ai/draft-kb',
+      '/ai/draft-kb',
+      payload,
+    );
+  },
+
+  assistWiki(payload: {
+    query: string;
+    mode?: 'research' | 'draft' | 'improve' | 'summarize';
+    existingTitle?: string;
+    existingContent?: string;
+    existingSection?: string;
+  }) {
+    return postAiJson<typeof payload, WikiAssistResponse>(
+      '/api/ai/wiki-assist',
+      '/ai/wiki-assist',
+      payload,
+    );
   },
 
   askCopilot(payload: {
@@ -149,7 +207,11 @@ export const aiService = {
     history?: CopilotTurnMessage[];
     tenantContext: string;
   }) {
-    return postAiJson<typeof payload, CopilotResponse>('/api/ai/copilot', payload);
+    return postAiJson<typeof payload, CopilotResponse>(
+      '/api/ai/copilot',
+      '/ai/copilot',
+      payload,
+    );
   },
 };
 

@@ -64,13 +64,32 @@ class Settings(BaseSettings):
     )
     max_request_body_bytes: int = Field(default=2 * 1024 * 1024, ge=1024, le=50 * 1024 * 1024)
 
-    # Authentication cryptography foundations (used in Phase 2)
+    # Authentication cryptography foundations
     jwt_secret_key: SecretStr = Field(
         default=SecretStr("dev-only-change-before-staging-or-production-32chars"),
     )
     jwt_algorithm: Literal["HS256", "RS256", "EdDSA"] = Field(default="HS256")
     access_token_ttl_minutes: int = Field(default=15, ge=1, le=60)
     refresh_token_ttl_days: int = Field(default=14, ge=1, le=90)
+
+    # Phase 4: AI Integration (Gemini API — strictly backend-only)
+    gemini_api_key: SecretStr = Field(default=SecretStr(""))
+    gemini_model: str = Field(default="gemini-4-hydrogen")
+    ai_rate_limit_per_minute: int = Field(default=20, ge=1, le=600)
+    ai_daily_org_limit: int = Field(default=500, ge=1, le=100000)
+
+    # Phase 4: Integration Secrets, Rate Limiting, Uploads & Telephony
+    integration_encryption_key: SecretStr = Field(
+        default=SecretStr("dev-only-integration-encryption-key-change-prod-32"),
+    )
+    api_rate_limit_per_minute: int = Field(default=240, ge=10, le=10000)
+    upload_storage_dir: str = Field(default="/var/lib/scribble-it/uploads")
+    max_upload_bytes: int = Field(default=10 * 1024 * 1024, ge=1024, le=100 * 1024 * 1024)
+    twilio_account_sid: str = Field(default="")
+    twilio_auth_token: SecretStr = Field(default=SecretStr(""))
+    twilio_from_number: str = Field(default="")
+    telephony_webhook_secret: SecretStr = Field(default=SecretStr(""))
+    webhook_replay_window_seconds: int = Field(default=300, ge=30, le=3600)
 
     @field_validator("cors_allowed_origins", mode="before")
     @classmethod
@@ -149,6 +168,13 @@ class Settings(BaseSettings):
             if len(secret) < 32 or "change-before" in secret.lower() or "dev-only" in secret.lower():
                 raise ValueError(
                     "JWT_SECRET_KEY must be a high-entropy secret of at least 32 characters in "
+                    f"{self.app_env}."
+                )
+
+            enc_secret = self.integration_encryption_key.get_secret_value()
+            if len(enc_secret) < 32 or "dev-only" in enc_secret.lower():
+                raise ValueError(
+                    "INTEGRATION_ENCRYPTION_KEY must be a high-entropy secret of at least 32 characters in "
                     f"{self.app_env}."
                 )
 

@@ -38,6 +38,20 @@ import {
   type CloudWorkspaceSnapshot,
 } from '../services/firestoreSync';
 import { User } from 'firebase/auth';
+import {
+  authApi,
+  clearAuthTokens,
+  cmdbApi,
+  getAccessToken,
+  isBackendApiConfigured,
+  itsmApi,
+  mapAssetDto,
+  mapChangeDto,
+  mapIncidentDto,
+  mapProblemDto,
+  mapServiceRequestDto,
+} from '../services/api';
+import { BackendSyncState, useBackendSyncBridge } from '../hooks/useBackendSyncBridge';
 
 export type CloudSyncStatus = 'disconnected' | 'connecting' | 'synced' | 'syncing' | 'error';
 
@@ -120,6 +134,19 @@ interface ITSMContextType {
   lastCloudSyncAt: string | null;
   cloudSyncError: string | null;
   forceCloudSync: () => Promise<void>;
+
+  // Scribble-IT 2.0 FastAPI + PostgreSQL Backend Bridge
+  backendSyncStatus: BackendSyncState;
+  lastBackendSyncAt: string | null;
+  backendSyncError: string | null;
+  isBackendApiMode: boolean;
+  syncWithBackend: () => Promise<boolean>;
+  loginWithBackendApi: (
+    portalType: AuthPortalType,
+    email: string,
+    password: string,
+    organizationId?: string
+  ) => Promise<{ ok: boolean; error?: string }>;
 
   // Tenant-Isolated Collections
   incidents: Incident[];
@@ -1046,6 +1073,11 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logoutSession = async () => {
+    if (isBackendApiConfigured() && getAccessToken()) {
+      await authApi.logout().catch(() => undefined);
+    } else {
+      clearAuthTokens();
+    }
     setAuthSession(null);
     if (googleUser) {
       await logoutGoogle();
@@ -1646,6 +1678,117 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return false;
   };
 
+  const {
+    backendStatus: backendSyncStatus,
+    backendError: backendSyncError,
+    lastBackendSyncAt,
+    isBackendMode: isBackendApiMode,
+    hydrateFromBackend,
+  } = useBackendSyncBridge();
+
+  const applyHydratedBackendSnapshot = useCallback(
+    (snapshot: Awaited<ReturnType<typeof hydrateFromBackend>>) => {
+      if (!snapshot) return false;
+      const { me } = snapshot;
+      const backendOrgId = me.organization_id || activeTenant.id;
+      setAuthSession(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          name: me.full_name || prev.name,
+          email: me.email || prev.email,
+          portalType: me.portal_type,
+          role: me.portal_type === 'end_user' ? 'customer' : me.is_super_admin ? 'admin' : 'technician',
+          effectivePermissions: me.permissions,
+          clearanceTier: me.clearance_tier,
+          backendSessionId: me.session_id,
+          backendOrganizationId: backendOrgId,
+          permissionSource: 'backend',
+        };
+      });
+      if (snapshot.incidents.length > 0) setAllIncidents(snapshot.incidents);
+      if (snapshot.requests.length > 0) setAllRequests(snapshot.requests);
+      if (snapshot.problems.length > 0) setAllProblems(snapshot.problems);
+      if (snapshot.changes.length > 0) setAllChanges(snapshot.changes);
+      if (snapshot.assets.length > 0) setAllAssets(snapshot.assets);
+      if (snapshot.cmdbRelations.length > 0) setAllCmdbRelations(snapshot.cmdbRelations);
+      if (snapshot.inventory.length > 0) setAllInventory(snapshot.inventory);
+      if (snapshot.softwareLicenses.length > 0) setAllSoftware(snapshot.softwareLicenses);
+      if (snapshot.kbArticles.length > 0) setAllKb(snapshot.kbArticles);
+      if (snapshot.auditLogs.length > 0) setAllAuditLogs(snapshot.auditLogs);
+      return true;
+    },
+    [activeTenant.id]
+  );
+
+  const syncWithBackend = useCallback(async (): Promise<boolean> => {
+    const snapshot = await hydrateFromBackend();
+    return applyHydratedBackendSnapshot(snapshot);
+  }, [hydrateFromBackend, applyHydratedBackendSnapshot]);
+
+  const loginWithBackendApi = useCallback(
+    async (
+      portalType: AuthPortalType,
+      email: string,
+      password: string,
+      organizationSlug?: string
+    ): Promise<{ ok: boolean; error?: string }> => {
+      if (!isBackendApiConfigured()) {
+        return { ok: false, error: 'FastAPI backend URL is not configured.' };
+      }
+      try {
+        const res = await authApi.login({
+          email,
+          password,
+          portal_type: portalType,
+          organization_slug: organizationSlug,
+        });
+        const me = await authApi.me();
+        const resolvedOrgId = me.organization_id || res.organization_id || activeTenant.id;
+        const mappedRole: Role =
+          me.portal_type === 'end_user' ? 'customer' : me.is_super_admin ? 'admin' : 'technician';
+        const session: AuthSession = {
+          isAuthenticated: true,
+          portalType: me.portal_type,
+          role: mappedRole,
+          name: me.full_name,
+          email: me.email,
+          department: me.portal_type === 'end_user' ? 'Self-Service' : 'IT Operations',
+          authMethod:
+            me.portal_type === 'super_admin'
+              ? 'admin_credentials'
+              : me.portal_type === 'iam'
+                ? 'iam_credentials'
+                : me.portal_type === 'end_user'
+                  ? 'portal_login'
+                  : 'employee_password',
+          deviceManaged: Boolean(me.device_managed),
+          deviceId: me.device_id || undefined,
+          authenticatedAt: new Date().toISOString(),
+          effectivePermissions: me.permissions,
+          clearanceTier: me.clearance_tier,
+          backendSessionId: me.session_id,
+          backendOrganizationId: resolvedOrgId,
+          permissionSource: 'backend',
+        };
+        setAuthSession(session);
+        setRole(mappedRole);
+        const snapshot = await hydrateFromBackend();
+        applyHydratedBackendSnapshot(snapshot);
+        showToast({
+          variant: 'success',
+          title: 'Connected to Scribble-IT 2.0 Backend',
+          description: `Authenticated as ${me.email} (${me.permissions.length} backend-verified scopes).`,
+        });
+        return { ok: true };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Backend authentication failed.';
+        return { ok: false, error: msg };
+      }
+    },
+    [activeTenant.id, hydrateFromBackend, applyHydratedBackendSnapshot]
+  );
+
   const switchTenant = (tenantId: string) => {
     if (authSession?.isAuthenticated && !isSuperAdmin && !isIamPortal) {
       showToast({
@@ -1657,6 +1800,17 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     setActiveTenantId(tenantId);
     setActiveCall(null);
+    if (isBackendApiConfigured() && getAccessToken()) {
+      authApi
+        .switchOrganization(tenantId)
+        .then(() => hydrateFromBackend())
+        .then(snapshot => {
+          applyHydratedBackendSnapshot(snapshot);
+        })
+        .catch(() => {
+          // Non-UUID local tenant IDs remain isolated in standalone mode
+        });
+    }
   };
 
   const createTenant = (data: Partial<Tenant>): Tenant => {
@@ -1910,6 +2064,13 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const hasPermission = (scope: IamPermissionScope): boolean => {
     if (!authSession?.isAuthenticated) return false;
+    // Backend-calculated effective permissions from `/api/v1/auth/me` are authoritative
+    if (
+      authSession.permissionSource === 'backend' &&
+      Array.isArray(authSession.effectivePermissions)
+    ) {
+      return authSession.effectivePermissions.includes(scope);
+    }
     // Device enrollment verification code generation is strictly IAM Portal exclusive
     if (scope === 'devices:enroll_code') {
       return isIamPortal;
@@ -1922,7 +2083,7 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const assignedIds = authSession.policyIds || [];
     if (assignedIds.length === 0) {
       if (isIamPortal) {
-        return ['iam:manage', 'incidents:read', 'assets:read'].includes(scope);
+        return ['iam:manage', 'incidents:read', 'assets:read', 'audit:read'].includes(scope);
       }
       if (authSession.role === 'technician') {
         return ['incidents:read', 'incidents:write', 'assets:read', 'assets:write'].includes(scope);
@@ -2011,6 +2172,27 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
       activityLog: initialLog
     };
     setAllIncidents(prev => [newInc, ...prev]);
+    if (isBackendApiConfigured() && getAccessToken()) {
+      itsmApi
+        .createIncident({
+          title: newInc.title,
+          description: newInc.description,
+          category: newInc.category,
+          impact: newInc.impact,
+          urgency: newInc.urgency,
+          priority: newInc.priority,
+          source_channel: newInc.sourceChannel,
+          assignment_group: newInc.assignmentGroup,
+          affected_ci_label: newInc.affectedCI,
+        })
+        .then(dto => {
+          const mapped = mapIncidentDto(dto);
+          setAllIncidents(prev => prev.map(item => (item.id === newInc.id ? mapped : item)));
+        })
+        .catch(() => {
+          // Local optimistic record stays visible if backend call fails transiently
+        });
+    }
     recordAudit('Incidents', 'CREATE', id, `${newInc.priority} ${newInc.title} -> ${resolvedGroup}`);
     showToast({ variant: 'success', title: `Incident Created: ${id}`, description: `${newInc.priority} · ${resolvedGroup} · ${newInc.title}` });
     return newInc;
@@ -2038,6 +2220,15 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         activityLog: updatedLog
       };
     }));
+    if (isBackendApiConfigured() && getAccessToken()) {
+      const apiCall =
+        status === 'resolved'
+          ? itsmApi.resolveIncident(id, resolutionNotes || note || 'Resolved via console')
+          : status === 'closed'
+            ? itsmApi.closeIncident(id, note)
+            : itsmApi.updateIncident(id, { status, note });
+      apiCall.catch(() => undefined);
+    }
     recordAudit('Incidents', 'STATUS_CHANGE', id, `Moved to ${status}`);
     showToast({ variant: 'success', title: `Incident Updated: ${id}`, description: `State changed to ${status.replace('_', ' ')}` });
   };
@@ -2057,6 +2248,9 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ]
       };
     }));
+    if (isBackendApiConfigured() && getAccessToken()) {
+      itsmApi.assignIncident(id, { assignee_name: assignee }).catch(() => undefined);
+    }
     recordAudit('Incidents', 'ASSIGN', id, `Assigned to ${assignee}`);
     showToast({ variant: 'success', title: `Incident Assigned: ${id}`, description: `Owner: ${assignee}` });
   };
@@ -2137,6 +2331,22 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createdAt: now
     };
     setAllRequests(prev => [newReq, ...prev]);
+    if (isBackendApiConfigured() && getAccessToken()) {
+      itsmApi
+        .createRequest({
+          catalog_item_name: newReq.catalogItemName,
+          description: newReq.description,
+          department: newReq.department,
+          cost: newReq.cost,
+          delivery_estimate_days: newReq.deliveryEstimateDays,
+          custom_form_values: newReq.customFormValues,
+        })
+        .then(dto => {
+          const mapped = mapServiceRequestDto(dto);
+          setAllRequests(prev => prev.map(item => (item.id === newReq.id ? mapped : item)));
+        })
+        .catch(() => undefined);
+    }
     recordAudit('Service Requests', 'CREATE', id, newReq.catalogItemName);
     showToast({ variant: 'success', title: `Request Submitted: ${id}`, description: newReq.catalogItemName });
     return newReq;
@@ -2307,6 +2517,21 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updatedAt: now
     };
     setAllProblems(prev => [newProb, ...prev]);
+    if (isBackendApiConfigured() && getAccessToken()) {
+      itsmApi
+        .createProblem({
+          title: newProb.title,
+          description: newProb.description,
+          severity: newProb.severity,
+          root_cause_analysis: newProb.rootCauseAnalysis,
+          workaround: newProb.workaround,
+        })
+        .then(dto => {
+          const mapped = mapProblemDto(dto);
+          setAllProblems(prev => prev.map(item => (item.id === newProb.id ? mapped : item)));
+        })
+        .catch(() => undefined);
+    }
     recordAudit('Problems', 'CREATE', id, newProb.title);
     showToast({ variant: 'success', title: `Problem Created: ${id}`, description: newProb.title });
     return newProb;
@@ -2355,6 +2580,25 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
       activityLog: []
     };
     setAllChanges(prev => [newChg, ...prev]);
+    if (isBackendApiConfigured() && getAccessToken()) {
+      itsmApi
+        .createChange({
+          title: newChg.title,
+          change_type: newChg.type,
+          risk_score: newChg.riskScore,
+          reason: newChg.reason,
+          implementation_plan: newChg.implementationPlan,
+          rollback_plan: newChg.rollbackPlan,
+          test_plan: newChg.testPlan,
+          scheduled_start: newChg.scheduledStart,
+          scheduled_end: newChg.scheduledEnd,
+        })
+        .then(dto => {
+          const mapped = mapChangeDto(dto);
+          setAllChanges(prev => prev.map(item => (item.id === newChg.id ? mapped : item)));
+        })
+        .catch(() => undefined);
+    }
     recordAudit('Change (CAB)', 'CREATE', id, newChg.title);
     showToast({ variant: 'success', title: `Change Request Created: ${id}`, description: newChg.title });
     return newChg;
@@ -2574,6 +2818,27 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
       qrCodeData: `https://scribble.njuretech.io/asset/${id}`
     };
     setAllAssets(prev => [newAsset, ...prev]);
+    if (isBackendApiConfigured() && getAccessToken()) {
+      cmdbApi
+        .createAsset({
+          asset_tag: newAsset.assetTag,
+          name: newAsset.name,
+          asset_type: newAsset.type,
+          serial_number: newAsset.serialNumber,
+          model: newAsset.model,
+          manufacturer: newAsset.manufacturer,
+          status: newAsset.status,
+          assigned_to_name: newAsset.assignedTo,
+          location: newAsset.location,
+          purchase_cost: newAsset.purchaseCost,
+          current_book_value: newAsset.currentBookValue,
+        })
+        .then(dto => {
+          const mapped = mapAssetDto(dto);
+          setAllAssets(prev => prev.map(item => (item.id === newAsset.id ? mapped : item)));
+        })
+        .catch(() => undefined);
+    }
     recordAudit('CMDB Assets', 'CREATE', id, newAsset.name);
     showToast({ variant: 'success', title: `Asset Registered: ${id}`, description: `${newAsset.assetTag} · ${newAsset.name}` });
     return newAsset;
@@ -2581,6 +2846,14 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateAssetStatus = (id: string, status: Asset['status'], assignedTo?: string) => {
     setAllAssets(prev => prev.map(a => (a.id === id ? { ...a, status, assignedTo: assignedTo !== undefined ? assignedTo : a.assignedTo } : a)));
+    if (isBackendApiConfigured() && getAccessToken()) {
+      cmdbApi
+        .assignAsset(id, {
+          status,
+          ...(assignedTo !== undefined ? { assigned_to_name: assignedTo } : {}),
+        })
+        .catch(() => undefined);
+    }
     showToast({ variant: 'success', title: `Asset Updated: ${id}`, description: `Status: ${status.replace('_', ' ')}` });
   };
 
@@ -3627,6 +3900,7 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         iamPolicies, createIamIdentity, updateIamIdentity, deleteIamIdentity, createIamPolicy, deleteIamPolicy, hasPermission,
         googleUser, googleToken, loginWithGoogle, loginWithGooglePortal, logoutGoogle, isFirebaseConnected,
         cloudSyncStatus, lastCloudSyncAt, cloudSyncError, forceCloudSync,
+        backendSyncStatus, lastBackendSyncAt, backendSyncError, isBackendApiMode, syncWithBackend, loginWithBackendApi,
         incidents, requests, problems, changes, assets, inventory, calls, invoices, activeCall,
         softwareLicenses, tasks, projects, kbArticles, contracts, domains, statusComponents,
         morningChecks, calendarEvents, warRooms, lmsCourses, wikiPages, processMaps,

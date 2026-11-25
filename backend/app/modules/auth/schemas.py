@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -11,14 +10,14 @@ class RegisterRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     email: EmailStr
-    password: str = Field(min_length=8, max_length=128)
+    password: str = Field(min_length=12, max_length=128)
     full_name: str = Field(min_length=2, max_length=160)
     phone: str | None = Field(default=None, max_length=32)
     job_title: str | None = Field(default=None, max_length=128)
     organization_id: uuid.UUID | None = None
     company_name: str | None = Field(default=None, max_length=160)
-    company_slug: str | None = Field(default=None, max_length=96)
-    company_code: str | None = Field(default=None, max_length=48)
+    company_slug: str | None = Field(default=None, max_length=96, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+    company_code: str | None = Field(default=None, max_length=48, pattern=r"^[A-Z0-9_-]+$")
 
 
 class LoginRequest(BaseModel):
@@ -35,7 +34,7 @@ class LoginRequest(BaseModel):
 class RefreshTokenRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    refresh_token: str = Field(min_length=16)
+    refresh_token: str = Field(min_length=16, max_length=256)
 
 
 class TokenResponse(BaseModel):
@@ -53,7 +52,9 @@ class TokenResponse(BaseModel):
     is_platform_super_admin: bool
     permissions: list[str]
     mfa_required: bool
-    requires_mfa_verification: bool = False
+    mfa_enrolled: bool = False
+    device_managed: bool = False
+    email_verified: bool = False
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -62,11 +63,22 @@ class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
 
+class ForgotPasswordResponse(BaseModel):
+    message: str
+    reset_token: str | None = None
+
+
 class ResetPasswordRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    token: str = Field(min_length=16)
-    new_password: str = Field(min_length=8, max_length=128)
+    token: str = Field(min_length=16, max_length=256)
+    new_password: str = Field(min_length=12, max_length=128)
+
+
+class VerifyEmailRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    token: str = Field(min_length=16, max_length=256)
 
 
 class MfaEnrollResponse(BaseModel):
@@ -88,6 +100,16 @@ class DeviceEnrollRequest(BaseModel):
     hostname: str = Field(min_length=2, max_length=128)
     os_platform: str = Field(default="Enterprise OS", max_length=64)
     device_fingerprint: str = Field(min_length=16, max_length=128)
+
+
+class DeviceEnrollResponse(BaseModel):
+    device_id: uuid.UUID
+    hostname: str
+    mdm_provider: str
+    certificate_thumbprint: str
+    trust_level: str
+    mdm_verified: bool
+    status: str
 
 
 class DeviceSsoLoginRequest(BaseModel):
@@ -113,3 +135,10 @@ class UserSessionOut(BaseModel):
     expires_at: datetime
     last_used_at: datetime | None
     revoked_at: datetime | None
+    revocation_reason: str | None
+    is_current: bool = False
+
+
+class SessionListResponse(BaseModel):
+    items: list[UserSessionOut]
+    total: int

@@ -5,8 +5,9 @@ export type NavSectionId =
   | 'itsm'
   | 'cmdb'
   | 'automation'
+  | 'finance'
+  | 'audit_comms'
   | 'knowledge'
-  | 'finance_comms'
   | 'workspace'
   | 'governance';
 
@@ -83,6 +84,18 @@ export interface NavSectionMeta {
   defaultExpanded: boolean;
 }
 
+/**
+ * 9 Preserved Enterprise Navigation Groups:
+ * 1. Command & Operations
+ * 2. ITSM & Delivery
+ * 3. CMDB & Assets
+ * 4. Automation & Workflows
+ * 5. Finance
+ * 6. Audit & Communications
+ * 7. Knowledge & Learning
+ * 8. Google Workspace
+ * 9. Governance & Platform
+ */
 export const NAV_SECTION_METADATA: Record<NavSectionId, NavSectionMeta> = {
   command: {
     id: 'command',
@@ -108,17 +121,23 @@ export const NAV_SECTION_METADATA: Record<NavSectionId, NavSectionMeta> = {
     subtitle: 'Rules, maps & custom forms',
     defaultExpanded: true,
   },
+  finance: {
+    id: 'finance',
+    title: 'Finance',
+    subtitle: 'Invoices & billing controls',
+    defaultExpanded: true,
+  },
+  audit_comms: {
+    id: 'audit_comms',
+    title: 'Audit & Communications',
+    subtitle: 'Reporting, audit & telephony',
+    defaultExpanded: true,
+  },
   knowledge: {
     id: 'knowledge',
     title: 'Knowledge & Learning',
     subtitle: 'SOPs, wiki & LMS',
     defaultExpanded: false,
-  },
-  finance_comms: {
-    id: 'finance_comms',
-    title: 'Finance, Audit & Comms',
-    subtitle: 'Billing, audit & telephony',
-    defaultExpanded: true,
   },
   workspace: {
     id: 'workspace',
@@ -441,7 +460,53 @@ export const NAV_MODULES: NavModuleItem[] = [
     },
   },
 
-  // 5. Knowledge & Learning
+  // 5. Finance
+  {
+    id: 'billing',
+    sectionId: 'finance',
+    moduleId: 'billing',
+    path: '/billing',
+    label: 'Invoices & Billing',
+    code: 'fin_invoice.list',
+    icon: 'dollar_sign',
+    newPath: '/billing/new',
+    newPathScope: 'billing:read',
+    access: {
+      requiredScope: 'billing:read',
+      clearanceLabel: 'Financial Operations (billing:read)',
+    },
+  },
+
+  // 6. Audit & Communications
+  {
+    id: 'reports',
+    sectionId: 'audit_comms',
+    moduleId: 'reports',
+    path: '/reports',
+    label: 'Reporting & Audit',
+    code: 'sys_report.do',
+    icon: 'bar_chart',
+    access: {
+      allowIamPortal: true,
+      anyOfScopes: ['audit:read', 'iam:manage', 'billing:read', 'incidents:write'],
+      clearanceLabel: 'Audit, IAM, FinOps, or Operations clearance',
+    },
+  },
+  {
+    id: 'telephony',
+    sectionId: 'audit_comms',
+    moduleId: 'telephony',
+    path: '/telephony',
+    label: 'Telephony Softphone',
+    code: 'cti_console',
+    icon: 'phone',
+    access: {
+      requiredScope: 'incidents:write',
+      clearanceLabel: 'Service Desk Operations (incidents:write)',
+    },
+  },
+
+  // 7. Knowledge & Learning
   {
     id: 'knowledge',
     sectionId: 'knowledge',
@@ -482,51 +547,7 @@ export const NAV_MODULES: NavModuleItem[] = [
     },
   },
 
-  // 6. Finance, Audit & Communications
-  {
-    id: 'billing',
-    sectionId: 'finance_comms',
-    moduleId: 'billing',
-    path: '/billing',
-    label: 'Invoices & Billing',
-    code: 'fin_invoice.list',
-    icon: 'dollar_sign',
-    newPath: '/billing/new',
-    newPathScope: 'billing:read',
-    access: {
-      requiredScope: 'billing:read',
-      clearanceLabel: 'Financial Operations (billing:read)',
-    },
-  },
-  {
-    id: 'reports',
-    sectionId: 'finance_comms',
-    moduleId: 'reports',
-    path: '/reports',
-    label: 'Reporting & Audit',
-    code: 'sys_report.do',
-    icon: 'bar_chart',
-    access: {
-      allowIamPortal: true,
-      anyOfScopes: ['iam:manage', 'billing:read', 'incidents:write'],
-      clearanceLabel: 'Audit, IAM, FinOps, or Operations clearance',
-    },
-  },
-  {
-    id: 'telephony',
-    sectionId: 'finance_comms',
-    moduleId: 'telephony',
-    path: '/telephony',
-    label: 'Telephony Softphone',
-    code: 'cti_console',
-    icon: 'phone',
-    access: {
-      requiredScope: 'incidents:write',
-      clearanceLabel: 'Service Desk Operations (incidents:write)',
-    },
-  },
-
-  // 7. Google Workspace
+  // 8. Google Workspace
   {
     id: 'google_forms',
     sectionId: 'workspace',
@@ -580,7 +601,7 @@ export const NAV_MODULES: NavModuleItem[] = [
     },
   },
 
-  // 8. Governance & Platform
+  // 9. Governance & Platform
   {
     id: 'iam',
     sectionId: 'governance',
@@ -638,6 +659,14 @@ export const NAV_MODULES_BY_ID: Record<string, NavModuleItem> = Object.fromEntri
   NAV_MODULES.map(item => [item.id, item])
 );
 
+export const NAV_MODULES_BY_PATH: Record<string, NavModuleItem> = Object.fromEntries(
+  NAV_MODULES.map(item => [item.path, item])
+);
+
+export const NAV_MODULES_BY_NEW_PATH: Record<string, NavModuleItem> = Object.fromEntries(
+  NAV_MODULES.filter(item => Boolean(item.newPath)).map(item => [item.newPath as string, item])
+);
+
 export interface NavRbacContext {
   role: Role;
   portalType?: AuthPortalType;
@@ -688,7 +717,7 @@ export function hasModuleRolePermission(
 
 /**
  * Full visibility check: module must be enabled for the active tenant AND
- * permitted for the active user's role / IAM policies.
+ * permitted for the active user's role / backend effective permissions.
  */
 export function canAccessNavModule(item: NavModuleItem, ctx: NavRbacContext): boolean {
   if (item.moduleId && !ctx.isModuleEnabled(item.moduleId)) {
@@ -705,25 +734,78 @@ export function canAccessNavId(navId: string, ctx: NavRbacContext): boolean {
 
 export function canUseQuickCreate(
   item: NavModuleItem,
-  ctx: Pick<NavRbacContext, 'isSuperAdmin' | 'hasPermission'>
+  ctx: Pick<NavRbacContext, 'isSuperAdmin' | 'hasPermission'> & Partial<Pick<NavRbacContext, 'isModuleEnabled'>>
 ): boolean {
   if (!item.newPath) return false;
+  if (item.moduleId && ctx.isModuleEnabled && !ctx.isModuleEnabled(item.moduleId)) {
+    return false;
+  }
   if (!item.newPathScope) return true;
   return ctx.isSuperAdmin || ctx.hasPermission(item.newPathScope);
 }
 
 /**
- * Portal-aware section ordering so each corporate persona gets their primary
- * workspace domain at the top of the navigator.
+ * Shared direct-route & quick-create authorization check consuming the same registry.
+ */
+export function canAccessRoutePath(pathname: string, ctx: NavRbacContext): boolean {
+  const quickCreateOwner = NAV_MODULES_BY_NEW_PATH[pathname];
+  if (quickCreateOwner) {
+    return canAccessNavModule(quickCreateOwner, ctx) && canUseQuickCreate(quickCreateOwner, ctx);
+  }
+  const directModule = NAV_MODULES_BY_PATH[pathname];
+  if (directModule) {
+    return canAccessNavModule(directModule, ctx);
+  }
+  return false;
+}
+
+/**
+ * Shared global search domain authorization rules aligned with backend /api/v1/search.
+ */
+export interface GlobalSearchPermissions {
+  canSearchIncidents: boolean;
+  canSearchRequests: boolean;
+  canSearchAssets: boolean;
+  canSearchProblems: boolean;
+  canSearchChanges: boolean;
+  ownRecordsOnly: boolean;
+}
+
+export function getGlobalSearchPermissions(ctx: NavRbacContext): GlobalSearchPermissions {
+  const ownRecordsOnly = ctx.role === 'customer' || ctx.portalType === 'end_user';
+  return {
+    canSearchIncidents:
+      ctx.isModuleEnabled('incidents') && (ctx.isSuperAdmin || ctx.hasPermission('incidents:read')),
+    canSearchRequests: ownRecordsOnly
+      ? true
+      : ctx.isModuleEnabled('requests') &&
+        (ctx.isSuperAdmin || ctx.hasPermission('incidents:read') || ctx.hasPermission('requests:approve')),
+    canSearchAssets:
+      ctx.isModuleEnabled('assets') && (ctx.isSuperAdmin || ctx.hasPermission('assets:read')),
+    canSearchProblems:
+      !ownRecordsOnly &&
+      ctx.isModuleEnabled('problems') &&
+      (ctx.isSuperAdmin || ctx.hasPermission('incidents:read')),
+    canSearchChanges:
+      !ownRecordsOnly &&
+      ctx.isModuleEnabled('changes') &&
+      (ctx.isSuperAdmin || ctx.hasPermission('incidents:read') || ctx.hasPermission('changes:cab_vote')),
+    ownRecordsOnly,
+  };
+}
+
+/**
+ * Portal-aware section ordering across all 9 preserved enterprise groups.
  */
 export function getOrderedSectionIds(portalType?: AuthPortalType): NavSectionId[] {
   if (portalType === 'iam') {
     return [
       'governance',
-      'finance_comms',
+      'audit_comms',
       'command',
       'itsm',
       'cmdb',
+      'finance',
       'knowledge',
       'automation',
       'workspace',
@@ -735,7 +817,8 @@ export function getOrderedSectionIds(portalType?: AuthPortalType): NavSectionId[
     'itsm',
     'cmdb',
     'automation',
-    'finance_comms',
+    'finance',
+    'audit_comms',
     'knowledge',
     'workspace',
     'governance',

@@ -4,13 +4,17 @@ import { ITSMProvider, useITSM } from './context/ITSMContext';
 import { ServiceNowHeader } from './components/common/ServiceNowHeader';
 import { ServiceNowNavigator } from './components/common/ServiceNowNavigator';
 import { ToastViewport } from './components/common/ToastViewport';
+import { VoluntarySupportBanner } from './components/common/VoluntarySupportBanner';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { FreeITSMModuleId, IamPermissionScope } from './types/itsm';
 import {
   NAV_MODULES_BY_ID,
+  NAV_MODULES_BY_NEW_PATH,
   canAccessNavId,
+  canAccessRoutePath,
   hasModuleRolePermission,
 } from './config/navigationAccess';
+import { usePermissions } from './hooks/usePermissions';
 import {
   Eye,
   AlertTriangle,
@@ -133,23 +137,59 @@ const SuperAdminOnlyGate: React.FC<{ label: string; children: React.ReactNode }>
   return <>{children}</>;
 };
 
-const PermissionGate: React.FC<{ scope: IamPermissionScope; label: string; children: React.ReactNode }> = ({
-  scope, label, children
+const QuickCreateGate: React.FC<{ routePath: string; fallbackScope: IamPermissionScope; label: string; children: React.ReactNode }> = ({
+  routePath, fallbackScope, label, children
 }) => {
-  const { isSuperAdmin, hasPermission } = useITSM();
-  if (!isSuperAdmin && !hasPermission(scope)) {
+  const { role, authSession, isSuperAdmin, isIamPortal, isModuleEnabled, hasPermission, activeTenant } = useITSM();
+  const { rbacContext } = usePermissions({
+    role,
+    authSession,
+    isSuperAdmin,
+    isIamPortal,
+    isModuleEnabled,
+    hasPermission,
+  });
+
+  const navItem = NAV_MODULES_BY_NEW_PATH[routePath];
+  if (navItem?.moduleId && !isModuleEnabled(navItem.moduleId)) {
+    return (
+      <div className="border border-neutral-800 bg-neutral-950 p-8 font-sans text-xs space-y-4 max-w-xl mx-auto mt-10 rounded-lg">
+        <div className="text-[11px] text-neutral-500 font-semibold">Module Availability · {activeTenant.name}</div>
+        <h2 className="text-base font-bold text-neutral-100">{navItem.label} Is Disabled</h2>
+        <p className="text-neutral-400 leading-relaxed">
+          This module is currently disabled by corporate administration for {activeTenant.name}.
+        </p>
+        {isSuperAdmin && (
+          <Link
+            to="/system/modules"
+            className="inline-block px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-semibold rounded-md"
+          >
+            Enable in Module Controls
+          </Link>
+        )}
+      </div>
+    );
+  }
+
+  const allowed = navItem
+    ? canAccessRoutePath(routePath, rbacContext)
+    : isSuperAdmin || rbacContext.hasPermission(fallbackScope);
+
+  if (!allowed) {
+    const requiredScope = navItem?.newPathScope || fallbackScope;
+    const defaultReturnPath = authSession?.portalType === 'iam' ? '/iam' : '/watchtower';
     return (
       <div className="border border-neutral-800 bg-neutral-950 p-8 font-mono text-xs space-y-4 max-w-xl mx-auto mt-10">
         <div className="text-[10px] text-amber-400 uppercase font-bold tracking-wider">
-          RBAC POLICY SCOPE REQUIRED · {scope}
+          RBAC POLICY SCOPE REQUIRED · {requiredScope}
         </div>
         <h2 className="text-base font-bold text-neutral-100">{label} Access Restricted</h2>
         <p className="text-neutral-400 leading-relaxed">
-          Your current corporate role does not hold the <span className="text-neutral-200 font-bold">{scope}</span> permission scope required to access {label}. Contact the IAM Team to request an updated policy binding.
+          Your current corporate role does not hold the <span className="text-neutral-200 font-bold">{requiredScope}</span> permission scope required to access {label}. Contact the IAM Team to request an updated policy binding.
         </p>
         <div className="flex flex-wrap gap-3">
           <Link
-            to="/watchtower"
+            to={defaultReturnPath}
             className="inline-block px-4 py-2 border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 font-bold"
           >
             Return to Operations
@@ -200,6 +240,14 @@ const IamAccessGate: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
 const NavAccessGate: React.FC<{ navId: string; children: React.ReactNode }> = ({ navId, children }) => {
   const { role, authSession, isSuperAdmin, isIamPortal, isModuleEnabled, hasPermission, activeTenant } = useITSM();
+  const { rbacContext } = usePermissions({
+    role,
+    authSession,
+    isSuperAdmin,
+    isIamPortal,
+    isModuleEnabled,
+    hasPermission,
+  });
   const item = NAV_MODULES_BY_ID[navId];
   if (!item) return <>{children}</>;
 
@@ -223,12 +271,7 @@ const NavAccessGate: React.FC<{ navId: string; children: React.ReactNode }> = ({
     );
   }
 
-  const allowed = hasModuleRolePermission(item, {
-    role,
-    isSuperAdmin,
-    isIamPortal,
-    hasPermission,
-  });
+  const allowed = hasModuleRolePermission(item, rbacContext);
 
   if (!allowed) {
     const isSuperOnly = Boolean(item.access.superAdminOnly);
@@ -267,6 +310,14 @@ const NavAccessGate: React.FC<{ navId: string; children: React.ReactNode }> = ({
 
 function MainApp() {
   const { authSession, role, activeTenant, isModuleEnabled, isSuperAdmin, isIamPortal, hasPermission, getPortalBranding } = useITSM();
+  const { rbacContext } = usePermissions({
+    role,
+    authSession,
+    isSuperAdmin,
+    isIamPortal,
+    isModuleEnabled,
+    hasPermission,
+  });
   const location = useLocation();
   const [isNavigatorOpen, setIsNavigatorOpen] = useState<boolean>(() =>
     typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
@@ -447,14 +498,14 @@ function MainApp() {
                 <Route path="/database" element={<SuperAdminOnlyGate label="Database & Sync"><DatabaseModule /></SuperAdminOnlyGate>} />
                 <Route path="/portal" element={<CustomerPortal />} />
 
-                {/* Dedicated Form Pages */}
-                <Route path="/incidents/new" element={<PermissionGate scope="incidents:write" label="New Incident"><NewIncidentPage /></PermissionGate>} />
-                <Route path="/changes/new" element={<PermissionGate scope="incidents:write" label="New Change Request"><NewChangePage /></PermissionGate>} />
-                <Route path="/requests/new" element={<PermissionGate scope="incidents:write" label="New Service Request"><NewRequestPage /></PermissionGate>} />
-                <Route path="/problems/new" element={<PermissionGate scope="incidents:write" label="New Problem Record"><NewProblemPage /></PermissionGate>} />
-                <Route path="/assets/new" element={<PermissionGate scope="assets:write" label="New Asset"><NewAssetPage /></PermissionGate>} />
-                <Route path="/inventory/new" element={<PermissionGate scope="assets:write" label="New Inventory Item"><NewInventoryPage /></PermissionGate>} />
-                <Route path="/billing/new" element={<PermissionGate scope="billing:read" label="New Invoice"><NewInvoicePage /></PermissionGate>} />
+                {/* Dedicated Form Pages (Permission + Module Gated via Shared Registry) */}
+                <Route path="/incidents/new" element={<QuickCreateGate routePath="/incidents/new" fallbackScope="incidents:write" label="New Incident"><NewIncidentPage /></QuickCreateGate>} />
+                <Route path="/changes/new" element={<QuickCreateGate routePath="/changes/new" fallbackScope="incidents:write" label="New Change Request"><NewChangePage /></QuickCreateGate>} />
+                <Route path="/requests/new" element={<QuickCreateGate routePath="/requests/new" fallbackScope="incidents:write" label="New Service Request"><NewRequestPage /></QuickCreateGate>} />
+                <Route path="/problems/new" element={<QuickCreateGate routePath="/problems/new" fallbackScope="incidents:write" label="New Problem Record"><NewProblemPage /></QuickCreateGate>} />
+                <Route path="/assets/new" element={<QuickCreateGate routePath="/assets/new" fallbackScope="assets:write" label="New Asset"><NewAssetPage /></QuickCreateGate>} />
+                <Route path="/inventory/new" element={<QuickCreateGate routePath="/inventory/new" fallbackScope="assets:write" label="New Inventory Item"><NewInventoryPage /></QuickCreateGate>} />
+                <Route path="/billing/new" element={<QuickCreateGate routePath="/billing/new" fallbackScope="billing:read" label="New Invoice"><NewInvoicePage /></QuickCreateGate>} />
                 <Route path="/portal/new" element={<NewPortalTicketPage />} />
 
                 {/* Google Workspace Integrations */}
@@ -523,14 +574,6 @@ function MainApp() {
           </div>
         ) : (
           (() => {
-            const rbacCtx = {
-              role,
-              portalType: authSession?.portalType,
-              isSuperAdmin,
-              isIamPortal,
-              isModuleEnabled,
-              hasPermission,
-            };
             const mobileShortcuts = [
               authSession?.portalType === 'iam'
                 ? { navId: 'iam', path: '/iam', label: 'IAM', Icon: Shield }
@@ -538,7 +581,7 @@ function MainApp() {
               { navId: 'incidents', path: '/incidents', label: 'Incidents', Icon: AlertTriangle },
               { navId: 'requests', path: '/requests', label: 'Requests', Icon: Package },
               { navId: 'knowledge', path: '/knowledge', label: 'KB', Icon: BookOpen },
-            ].filter(item => canAccessNavId(item.navId, rbacCtx));
+            ].filter(item => canAccessNavId(item.navId, rbacContext));
 
             return (
               <div
@@ -588,6 +631,7 @@ export default function App() {
           <MainApp />
         </HashRouter>
         <ToastViewport />
+        <VoluntarySupportBanner />
       </ITSMProvider>
     </ErrorBoundary>
   );

@@ -1,7 +1,21 @@
 """ORM models package — imported by Alembic env.py for full schema discovery."""
 
+from app.db.models.approvals import (
+    ApprovalAssignmentHistory,
+    ApprovalWorkflowItem,
+    CabSeatAssignmentHistory,
+    CabVotingSeat,
+)
 from app.db.models.audit import AuditLog
-from app.db.models.device_trust import DeviceEnrollmentCode, ManagedDevice
+from app.db.models.cmdb import (
+    Asset,
+    CmdbRelation,
+    DomainRecord,
+    InventoryItem,
+    SoftwareLicense,
+    VendorContract,
+)
+from app.db.models.device_trust import DeviceEnrollmentCode, DeviceTrustEvent, ManagedDevice
 from app.db.models.identity import (
     MembershipRole,
     MfaMethod,
@@ -13,23 +27,90 @@ from app.db.models.identity import (
     User,
     UserSession,
 )
+from app.db.models.integrations import (
+    AiInteractionLog,
+    BackgroundJob,
+    IntegrationConnection,
+    TelephonyCallLog,
+    WebhookEndpoint,
+)
+from app.db.models.itsm import (
+    ChangeActivity,
+    ChangeRequest,
+    Incident,
+    IncidentActivity,
+    IncidentAttachment,
+    IncidentRelation,
+    Problem,
+    ProblemIncidentLink,
+    ServiceCatalogItem,
+    ServiceRequest,
+    ServiceRequestActivity,
+)
+from app.db.models.operations import (
+    Invoice,
+    KnowledgeArticle,
+    Notification,
+    ProjectItem,
+    ServiceStatusComponent,
+    SlaPolicy,
+    TaskItem,
+    TicketWorkflowRule,
+    WorkflowDefinition,
+)
 from app.db.models.organizations import Department, Organization
 from app.db.models.platform import PlatformSetting
 
 __all__ = [
+    "AiInteractionLog",
+    "ApprovalAssignmentHistory",
+    "ApprovalWorkflowItem",
+    "Asset",
     "AuditLog",
+    "BackgroundJob",
+    "CabSeatAssignmentHistory",
+    "CabVotingSeat",
+    "ChangeActivity",
+    "ChangeRequest",
+    "CmdbRelation",
     "Department",
     "DeviceEnrollmentCode",
+    "DeviceTrustEvent",
+    "DomainRecord",
+    "Incident",
+    "IncidentActivity",
+    "IncidentAttachment",
+    "IncidentRelation",
+    "IntegrationConnection",
+    "InventoryItem",
+    "Invoice",
+    "KnowledgeArticle",
     "ManagedDevice",
     "MembershipRole",
     "MfaMethod",
+    "Notification",
     "Organization",
     "OrganizationMembership",
     "PasswordResetToken",
     "Permission",
     "PlatformSetting",
+    "Problem",
+    "ProblemIncidentLink",
+    "ProjectItem",
     "Role",
     "RolePermission",
+    "ServiceCatalogItem",
+    "ServiceRequest",
+    "ServiceRequestActivity",
+    "ServiceStatusComponent",
+    "SlaPolicy",
+    "SoftwareLicense",
+    "TaskItem",
+    "TelephonyCallLog",
+    "TicketWorkflowRule",
     "User",
     "UserSession",
+    "VendorContract",
+    "WebhookEndpoint",
+    "WorkflowDefinition",
 ]

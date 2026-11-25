@@ -20,6 +20,7 @@ from app.core.permissions import (
     CANONICAL_PERMISSIONS,
     DEFAULT_ROLE_BY_PORTAL,
     DEFAULT_ROLE_TEMPLATES,
+    PORTAL_IAM,
     PORTAL_SUPER_ADMIN,
     compute_effective_permissions,
     derive_clearance_tier,
@@ -372,6 +373,14 @@ class OrganizationService:
         if payload.portal_type == PORTAL_SUPER_ADMIN and not principal.is_super_admin:
             raise AuthorizationError(
                 "Only a platform Super Admin may assign Super Admin Portal memberships."
+            )
+        if (
+            payload.portal_type == PORTAL_IAM
+            and not principal.is_super_admin
+            and principal.portal_type != PORTAL_IAM
+        ):
+            raise AuthorizationError(
+                "Only Super Admin or IAM Portal officers may assign IAM Portal memberships."
             )
 
         await enable_transaction_platform_lookup(db)

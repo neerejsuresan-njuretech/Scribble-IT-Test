@@ -45,6 +45,8 @@ jobs:
       DATABASE_URL: postgresql+asyncpg://scribble_app:ci_app_password@127.0.0.1:5432/scribble_it_test
       MIGRATION_DATABASE_URL: postgresql+psycopg://scribble_migrator:ci_migrator_password@127.0.0.1:5432/scribble_it_test
       REDIS_URL: redis://127.0.0.1:6379/0
+      JWT_SECRET_KEY: ci-jwt-secret-key-at-least-thirty-two-characters-long
+      INTEGRATION_ENCRYPTION_KEY: ci-integration-encryption-key-thirty-two-chars-min
       RUN_LIVE_INTEGRATION_TESTS: "true"
 
     steps:
@@ -74,12 +76,12 @@ jobs:
           alembic downgrade base
           alembic upgrade head
 
-      - name: Run Pytest unit & live integration suite
+      - name: Run full Pytest suite (unit, ITSM, AI, integrations, security, migration, reliability)
         working-directory: backend
         run: pytest -v
 
   frontend-preservation-check:
-    name: Preserved React Frontend Build & Typecheck
+    name: Preserved React Frontend Tests, Typecheck & Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -92,6 +94,9 @@ jobs:
 
       - name: Install dependencies
         run: npm install
+
+      - name: Run Frontend API & RBAC unit tests
+        run: npx tsx --test tests/frontend/navigation_rbac.test.ts tests/frontend/api_client.test.ts
 
       - name: TypeScript check
         run: npm run lint

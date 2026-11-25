@@ -46,7 +46,8 @@ export type IamPermissionScope =
   | 'iam:manage'
   | 'devices:enroll_code'
   | 'tenants:admin'
-  | 'billing:read';
+  | 'billing:read'
+  | 'audit:read';
 
 export interface IamPolicy {
   id: string;
@@ -89,6 +90,12 @@ export interface AuthSession {
   deviceId?: string;
   companyId?: string;
   policyIds?: string[];
+  /** Authoritative permission scopes delivered by FastAPI /api/v1/auth/me */
+  effectivePermissions?: IamPermissionScope[];
+  clearanceTier?: string;
+  backendSessionId?: string;
+  backendOrganizationId?: string;
+  permissionSource?: 'backend' | 'legacy_local';
   authenticatedAt: string;
 }
 

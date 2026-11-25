@@ -1,12 +1,14 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useITSM } from '../../context/ITSMContext';
-import { canAccessNavId } from '../../config/navigationAccess';
-import { Search, X, AlertTriangle, Package, Server, ShieldCheck, ArrowRight, Lock } from 'lucide-react';
+import { usePermissions } from '../../hooks/usePermissions';
+import { canAccessNavId, getGlobalSearchPermissions } from '../../config/navigationAccess';
+import { getAccessToken, isBackendApiConfigured, itsmApi } from '../../services/api';
+import { Search, X, AlertTriangle, Package, Server, ShieldCheck, BookOpen, ArrowRight, Lock } from 'lucide-react';
 
 interface SearchResultItem {
   id: string;
-  group: 'Incidents' | 'Tickets & Requests' | 'Assets (CMDB)' | 'Problems & Changes';
+  group: 'Incidents' | 'Tickets & Requests' | 'Assets (CMDB)' | 'Problems & Changes' | 'Knowledge Base';
   title: string;
   subtitle: string;
   status: string;
@@ -36,11 +38,21 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
     problems,
     changes,
     isModuleEnabled,
-    hasPermission
+    hasPermission,
   } = useITSM();
+
+  const { rbacContext } = usePermissions({
+    role,
+    authSession,
+    isSuperAdmin,
+    isIamPortal,
+    isModuleEnabled,
+    hasPermission,
+  });
 
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
+  const [remoteResults, setRemoteResults] = useState<SearchResultItem[] | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -53,51 +65,80 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
-  // Access-controlled record sets derived strictly from context
+  // Query backend RBAC-enforced /api/v1/search when FastAPI session is active
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (!trimmed || !isBackendApiConfigured() || !getAccessToken()) {
+      setRemoteResults(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await itsmApi.globalSearch(trimmed, 12);
+        if (!cancelled) {
+          setRemoteResults(
+            res.hits.map(hit => ({
+              id: hit.ref || hit.id,
+              group: hit.group,
+              title: hit.title,
+              subtitle: hit.subtitle,
+              status: hit.status,
+              path: hit.path,
+            }))
+          );
+        }
+      } catch {
+        if (!cancelled) setRemoteResults(null);
+      }
+    }, 180);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query]);
+
+  // Access-controlled record sets derived strictly from shared navigationAccess.ts rules
   const accessibleData = useMemo(() => {
-    const isCustomer = role === 'customer';
+    const searchPerms = getGlobalSearchPermissions(rbacContext);
+    const isCustomer = searchPerms.ownRecordsOnly;
 
-    const incPool =
-      isModuleEnabled('incidents') && hasPermission('incidents:read')
-        ? isCustomer
-          ? incidents.filter(
-              i =>
-                i.requesterEmail.toLowerCase() === currentUser.email.toLowerCase() ||
-                i.requesterName.toLowerCase() === currentUser.name.toLowerCase()
-            )
-          : incidents
-        : [];
+    const incPool = searchPerms.canSearchIncidents
+      ? isCustomer
+        ? incidents.filter(
+            i =>
+              i.requesterEmail.toLowerCase() === currentUser.email.toLowerCase() ||
+              i.requesterName.toLowerCase() === currentUser.name.toLowerCase()
+          )
+        : incidents
+      : [];
 
-    const reqPool =
-      isCustomer
+    const reqPool = searchPerms.canSearchRequests
+      ? isCustomer
         ? requests.filter(
             r =>
               r.requesterEmail.toLowerCase() === currentUser.email.toLowerCase() ||
               r.requesterName.toLowerCase() === currentUser.name.toLowerCase()
           )
-        : isModuleEnabled('requests') && (hasPermission('incidents:read') || hasPermission('requests:approve'))
-        ? requests
-        : [];
+        : requests
+      : [];
 
-    const assetPool =
-      isModuleEnabled('assets') && hasPermission('assets:read')
-        ? isCustomer
-          ? assets.filter(
-              a => (a.assignedTo || '').toLowerCase() === currentUser.name.toLowerCase()
-            )
-          : assets
-        : [];
+    const assetPool = searchPerms.canSearchAssets
+      ? isCustomer
+        ? assets.filter(
+            a => (a.assignedTo || '').toLowerCase() === currentUser.name.toLowerCase()
+          )
+        : assets
+      : [];
 
-    const prbPool = !isCustomer && isModuleEnabled('problems') && hasPermission('incidents:read') ? problems : [];
-    const chgPool =
-      !isCustomer && isModuleEnabled('changes') && (hasPermission('incidents:read') || hasPermission('changes:cab_vote'))
-        ? changes
-        : [];
+    const prbPool = searchPerms.canSearchProblems ? problems : [];
+    const chgPool = searchPerms.canSearchChanges ? changes : [];
 
     return { incPool, reqPool, assetPool, prbPool, chgPool, isCustomer };
-  }, [role, currentUser, incidents, requests, assets, problems, changes, isModuleEnabled, hasPermission]);
+  }, [rbacContext, currentUser, incidents, requests, assets, problems, changes]);
 
-  const results = useMemo<SearchResultItem[]>(() => {
+  const localResults = useMemo<SearchResultItem[]>(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
 
@@ -112,7 +153,7 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
           title: inc.title,
           subtitle: `${inc.priority} · ${inc.category} · ${inc.assignee}`,
           status: inc.status,
-          path: accessibleData.isCustomer ? '/portal' : '/incidents'
+          path: accessibleData.isCustomer ? '/portal' : '/incidents',
         });
       }
     });
@@ -126,7 +167,7 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
           title: req.catalogItemName,
           subtitle: `${req.department} · Stage ${req.currentStage}/4`,
           status: req.status,
-          path: accessibleData.isCustomer ? '/portal' : '/requests'
+          path: accessibleData.isCustomer ? '/portal' : '/requests',
         });
       }
     });
@@ -140,7 +181,7 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
           title: ast.name,
           subtitle: `${ast.type} · SN: ${ast.serialNumber}${ast.assignedTo ? ` · ${ast.assignedTo}` : ''}`,
           status: ast.status,
-          path: accessibleData.isCustomer ? '/portal' : '/assets'
+          path: accessibleData.isCustomer ? '/portal' : '/assets',
         });
       }
     });
@@ -154,7 +195,7 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
           title: prb.title,
           subtitle: `Problem · ${prb.severity}`,
           status: prb.status,
-          path: '/problems'
+          path: '/problems',
         });
       }
     });
@@ -168,13 +209,15 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
           title: chg.title,
           subtitle: `Change (${chg.type}) · Risk ${chg.riskScore}`,
           status: chg.status,
-          path: '/changes'
+          path: '/changes',
         });
       }
     });
 
     return matches.slice(0, 12);
   }, [query, accessibleData]);
+
+  const results = remoteResults !== null ? remoteResults : localResults;
 
   const handleSelectResult = (item: SearchResultItem) => {
     setIsOpen(false);
@@ -199,17 +242,8 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
       return;
     }
 
-    const rbacCtx = {
-      role,
-      portalType: authSession?.portalType,
-      isSuperAdmin,
-      isIamPortal,
-      isModuleEnabled,
-      hasPermission,
-    };
-
     const routeIfAllowed = (navId: string, path: string): boolean => {
-      if (!canAccessNavId(navId, rbacCtx)) return false;
+      if (!canAccessNavId(navId, rbacContext)) return false;
       navigate(path);
       return true;
     };
@@ -241,6 +275,8 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
         return <Package className="w-3.5 h-3.5 text-amber-400 shrink-0" />;
       case 'Assets (CMDB)':
         return <Server className="w-3.5 h-3.5 text-sky-400 shrink-0" />;
+      case 'Knowledge Base':
+        return <BookOpen className="w-3.5 h-3.5 text-indigo-400 shrink-0" />;
       default:
         return <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />;
     }
@@ -250,7 +286,8 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
     'Incidents',
     'Tickets & Requests',
     'Assets (CMDB)',
-    'Problems & Changes'
+    'Problems & Changes',
+    'Knowledge Base',
   ];
 
   const isMobileOverlay = variant === 'mobile-overlay';

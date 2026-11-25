@@ -10,17 +10,23 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from app.core.config import Settings
 from app.core.exceptions import build_error_response
 from app.core.logging import request_id_ctx, tenant_id_ctx
+from app.core.rate_limit import rate_limiter
+from app.core.redis import redis_manager
 
 logger = logging.getLogger("scribble_it.http")
+
+STATE_CHANGING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
 
 class RequestContextAndSecurityMiddleware(BaseHTTPMiddleware):
     """
-    Centralized HTTP middleware:
+    Centralized HTTP security & telemetry middleware:
     - Generates or propagates sanitized X-Request-ID correlation header.
     - Enforces maximum request payload size before body processing.
+    - Enforces sliding-window per-client IP rate limiting on /api/* endpoints.
+    - Enforces Origin/Referer CSRF verification when cookies accompany state-changing calls.
     - Emits structured access logs with timing.
-    - Attaches strict security headers to every HTTP response.
+    - Attaches strict security headers (including CSP & HSTS) to every HTTP response.
     """
 
     def __init__(self, app, *, settings: Settings) -> None:
@@ -41,24 +47,82 @@ class RequestContextAndSecurityMiddleware(BaseHTTPMiddleware):
         started = time.perf_counter()
 
         try:
+            # 1. Payload size guard
             content_length = request.headers.get("content-length")
+            max_bytes = (
+                self._settings.max_upload_bytes
+                if request.url.path.endswith("/attachments")
+                else self._settings.max_request_body_bytes
+            )
             if content_length is not None:
                 try:
-                    if int(content_length) > self._settings.max_request_body_bytes:
+                    if int(content_length) > max_bytes:
                         response = build_error_response(
                             status_code=413,
                             error_code="PAYLOAD_TOO_LARGE",
-                            message=(
-                                f"Request body exceeds maximum allowed size of "
-                                f"{self._settings.max_request_body_bytes} bytes."
-                            ),
+                            message=f"Request body exceeds maximum allowed size of {max_bytes} bytes.",
                         )
                         self._apply_security_headers(response, request.url.path, req_id)
                         return response
                 except ValueError:
                     pass
 
+            # 2. CSRF protection for any cookie-bearing state-changing API request
+            if (
+                request.url.path.startswith("/api/")
+                and request.method in STATE_CHANGING_METHODS
+                and request.headers.get("cookie")
+                and not request.headers.get("authorization")
+            ):
+                origin = request.headers.get("origin", "").strip()
+                allowed = set(self._settings.cors_allowed_origins)
+                if not origin or origin not in allowed:
+                    response = build_error_response(
+                        status_code=403,
+                        error_code="CSRF_ORIGIN_MISMATCH",
+                        message="Cross-site state-changing request rejected by origin policy.",
+                    )
+                    self._apply_security_headers(response, request.url.path, req_id)
+                    return response
+
+            # 3. Sliding-window rate limiting on API endpoints (exempt health probes)
+            rate_headers: dict[str, str] = {}
+            if (
+                request.url.path.startswith("/api/")
+                and not request.url.path.startswith("/api/v1/health")
+                and self._settings.app_env != "test"
+            ):
+                client_ip = (
+                    request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+                    or (request.client.host if request.client else "unknown")
+                )
+                redis_client = getattr(redis_manager, "client", None)
+                rl = await rate_limiter.check(
+                    f"rl:ip:{client_ip}",
+                    limit=self._settings.api_rate_limit_per_minute,
+                    window_seconds=60,
+                    redis_client=redis_client,
+                )
+                rate_headers = {
+                    "X-RateLimit-Limit": str(rl.limit),
+                    "X-RateLimit-Remaining": str(rl.remaining),
+                    "X-RateLimit-Reset": str(rl.reset_after_seconds),
+                }
+                if not rl.allowed:
+                    response = build_error_response(
+                        status_code=429,
+                        error_code="RATE_LIMITED",
+                        message="Too many requests. Please slow down and retry shortly.",
+                    )
+                    for k, v in rate_headers.items():
+                        response.headers[k] = v
+                    response.headers["Retry-After"] = str(rl.reset_after_seconds)
+                    self._apply_security_headers(response, request.url.path, req_id)
+                    return response
+
             response = await call_next(request)
+            for k, v in rate_headers.items():
+                response.headers[k] = v
             self._apply_security_headers(response, request.url.path, req_id)
 
             duration_ms = round((time.perf_counter() - started) * 1000, 2)
@@ -84,8 +148,10 @@ class RequestContextAndSecurityMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
         if path.startswith("/api/"):
             response.headers.setdefault("Cache-Control", "no-store")
+            response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
         if self._settings.app_env == "production":
             response.headers["Strict-Transport-Security"] = (
                 "max-age=63072000; includeSubDomains; preload"

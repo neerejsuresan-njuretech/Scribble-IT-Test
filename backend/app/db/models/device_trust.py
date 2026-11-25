@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Any
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, UniqueConstraint
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text, UniqueConstraint, func
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, TenantOwnedMixin, TimestampMixin, UUIDPrimaryKeyMixin
@@ -47,11 +48,20 @@ class DeviceEnrollmentCode(UUIDPrimaryKeyMixin, TenantOwnedMixin, TimestampMixin
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     used_by_device_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
 
 class ManagedDevice(UUIDPrimaryKeyMixin, TenantOwnedMixin, TimestampMixin, Base):
     """
-    IAM-verified corporate managed device record required for Company Device SSO.
+    IAM-registered corporate device record.
+    Explicitly separates `trust_level = 'registered_iam_code'` (enrolled via single-use IAM code
+    using a client fingerprint) from `trust_level = 'mdm_verified'` (independently attested by an
+    MDM authority). A browser-generated fingerprint alone is never treated as proof of MDM management.
     Revoking a device immediately invalidates all SSO sessions linked to it.
     """
 
@@ -83,9 +93,20 @@ class ManagedDevice(UUIDPrimaryKeyMixin, TenantOwnedMixin, TimestampMixin, Base)
         ForeignKey("device_enrollment_codes.id", ondelete="SET NULL"),
         nullable=True,
     )
+    trust_level: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="registered_iam_code",
+        server_default="registered_iam_code",
+    )  # registered_iam_code | mdm_verified | revoked
     verified_by_iam: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )
+    mdm_verified: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    mdm_authority_ref: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    mdm_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(
         String(24),
         nullable=False,
@@ -99,3 +120,46 @@ class ManagedDevice(UUIDPrimaryKeyMixin, TenantOwnedMixin, TimestampMixin, Base)
         nullable=True,
     )
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class DeviceTrustEvent(UUIDPrimaryKeyMixin, TenantOwnedMixin, Base):
+    """Append-only lifecycle history for device enrollment, MDM attestation, SSO usage, and revocation."""
+
+    __tablename__ = "device_trust_events"
+    __table_args__ = (
+        Index("ix_device_trust_events_org_device", "organization_id", "device_id", "created_at"),
+    )
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    device_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("managed_devices.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    enrollment_code_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("device_enrollment_codes.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    event_type: Mapped[str] = mapped_column(String(48), nullable=False, index=True)
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    actor_email: Mapped[str] = mapped_column(String(160), nullable=False, default="system")
+    detail: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        server_default=func.now(),
+        index=True,
+    )

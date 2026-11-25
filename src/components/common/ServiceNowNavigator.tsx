@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useITSM } from '../../context/ITSMContext';
+import { usePermissions } from '../../hooks/usePermissions';
 import {
-  getAccessibleNavSections,
   canUseQuickCreate,
   NavIconKey,
   NavModuleItem,
@@ -131,28 +131,19 @@ export const ServiceNowNavigator: React.FC<ServiceNowNavigatorProps> = ({
   const [filterText, setFilterText] = useState('');
   const [sectionOverrides, setSectionOverrides] = useState<Partial<Record<NavSectionId, boolean>>>({});
 
-  const rbacContext = useMemo(
-    () => ({
-      role,
-      portalType: authSession?.portalType,
-      isSuperAdmin,
-      isIamPortal,
-      isModuleEnabled,
-      hasPermission,
-    }),
-    [role, authSession?.portalType, isSuperAdmin, isIamPortal, isModuleEnabled, hasPermission]
-  );
-
-  // Dynamically compute only the sections & modules the user's role/policies permit
-  const accessibleSections = useMemo(
-    () => getAccessibleNavSections(rbacContext),
-    [rbacContext]
-  );
-
-  const totalAccessibleCount = useMemo(
-    () => accessibleSections.reduce((sum, sec) => sum + sec.items.length, 0),
-    [accessibleSections]
-  );
+  const {
+    rbacContext,
+    accessibleSections,
+    totalAccessibleModules: totalAccessibleCount,
+    clearanceLabel,
+  } = usePermissions({
+    role,
+    authSession,
+    isSuperAdmin,
+    isIamPortal,
+    isModuleEnabled,
+    hasPermission,
+  });
 
   // Live numeric counters (shown as quiet tabular numerals, never pill badges)
   const metricCounts = useMemo<Record<string, number>>(() => {
@@ -220,18 +211,6 @@ export const ServiceNowNavigator: React.FC<ServiceNowNavigatorProps> = ({
     });
     setSectionOverrides(nextOverrides);
   };
-
-  const clearanceLabel = isSuperAdmin
-    ? 'Super Admin'
-    : isIamPortal
-    ? 'IAM Officer'
-    : hasPermission('workflows:manage')
-    ? 'Operations Lead'
-    : hasPermission('incidents:write')
-    ? 'IT Operations'
-    : hasPermission('billing:read')
-    ? 'FinOps Analyst'
-    : 'Scoped Access';
 
   const clearanceAccent = isSuperAdmin
     ? 'text-rose-400'
