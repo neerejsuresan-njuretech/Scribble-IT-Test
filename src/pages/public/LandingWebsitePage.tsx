@@ -2,199 +2,519 @@ import React, { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
-  Check,
-  Minus,
+  ChevronDown,
+  ChevronUp,
   Sun,
   Moon,
-  Play,
-  ShieldAlert,
-  Laptop,
-  Shield,
-  UserCheck,
-  Workflow,
-  PhoneCall,
-  Layers,
   Menu,
   X,
   Github,
   Heart,
-  FileText,
-  Code2,
-  Cpu,
-  Server,
-  Terminal,
-  Globe,
-  GitPullRequest,
-  MessageSquare,
-  LifeBuoy,
   Coffee,
   ExternalLink,
+  Shield,
+  Server,
+  Workflow,
+  Scale,
+  Plug,
+  AlertTriangle,
+  Globe,
+  Monitor,
+  Smartphone,
+  Laptop,
+  Code2,
+  Bug,
+  Lightbulb,
+  BookOpen,
+  CheckCircle2,
+  Palette,
+  Languages,
+  Users,
+  Lock,
+  FileText,
+  Terminal,
+  GitPullRequest,
+  Building2,
+  GraduationCap,
+  Rocket,
+  Briefcase,
+  UserCheck,
+  Sparkles,
+  Clock,
+  Layers,
 } from 'lucide-react';
 import { useITSM } from '../../context/ITSMContext';
-import { OPEN_SOURCE_CONFIG } from '../../config/openSourceConfig';
+import {
+  PROJECT_IDENTITY,
+  GITHUB_REPOSITORY_URL,
+  ISSUES_URL,
+  DOCUMENTATION_URL,
+  NJURE_SUPPORT_PAYMENT_URL,
+  BUY_ME_A_COFFEE_URL,
+  GITHUB_SPONSORS_URL,
+  COMMUNITY_URL,
+  ROADMAP_URL,
+  CHANGELOG_URL,
+  isConfiguredUrl,
+} from '../../config/openSourceConfig';
+import { ArchitectureDiagram } from '../../components/public/ArchitectureDiagram';
+import { ProductPreviewShowcase } from '../../components/public/ProductPreviewShowcase';
+import { DotMatrixText } from '../../components/common/DotMatrixDisplay';
 import heroOpsImg from '../../assets/images/hero_scribbleit_ops_1795074484892.jpg';
-import featureWireframeImg from '../../assets/images/feature_wireframe_studio_1795074487495.jpg';
-import featureTelephonyImg from '../../assets/images/feature_telephony_desk_1795074484589.jpg';
 
-type FeatureCategory = 'all' | 'itsm_ai' | 'workflows_cmdb' | 'telephony_iam';
+type CapabilityCategoryId =
+  | 'all'
+  | 'itsm'
+  | 'cmdb'
+  | 'iam'
+  | 'automation_ai'
+  | 'governance'
+  | 'integrations';
 
-interface FeatureItem {
-  id: string;
-  category: Exclude<FeatureCategory, 'all'>;
-  categoryLabel: string;
+type CapabilityStatus = 'Available' | 'In Development' | 'Planned';
+
+interface CapabilityGroup {
+  id: Exclude<CapabilityCategoryId, 'all'>;
   title: string;
-  summary: string;
-  highlights: string[];
-  status: 'Implemented' | 'In Progress' | 'Planned';
-  span?: 'wide' | 'standard';
-  image?: string;
-  imageAlt?: string;
-  fallbackIcon?: 'workflow' | 'telephony';
+  subtitle: string;
+  items: Array<{
+    name: string;
+    detail: string;
+    status: CapabilityStatus;
+  }>;
 }
 
-const FEATURES: FeatureItem[] = [
+const CAPABILITY_GROUPS: CapabilityGroup[] = [
   {
-    id: 'wireframe-workflows',
-    category: 'workflows_cmdb',
-    categoryLabel: 'Process & Automation',
-    title: 'Figma-Style Pre-Close Process Mapper & Workflow Builder',
-    summary:
-      'Design incident and service request lifecycles on an interactive blueprint canvas. Insert approvals, operational actions, conditional branches, and webhook automations directly between Record Open and Close gates.',
-    highlights: [
-      '16px snap-to-grid node canvas with cubic Bezier connectors and inline wire insertion',
-      'Multi-step workflow creator spanning all 31 Scribble IT modules',
-      'Built-in Incident and Service Request wireframe templates with SLA & approver inspection',
+    id: 'itsm',
+    title: 'IT Service Management',
+    subtitle: 'ITIL-aligned operational lifecycle for service desks and infrastructure teams.',
+    items: [
+      {
+        name: 'Incident Management',
+        detail: 'Ticket intake, categorization, P1–P4 prioritization, assignment queues, work notes, attachments, resolution, and closure.',
+        status: 'Available',
+      },
+      {
+        name: 'Service Request Management',
+        detail: 'Self-service catalog items, request fulfillment, multi-stage designated approvers, and complete request history.',
+        status: 'Available',
+      },
+      {
+        name: 'Problem Management',
+        detail: 'Problem records, root cause analysis (RCA), known error documentation, workarounds, and linked incident tracking.',
+        status: 'Available',
+      },
+      {
+        name: 'Change Management & CAB',
+        detail: 'Standard, Normal, and Emergency changes with risk evaluation, schedules, implementation/rollback plans, and human CAB voting.',
+        status: 'Available',
+      },
+      {
+        name: 'SLA Tracking',
+        detail: 'Configurable response and resolution SLA targets with live breach timers, escalation tracking, and Watchtower summaries.',
+        status: 'Available',
+      },
+      {
+        name: 'Knowledge Base',
+        detail: 'Categorized knowledge articles, SOP documentation, self-service visibility controls, and incident-linked lookup.',
+        status: 'Available',
+      },
     ],
-    status: 'Implemented',
-    span: 'wide',
-    image: featureWireframeImg,
-    imageAlt: 'Architectural system flowchart blueprints and precision modular diagrams on a slate workstation',
-    fallbackIcon: 'workflow',
   },
   {
-    id: 'telephony-cti',
-    category: 'telephony_iam',
-    categoryLabel: 'Voice & Personal Mobile CTI',
-    title: 'Operational Personal Mobile & Multi-Provider Softphone',
-    summary:
-      'Turn any personal smartphone number into an operational helpdesk line immediately — or connect Amazon Connect CCP v2, Twilio Programmable Voice, SIP/WebRTC gateways, RingCentral, or Genesys Cloud.',
-    highlights: [
-      'Direct personal mobile calling (tel:/sms:/WhatsApp) & desktop-to-phone scan-to-call QR handoff',
-      'Live Caller ID directory lookup, 1-tap GSM shift forwarding QR codes & two-leg Twilio bridge',
-      'Web Audio DTMF dialpad, incoming ringtone cadence, microphone test, call notes & 1-click incident screen-pop',
+    id: 'cmdb',
+    title: 'Configuration & Asset Management',
+    subtitle: 'Unified visibility across hardware, software entitlements, and service dependencies.',
+    items: [
+      {
+        name: 'Asset Management',
+        detail: 'Hardware and IT asset lifecycle management from acquisition and assignment through maintenance and retirement.',
+        status: 'Available',
+      },
+      {
+        name: 'CMDB',
+        detail: 'Configuration Item (CI) registry with upstream/downstream dependency mapping tied directly to incidents and changes.',
+        status: 'Available',
+      },
+      {
+        name: 'IT Inventory',
+        detail: 'Consumable stockroom levels, reorder threshold tracking, vendor assignments, and fulfillment deductions.',
+        status: 'Available',
+      },
+      {
+        name: 'Software Licenses',
+        detail: 'Seat allocation tracking, license compliance visibility, renewal scheduling, and contract cost monitoring.',
+        status: 'Available',
+      },
     ],
-    status: 'Implemented',
-    span: 'standard',
-    image: featureTelephonyImg,
-    imageAlt: 'Minimalist corporate desk with smartphone on aluminum stand beside workstation monitor and microphone',
-    fallbackIcon: 'telephony',
   },
   {
-    id: 'itsm-ai',
-    category: 'itsm_ai',
-    categoryLabel: 'Core ITIL & AI Triage',
-    title: 'Incident, Problem, Change (CAB) & AI Triage Assistant',
-    summary:
-      'Manage full ITIL service delivery across incidents, service requests, problems, CAB changes, and knowledge articles — paired with automated assignment-group recommendations on intake and a live AI Triage Assistant sidebar.',
-    highlights: [
-      'AI-powered ticket routing on the New Incident form with one-click priority and queue apply',
-      'Real-time Incident Triage sidebar matching SOPs and KB articles with actionable remediation steps',
-      'CAB voting workflows, Change risk analysis, SLA tracking, and centralized audit logs',
+    id: 'iam',
+    title: 'Identity & Access Management',
+    subtitle: 'Backend-controlled authentication, portal clearance, and device trust governance.',
+    items: [
+      {
+        name: 'Centralized Authentication',
+        detail: 'Argon2id password hashing, short-lived JWT access tokens, hashed refresh-token rotation with reuse detection, and brute-force lockouts.',
+        status: 'Available',
+      },
+      {
+        name: 'Role-Based Access Control (RBAC)',
+        detail: 'Server-computed effective permissions across Super Admin, IAM, Employee Operations, and End-User Self-Service portals.',
+        status: 'Available',
+      },
+      {
+        name: 'Device Trust & Enrollment',
+        detail: 'Single-use enrollment verification codes, managed device registration, device binding, and revocable trust states.',
+        status: 'Available',
+      },
+      {
+        name: 'Session Management & MFA Foundations',
+        detail: 'Active session inventory, targeted session revocation, account suspension controls, email verification, and MFA enrollment foundations.',
+        status: 'Available',
+      },
+      {
+        name: 'Trusted Device SSO',
+        detail: 'Seamless portal sign-in bound to enrolled company devices with strict backend validation and policy revocation.',
+        status: 'Available',
+      },
     ],
-    status: 'Implemented',
-    span: 'standard',
   },
   {
-    id: 'iam-multitenant',
-    category: 'telephony_iam',
-    categoryLabel: 'Multi-Company Cloud & IAM',
-    title: 'Centralized Cloud Sync, Multi-Company Branding & IAM Governance',
-    summary:
-      'Operate isolated company profiles with custom uploaded logos across Super Admin, Employee Ops, IAM Governance, and End-User Self-Service portals — synchronized live across desktop, tablet, and mobile via Google Cloud Firestore.',
-    highlights: [
-      'Per-company logo upload & optimization synced to Cloud Firestore across every portal and device',
-      'Granular IAM directory profiles, RBAC & MFA access policies, and Company ID bindings',
-      'Instant per-tenant module enable/disable matrix, custom SLAs, and cross-device workspace continuity',
+    id: 'automation_ai',
+    title: 'Automation & AI',
+    subtitle: 'Human-in-the-loop operational assistance backed by strict governance guardrails.',
+    items: [
+      {
+        name: 'Workflow Automation',
+        detail: 'Visual pre-close process mapper and multi-step workflow builder spanning ITSM queues, approval gates, and notifications.',
+        status: 'Available',
+      },
+      {
+        name: 'AI-Assisted Incident Triage',
+        detail: 'Backend-proxied Gemini advisory recommendations for priority, assignment group, and SOP matching—applied only by human operators.',
+        status: 'Available',
+      },
+      {
+        name: 'AI Change Risk Insights',
+        detail: 'Automated change impact and rollback review checklists that advise human reviewers without casting CAB votes.',
+        status: 'Available',
+      },
+      {
+        name: 'AI Knowledge Generation & ITSM Copilot',
+        detail: 'Drafting support for knowledge articles, wiki SOPs, and operational queries with per-organization quotas and audit logs.',
+        status: 'Available',
+      },
     ],
-    status: 'Implemented',
-    span: 'wide',
   },
   {
-    id: 'cmdb-operations',
-    category: 'workflows_cmdb',
-    categoryLabel: 'Infrastructure & Operations',
-    title: 'CMDB Dependency Map, Asset Lifecycle & Operations Suite',
-    summary:
-      'Track hardware CIs, software licenses, vendor contracts, SSL/domain expirations, morning infrastructure checks, major incident War Rooms, Kanban tasks, LMS training, and client invoicing in one unified suite.',
-    highlights: [
-      'Interactive CMDB dependency mapping linked directly to incidents, hardware assets, and software seats',
-      'Major incident War Room bridge feeds, checklists, and live Service Status publishing',
-      'Self-service catalog, custom form builder, Google Workspace connectors, and full JSON/CSV backup',
+    id: 'governance',
+    title: 'Enterprise Governance',
+    subtitle: 'Multi-tenant isolation, append-only auditability, and structured approvals.',
+    items: [
+      {
+        name: 'Multi-Organization Isolation',
+        detail: 'PostgreSQL Row-Level Security (RLS) with transaction-local tenant scoping and per-organization module toggles.',
+        status: 'Available',
+      },
+      {
+        name: 'Approval Workflows',
+        detail: 'Centralized approval requests for service fulfillment, access grants, and governance actions with verified human sign-off.',
+        status: 'Available',
+      },
+      {
+        name: 'Audit Logs',
+        detail: 'Append-only security, governance, integration, and AI audit records with database-level UPDATE/DELETE revocation.',
+        status: 'Available',
+      },
+      {
+        name: 'Reporting & Analytics',
+        detail: 'SLA performance summaries, ticket aging analytics, operational Watchtower metrics, and exportable compliance views.',
+        status: 'Available',
+      },
     ],
-    status: 'Implemented',
-    span: 'wide',
+  },
+  {
+    id: 'integrations',
+    title: 'External Integrations',
+    subtitle: 'Encrypted backend adapters with SSRF protection, retries, and webhook verification.',
+    items: [
+      {
+        name: 'Google Workspace (Drive, Sheets, Forms, Chat)',
+        detail: 'Backend-managed Workspace integration adapters with encrypted credential storage and organization-level permissions.',
+        status: 'Available',
+      },
+      {
+        name: 'Telephony & Twilio',
+        detail: 'Twilio Programmable Voice bridge, personal mobile CTI softphone, call logging, and 1-click incident screen-pop.',
+        status: 'Available',
+      },
+      {
+        name: 'Webhooks & Notification Providers',
+        detail: 'Signed HMAC-SHA256 webhooks with replay-window protection, SSRF egress blocking, and exponential-backoff background workers.',
+        status: 'Available',
+      },
+      {
+        name: 'Plugin & Extension SDK',
+        detail: 'Standardized third-party extension hooks and community add-on packaging for custom enterprise workflows.',
+        status: 'Planned',
+      },
+    ],
   },
 ];
 
-const ROADMAP_ITEMS = [
+const ECOSYSTEM_PLATFORMS = [
   {
-    title: 'Backend Python & PostgreSQL Migration',
-    status: 'In Progress',
-    detail: 'Modular FastAPI backend, SQLAlchemy 2.x async models, Alembic migrations, and Argon2id security schemas developed in /backend.',
+    name: 'Web Application',
+    platforms: 'Modern Desktop & Mobile Browsers',
+    status: 'Available' as const,
+    icon: Globe,
+    summary:
+      'Full-featured React 19 + TypeScript workspace across Super Admin, IAM, Employee Operations, and End-User portals—ready for cloud or self-hosted deployment.',
   },
   {
-    title: 'Enterprise Authentication & IAM Governance',
-    status: 'Completed',
-    detail: 'Secure JWT access/refresh rotation, reuse-detection families, role-based access control, and organization membership isolation.',
+    name: 'Desktop Applications',
+    platforms: 'Windows · macOS · Linux',
+    status: 'Coming Soon' as const,
+    icon: Monitor,
+    summary:
+      'Native desktop client architecture audited for Tauri v2 with OS keychain token storage, desktop notifications, and shared TypeScript packages. Installers will be published when built.',
   },
   {
-    title: 'Multi-Tenant Isolation & RLS',
-    status: 'Completed',
-    detail: 'PostgreSQL Row-Level Security (RLS) enforcement, transaction-local tenant context, and append-only immutable audit logs.',
-  },
-  {
-    title: 'Device Trust & Secure SSO',
-    status: 'Completed',
-    detail: 'IAM-portal-exclusive single-use device verification codes (IAM-XXXX-XXXX) and company-managed device SSO binding.',
-  },
-  {
-    title: 'Core ITSM & 31 Module Suite',
-    status: 'Completed',
-    detail: 'All 31 operational modules, visual process mapper, CTI softphone, and Google Workspace integrations active in the React client.',
-  },
-  {
-    title: 'Server-Side Google Gemini AI Integrations',
-    status: 'Completed',
-    detail: 'Automated ticket classification, triage assistant, CAB risk analysis, and search-grounded wiki documentation using @google/genai.',
-  },
-  {
-    title: 'Desktop & Mobile Native Integration',
-    status: 'In Progress',
-    detail: 'Electron and PWA packaging for offline support, local storage persistence, and native push notifications.',
-  },
-  {
-    title: 'Self-Hosted Docker & Enterprise Deployment',
-    status: 'In Progress',
-    detail: 'Docker Compose orchestration, Nginx reverse proxy configurations, and automated GitHub Actions CI/CD pipelines.',
-  },
-  {
-    title: 'Global Community Ecosystem & Add-on Marketplace',
-    status: 'Planned',
-    detail: 'Community plugin marketplace, community-contributed workflow templates, and localized language packs.',
+    name: 'Mobile Applications',
+    platforms: 'Android · iOS',
+    status: 'Coming Soon' as const,
+    icon: Smartphone,
+    summary:
+      'Cross-platform mobile architecture audited for React Native (Expo CNG) with biometric secure storage and incident approvals. Store builds will be published under our AGPL-3.0 Section 7 exception.',
   },
 ];
+
+interface RoadmapMilestone {
+  phase: string;
+  title: string;
+  status: 'Completed' | 'In Progress' | 'Planned' | 'Coming Soon';
+  summary: string;
+}
+
+const ROADMAP_MILESTONES: RoadmapMilestone[] = [
+  {
+    phase: '01',
+    title: 'Core Enterprise ITSM Platform',
+    status: 'Completed',
+    summary: 'Incidents, Service Requests, Problems, Changes & CAB, SLAs, Assets, CMDB, Inventory, Software Licenses, Knowledge Base, and Workflow Mapper.',
+  },
+  {
+    phase: '02',
+    title: 'Enterprise IAM & RBAC Architecture',
+    status: 'Completed',
+    summary: 'Argon2id auth, JWT access/refresh rotation, reuse detection, 4-portal RBAC clearance, device enrollment, trusted device SSO, and immutable audit logs.',
+  },
+  {
+    phase: '03',
+    title: 'Backend Migration to FastAPI & PostgreSQL',
+    status: 'Completed',
+    summary: 'FastAPI REST /api/v1 backend, 50 SQLAlchemy 2.x models, Alembic migrations, PostgreSQL 16 Row-Level Security, and Firebase-to-PostgreSQL migrator.',
+  },
+  {
+    phase: '04',
+    title: 'AI-Assisted ITSM Operations',
+    status: 'Completed',
+    summary: 'Backend-only Gemini advisory services for incident triage, change risk review, KB drafting, and ITSM Copilot with strict human approval boundaries.',
+  },
+  {
+    phase: '05',
+    title: 'External Integrations & Automation',
+    status: 'Completed',
+    summary: 'Encrypted Google Workspace & Twilio adapters, HMAC-verified webhooks, SSRF egress protection, and Redis-backed async retry workers.',
+  },
+  {
+    phase: '06',
+    title: 'Self-Hosted Enterprise Deployment',
+    status: 'In Progress',
+    summary: 'Docker Compose production hardening, Nginx reverse proxy bundles, automated GitHub Actions CI, and streamlined operator deployment guides.',
+  },
+  {
+    phase: '07',
+    title: 'Community Ecosystem & Documentation',
+    status: 'In Progress',
+    summary: 'Expanded contributor handbooks, API references, public architecture docs, and structured GitHub issue templates for community collaboration.',
+  },
+  {
+    phase: '08',
+    title: 'Desktop Applications (Windows, macOS, Linux)',
+    status: 'Coming Soon',
+    summary: 'Native desktop clients sharing core TypeScript API/auth packages with OS-level secure credential storage and signed release pipelines.',
+  },
+  {
+    phase: '09',
+    title: 'Mobile Applications (Android, iOS)',
+    status: 'Coming Soon',
+    summary: 'Dedicated mobile apps for on-call incident response, CAB approvals, self-service tickets, and push alerts distributed with AGPL-3.0 Section 7 clarity.',
+  },
+  {
+    phase: '10',
+    title: 'Plugin & Extension Ecosystem',
+    status: 'Planned',
+    summary: 'Community-contributed workflow templates, custom integration modules, localization packs, and documented extension interfaces.',
+  },
+];
+
+const CONTRIBUTION_PATHS = [
+  {
+    icon: Code2,
+    title: 'Code Contributions',
+    detail: 'Build frontend components, FastAPI endpoints, database migrations, or integration adapters via pull requests.',
+  },
+  {
+    icon: Bug,
+    title: 'Bug Reports',
+    detail: 'Report reproducible issues with environment details, logs, and expected behavior in the GitHub issue tracker.',
+  },
+  {
+    icon: Lightbulb,
+    title: 'Feature Requests',
+    detail: 'Propose new ITIL capabilities, compliance workflows, or enterprise integrations backed by real operational use cases.',
+  },
+  {
+    icon: BookOpen,
+    title: 'Documentation Improvements',
+    detail: 'Strengthen deployment runbooks, API examples, architecture guides, and onboarding tutorials.',
+  },
+  {
+    icon: CheckCircle2,
+    title: 'Testing & QA',
+    detail: 'Expand pytest backend coverage, RBAC verification cases, and cross-browser accessibility validation.',
+  },
+  {
+    icon: Palette,
+    title: 'UI/UX Design Improvements',
+    detail: 'Refine information density, keyboard navigation, contrast parity, and responsive service-desk ergonomics.',
+  },
+  {
+    icon: Languages,
+    title: 'Translations',
+    detail: 'Help prepare multi-language labels and regional operational copy for global IT teams.',
+  },
+  {
+    icon: Users,
+    title: 'Community Support',
+    detail: 'Answer deployment questions, share self-hosting configurations, and help new administrators get started.',
+  },
+  {
+    icon: Lock,
+    title: 'Security Reporting',
+    detail: 'Responsibly disclose vulnerabilities in authentication, tenant isolation, or API security following our security specification.',
+  },
+];
+
+const FAQ_ITEMS = [
+  {
+    question: 'Is Scribble-IT really free?',
+    answer:
+      'Yes. SCRIBBLE-IT 2.0 is free and open-source software licensed under the GNU Affero General Public License v3.0 (AGPL-3.0-only) with a Section 7 App Store Distribution Exception. There are no per-seat license fees, artificial feature locks, or mandatory subscriptions.',
+  },
+  {
+    question: 'Can organizations self-host Scribble-IT?',
+    answer:
+      'Yes. You can deploy the full stack—React web application, FastAPI backend, PostgreSQL 16 database with Row-Level Security, Redis 7, and background workers—on your own servers or private cloud using Docker Compose and the deployment guides in docs/deployment/.',
+  },
+  {
+    question: 'Is Scribble-IT open source?',
+    answer:
+      'Yes. The complete source code is publicly available on GitHub under AGPL-3.0-only (see LICENSE) alongside our Section 7 App Store Distribution Exception (see LICENSE-EXCEPTION.md). Anyone can inspect, audit, modify, and contribute improvements.',
+  },
+  {
+    question: 'How does Scribble-IT sustain development?',
+    answer:
+      'Development is led by Njure Tech (formerly Njure Group) and supported by voluntary community sponsorships, individual donations, and open-source engineering contributions. Support is strictly voluntary and never gates platform capabilities.',
+  },
+  {
+    question: 'Are desktop and mobile apps available?',
+    answer:
+      'Not yet—the Web Application is available today, while native Desktop (Windows, macOS, Linux) and Mobile (Android, iOS) applications are currently in the architectural planning stage and marked Coming Soon. No installers are published yet.',
+  },
+  {
+    question: 'How does AI work in Scribble-IT?',
+    answer:
+      'AI capabilities (incident triage, change risk insights, knowledge article drafting, and ITSM Copilot) run strictly through authenticated FastAPI backend services using backend-only Gemini API keys, organization quotas, and audit logging. AI is strictly advisory—it never approves requests, casts CAB votes, alters IAM permissions, or executes Super Admin actions.',
+  },
+  {
+    question: 'How is data security handled?',
+    answer:
+      'SCRIBBLE-IT 2.0 enforces Argon2id password hashing, short-lived JWT access tokens, hashed refresh-token rotation with reuse detection, server-computed RBAC, PostgreSQL Row-Level Security (RLS) tenant isolation, append-only audit logs, encrypted integration credentials, HMAC webhook verification, and SSRF egress protection.',
+  },
+  {
+    question: 'Can I contribute to the project?',
+    answer:
+      'Absolutely. Developers, IT operators, designers, testers, and technical writers are welcome to contribute via GitHub pull requests, bug reports, documentation updates, and architecture discussions. Review CONTRIBUTING.md in the repository for workflow standards.',
+  },
+  {
+    question: 'Can businesses use Scribble-IT in production?',
+    answer:
+      'Yes. Businesses, startups, educational institutions, and IT departments may deploy SCRIBBLE-IT 2.0 in production in accordance with AGPL-3.0-only terms (including making Corresponding Source available to network users if modified). Follow docs/deployment/production-cloud-guide.md or docs/deployment/self-hosted-guide.md to configure production secrets, TLS, and backups.',
+  },
+];
+
+const AUDIENCES = [
+  {
+    icon: Rocket,
+    title: 'Startups & Growing Teams',
+    detail: 'Adopt structured incident, request, and asset operations from day one without enterprise licensing overhead.',
+  },
+  {
+    icon: GraduationCap,
+    title: 'Educational Institutions',
+    detail: 'Equip campus IT departments and labs with self-hosted service desks, inventory control, and RBAC portals.',
+  },
+  {
+    icon: Building2,
+    title: 'Enterprises',
+    detail: 'Run multi-organization ITSM with PostgreSQL Row-Level Security, CAB governance, device trust, and full source auditability.',
+  },
+  {
+    icon: Briefcase,
+    title: 'IT Operations Teams',
+    detail: 'Unify Watchtower monitoring, SLA enforcement, CMDB impact mapping, workflows, and telephony in one workspace.',
+  },
+  {
+    icon: UserCheck,
+    title: 'Independent IT Professionals',
+    detail: 'Manage client infrastructure, knowledge bases, and service delivery using transparent, portable open-source tooling.',
+  },
+];
+
+function getStatusColorClass(status: string): string {
+  switch (status) {
+    case 'Available':
+    case 'Completed':
+      return 'text-emerald-400';
+    case 'In Development':
+    case 'In Progress':
+      return 'text-amber-400';
+    case 'Coming Soon':
+      return 'text-sky-400';
+    default:
+      return 'text-neutral-400';
+  }
+}
 
 export const LandingWebsitePage: React.FC = () => {
   const navigate = useNavigate();
   const { loginAsTestAccount, theme, toggleTheme } = useITSM();
-  const [featureFilter, setFeatureFilter] = useState<FeatureCategory>('all');
-  const [brokenImages, setBrokenImages] = useState<Record<string, boolean>>({});
+  const [activeCategory, setActiveCategory] = useState<CapabilityCategoryId>('all');
+  const [openFaqIdx, setOpenFaqIdx] = useState<number | null>(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [heroImageBroken, setHeroImageBroken] = useState(false);
+  const [legalModal, setLegalModal] = useState<'privacy' | 'terms' | null>(null);
 
-  const visibleFeatures = useMemo(() => {
-    if (featureFilter === 'all') return FEATURES;
-    return FEATURES.filter(item => item.category === featureFilter);
-  }, [featureFilter]);
+  const currentYear = new Date().getFullYear();
+
+  const visibleCapabilities = useMemo(() => {
+    if (activeCategory === 'all') return CAPABILITY_GROUPS;
+    return CAPABILITY_GROUPS.filter(group => group.id === activeCategory);
+  }, [activeCategory]);
 
   const scrollToSection = (sectionId: string) => {
     setMobileMenuOpen(false);
@@ -212,732 +532,1425 @@ export const LandingWebsitePage: React.FC = () => {
     navigate(destination);
   };
 
-  const markImageBroken = (key: string) => {
-    setBrokenImages(prev => ({ ...prev, [key]: true }));
-  };
+  const docsResources = [
+    {
+      title: 'Documentation',
+      description: 'Project overview, setup instructions, and platform operational guides.',
+      href: DOCUMENTATION_URL,
+      configured: isConfiguredUrl(DOCUMENTATION_URL),
+      external: true,
+    },
+    {
+      title: 'Installation Guide',
+      description: 'Self-hosted Docker Compose and production cloud deployment runbooks.',
+      href: `${GITHUB_REPOSITORY_URL}/blob/main/docs/deployment/self-hosted-guide.md`,
+      configured: isConfiguredUrl(GITHUB_REPOSITORY_URL),
+      external: true,
+    },
+    {
+      title: 'API Documentation',
+      description: 'FastAPI /api/v1 endpoints, authentication flows, and error contracts.',
+      href: `${GITHUB_REPOSITORY_URL}/blob/main/docs/api/api-v1-reference.md`,
+      configured: isConfiguredUrl(GITHUB_REPOSITORY_URL),
+      external: true,
+    },
+    {
+      title: 'GitHub Repository',
+      description: 'Full source code, issue tracking, pull requests, and CI workflows.',
+      href: GITHUB_REPOSITORY_URL,
+      configured: isConfiguredUrl(GITHUB_REPOSITORY_URL),
+      external: true,
+    },
+    {
+      title: 'Contributing Guide',
+      description: 'Branch conventions, testing checks, and open-source collaboration standards.',
+      href: `${GITHUB_REPOSITORY_URL}/blob/main/CONTRIBUTING.md`,
+      configured: isConfiguredUrl(GITHUB_REPOSITORY_URL),
+      external: true,
+    },
+    {
+      title: 'Security Policy',
+      description: 'Security architecture specification, threat boundaries, and reporting guidance.',
+      href: `${GITHUB_REPOSITORY_URL}/blob/main/security_spec.md`,
+      configured: isConfiguredUrl(GITHUB_REPOSITORY_URL),
+      external: true,
+    },
+    {
+      title: 'Changelog',
+      description: 'Release notes and version milestones once published to a dedicated changelog URL.',
+      href: CHANGELOG_URL,
+      configured: isConfiguredUrl(CHANGELOG_URL),
+      external: true,
+      placeholderVar: 'CHANGELOG_URL',
+    },
+    {
+      title: 'Roadmap',
+      description: 'Public milestone tracker and cross-platform delivery stages.',
+      href: isConfiguredUrl(ROADMAP_URL) ? ROADMAP_URL : '#roadmap',
+      configured: true,
+      external: isConfiguredUrl(ROADMAP_URL),
+      sectionTarget: isConfiguredUrl(ROADMAP_URL) ? undefined : 'roadmap',
+    },
+    {
+      title: 'Community',
+      description: 'Community discussions and support channels (configure COMMUNITY_URL when live).',
+      href: COMMUNITY_URL,
+      configured: isConfiguredUrl(COMMUNITY_URL),
+      external: true,
+      placeholderVar: 'COMMUNITY_URL',
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 dot-matrix-bg font-sans selection:bg-rose-600 selection:text-white flex flex-col overflow-x-clip">
-      {/* Strict Top Header */}
-      <header className="sticky top-0 z-40 h-14 sm:h-16 border-b border-neutral-800 bg-neutral-950/95 backdrop-blur-md">
-        <div className="max-w-[1200px] mx-auto h-full px-3 sm:px-6 lg:px-8 flex items-center justify-between gap-3 sm:gap-6">
+      {/* ===================================================================== */}
+      {/* TOP BAR — STRICT 3-ZONE CONTRACT                                      */}
+      {/* ===================================================================== */}
+      <header className="sticky top-0 z-40 h-16 border-b border-neutral-800 bg-neutral-950/95 backdrop-blur-md">
+        <div className="max-w-[1200px] mx-auto h-full px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
+          {/* Zone 1: Brand Identity */}
           <button
             type="button"
             onClick={() => scrollToSection('overview')}
-            className="text-base sm:text-lg font-bold tracking-tight text-neutral-100 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 rounded-sm"
+            className="inline-flex items-center gap-2.5 text-base sm:text-lg font-bold tracking-tight text-neutral-100 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 rounded-sm"
           >
-            Scribble-IT — Enterprise ITSM
+            <span className="w-2.5 h-2.5 rounded-xs bg-rose-600 shrink-0" aria-hidden="true" />
+            <span>{PROJECT_IDENTITY.productName}</span>
           </button>
 
-          <nav aria-label="Primary Navigation" className="hidden lg:flex items-center gap-5 text-sm font-medium text-neutral-400">
-            <button type="button" onClick={() => scrollToSection('overview')} className="hover:text-neutral-100 transition-colors">Overview</button>
-            <button type="button" onClick={() => scrollToSection('features')} className="hover:text-neutral-100 transition-colors">Features</button>
-            <button type="button" onClick={() => scrollToSection('architecture')} className="hover:text-neutral-100 transition-colors">Architecture</button>
-            <button type="button" onClick={() => scrollToSection('opensource')} className="hover:text-neutral-100 transition-colors">Open Source</button>
-            <button type="button" onClick={() => scrollToSection('roadmap')} className="hover:text-neutral-100 transition-colors">Roadmap</button>
-            <button type="button" onClick={() => scrollToSection('community')} className="hover:text-neutral-100 transition-colors">Community</button>
-            <button type="button" onClick={() => scrollToSection('sponsor')} className="hover:text-neutral-100 transition-colors text-rose-400">Sponsor</button>
+          {/* Zone 2: Primary Single-Line Navigation (5 links) */}
+          <nav
+            aria-label="Primary Navigation"
+            className="hidden lg:flex items-center gap-6 text-sm font-medium text-neutral-400"
+          >
+            {[
+              { id: 'about', label: 'About' },
+              { id: 'features', label: 'Capabilities' },
+              { id: 'architecture', label: 'Architecture' },
+              { id: 'opensource', label: 'Open Source' },
+              { id: 'roadmap', label: 'Roadmap' },
+            ].map(item => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => scrollToSection(item.id)}
+                className="hover:text-neutral-100 transition-colors whitespace-nowrap shrink-0"
+              >
+                {item.label}
+              </button>
+            ))}
           </nav>
 
-          <div className="flex items-center gap-2.5 shrink-0">
-            <a
-              href={OPEN_SOURCE_CONFIG.githubRepoUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 border border-neutral-800 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 text-xs font-semibold rounded-sm transition-colors"
-            >
-              <Github className="w-3.5 h-3.5" />
-              <span>GitHub</span>
-            </a>
+          {/* Zone 3: Single Primary Action + Mobile Drawer Trigger */}
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={() => handleLaunchDemo('super_admin', '/watchtower')}
-              className="px-3 sm:px-4 py-2 min-h-[40px] bg-rose-600 hover:bg-rose-500 text-white text-xs sm:text-sm font-semibold transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0"
+              className="px-4 py-2 min-h-[40px] bg-rose-600 hover:bg-rose-500 text-white text-xs sm:text-sm font-semibold rounded-md transition-colors inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
             >
-              <Play className="w-3.5 h-3.5 fill-current shrink-0" />
-              <span>Launch Demo</span>
+              <span>Explore Platform</span>
+              <ArrowRight className="w-3.5 h-3.5 shrink-0" />
             </button>
+
             <button
               type="button"
               onClick={() => setMobileMenuOpen(prev => !prev)}
-              aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
-              className="lg:hidden min-h-[40px] min-w-[40px] border border-neutral-800 bg-neutral-900 text-neutral-200 flex items-center justify-center shrink-0"
+              aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={mobileMenuOpen}
+              className="lg:hidden min-h-[40px] min-w-[40px] border border-neutral-800 bg-neutral-900 text-neutral-200 rounded-md flex items-center justify-center shrink-0"
             >
               {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
             </button>
           </div>
         </div>
 
+        {/* Mobile Navigation Drawer */}
         {mobileMenuOpen && (
-          <div className="lg:hidden border-b border-neutral-800 bg-neutral-950 px-4 py-3 space-y-1">
+          <div className="lg:hidden border-b border-neutral-800 bg-neutral-950 px-4 py-4 space-y-1">
             {[
               { id: 'overview', label: 'Overview' },
-              { id: 'features', label: 'Platform Features' },
-              { id: 'architecture', label: 'Technology Architecture' },
-              { id: 'opensource', label: 'Free & Open Source Commitment' },
-              { id: 'roadmap', label: 'Project Roadmap' },
-              { id: 'community', label: 'Community & Contribution' },
-              { id: 'sponsor', label: 'Sponsor & Support' },
+              { id: 'about', label: 'About Scribble-IT' },
+              { id: 'features', label: 'Platform Capabilities' },
+              { id: 'ecosystem', label: 'Cross-Platform Ecosystem' },
+              { id: 'architecture', label: 'Technology & Architecture' },
+              { id: 'opensource', label: 'Open-Source Commitment' },
+              { id: 'sponsor', label: 'Support & Sponsorship' },
+              { id: 'roadmap', label: 'Roadmap' },
+              { id: 'faq', label: 'FAQ' },
             ].map(item => (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => scrollToSection(item.id)}
-                className="w-full text-left px-3 py-2.5 min-h-[40px] text-sm font-medium text-neutral-200 hover:bg-neutral-900 rounded-sm block"
+                className="w-full text-left px-3 py-2.5 min-h-[40px] text-sm font-medium text-neutral-200 hover:bg-neutral-900 rounded-md block"
               >
                 {item.label}
               </button>
             ))}
-            <div className="pt-2 border-t border-neutral-800 flex items-center justify-between">
+            <div className="pt-3 mt-2 border-t border-neutral-800 flex items-center justify-between gap-3">
               <a
-                href={OPEN_SOURCE_CONFIG.githubRepoUrl}
+                href={GITHUB_REPOSITORY_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold text-neutral-300"
               >
                 <Github className="w-4 h-4" />
-                <span>View GitHub Repository</span>
+                <span>View GitHub</span>
               </a>
-              <Link to="/login" className="text-xs font-semibold text-rose-400 hover:underline">
-                Sign In →
-              </Link>
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="inline-flex items-center gap-1.5 px-3 py-2 border border-neutral-800 bg-neutral-900 text-neutral-200 text-xs font-medium rounded-md"
+              >
+                {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+                <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+              </button>
             </div>
           </div>
         )}
       </header>
 
       <main className="flex-1">
-        {/* ===================================================== */}
-        {/* 1. PROJECT INTRODUCTION & HERO SECTION                  */}
-        {/* ===================================================== */}
+        {/* =================================================================== */}
+        {/* A. HERO SECTION                                                     */}
+        {/* =================================================================== */}
         <section id="overview" className="border-b border-neutral-800">
           <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-14 sm:pt-16 sm:pb-20 space-y-10">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-end">
-              <div className="lg:col-span-8 space-y-5">
-                <div className="inline-flex items-center gap-2 px-2.5 py-1 border border-neutral-800 bg-neutral-900/80 rounded-full text-xs font-mono text-emerald-400">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>Open Source Enterprise ITSM · AGPL-3.0</span>
-                </div>
-
-                <h1
-                  className="font-bold text-neutral-100 tracking-tight leading-[1.08]"
-                  style={{ fontSize: 'clamp(2rem, 4.5vw, 3.75rem)', textWrap: 'balance' }}
+            <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-neutral-400">
+              <div className="font-mono tracking-wide">
+                {PROJECT_IDENTITY.productName} · Open-Source Enterprise ITSM · AGPL-3.0-only
+              </div>
+              <div className="flex items-center gap-3">
+                <Link
+                  to="/login"
+                  className="text-neutral-300 hover:text-neutral-100 font-medium transition-colors"
                 >
-                  Enterprise IT Service Management. Open to Everyone.
+                  Sign In
+                </Link>
+                <span aria-hidden="true" className="text-neutral-600">·</span>
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  className="inline-flex items-center gap-1.5 text-neutral-300 hover:text-neutral-100 font-medium transition-colors"
+                  aria-label={theme === 'dark' ? 'Switch to Light theme' : 'Switch to Dark theme'}
+                >
+                  {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+                  <span>{theme === 'dark' ? 'Light Theme' : 'Dark Theme'}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+              <div className="lg:col-span-7 space-y-6">
+                <h1
+                  className="font-bold text-neutral-100 tracking-tight leading-[1.06]"
+                  style={{ fontSize: 'clamp(2.25rem, 4.8vw, 3.85rem)', textWrap: 'balance' }}
+                >
+                  {PROJECT_IDENTITY.tagline}
                 </h1>
 
                 <p className="text-base sm:text-lg text-neutral-400 leading-relaxed max-w-2xl">
-                  <strong className="text-neutral-200 font-semibold">Scribble-IT</strong> is a modern, open-source IT Service Management platform designed to help organizations manage their IT operations, service delivery, assets, incidents, workflows, users, and enterprise governance through one unified, transparent platform.
+                  <strong className="text-neutral-200 font-semibold">{PROJECT_IDENTITY.productName}</strong> is an open-source, community-driven Enterprise IT Service Management platform built by{' '}
+                  <strong className="text-neutral-200 font-semibold">{PROJECT_IDENTITY.organizationFull}</strong>—uniting incident response, service requests, CAB change governance, CMDB, centralized IAM, workflow automation, and human-supervised AI assistance in one self-hostable system.
                 </p>
 
-                {/* Vision Points */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                {/* Hero CTAs */}
+                <div className="flex flex-wrap items-center gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleLaunchDemo('super_admin', '/watchtower')}
+                    className="px-5 py-3 min-h-[44px] bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold rounded-md transition-colors inline-flex items-center gap-2 whitespace-nowrap"
+                  >
+                    <span>Explore Platform</span>
+                    <ArrowRight className="w-4 h-4 shrink-0" />
+                  </button>
+
+                  <a
+                    href={GITHUB_REPOSITORY_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-5 py-3 min-h-[44px] border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-100 text-sm font-semibold rounded-md transition-colors inline-flex items-center gap-2 whitespace-nowrap"
+                  >
+                    <Github className="w-4 h-4 shrink-0" />
+                    <span>View GitHub</span>
+                  </a>
+
+                  <button
+                    type="button"
+                    onClick={() => scrollToSection('sponsor')}
+                    className="px-5 py-3 min-h-[44px] border border-neutral-800 bg-neutral-950 hover:bg-neutral-900 text-neutral-200 text-sm font-semibold rounded-md transition-colors inline-flex items-center gap-2 whitespace-nowrap"
+                  >
+                    <Heart className="w-4 h-4 text-rose-500 shrink-0" />
+                    <span>Support the Project</span>
+                  </button>
+                </div>
+
+                {/* Concise Key Facts Row (Zero-Pill Typography) */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-5 border-t border-neutral-800">
                   {[
-                    'Enterprise-grade',
-                    'Open-Source',
-                    'Free for Everyone',
-                    'Self-Hosting',
-                    'Community-Driven',
-                    'Transparent',
-                    'AI-Assisted IT',
-                    'Accessible to All',
-                  ].map(vision => (
-                    <div key={vision} className="flex items-center gap-2 text-xs font-medium text-neutral-300 bg-neutral-900/60 border border-neutral-800/80 px-3 py-2 rounded-md">
-                      <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                      <span>{vision}</span>
+                    { value: '100% Free', label: 'Open-Source AGPL-3.0' },
+                    { value: '4 Portals', label: 'Admin, IAM, Ops & User' },
+                    { value: 'RLS Isolated', label: 'PostgreSQL 16 + FastAPI' },
+                    { value: 'Self-Hostable', label: 'Docker & Cloud Ready' },
+                  ].map(stat => (
+                    <div key={stat.label}>
+                      <div className="text-base sm:text-lg font-bold text-neutral-100 font-mono tabular-nums">
+                        {stat.value}
+                      </div>
+                      <div className="text-xs text-neutral-400 mt-0.5">{stat.label}</div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="lg:col-span-4 flex flex-col gap-3.5">
-                <button
-                  type="button"
-                  onClick={() => handleLaunchDemo('super_admin', '/watchtower')}
-                  className="w-full px-5 py-3.5 bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-lg shadow-rose-950/50"
-                >
-                  <Play className="w-4 h-4 fill-current" />
-                  <span>Launch Live Demo Workspace</span>
-                </button>
-                <a
-                  href={OPEN_SOURCE_CONFIG.githubRepoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full px-4 py-3 border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-100 text-sm font-semibold transition-colors flex items-center justify-center gap-2"
-                >
-                  <Github className="w-4 h-4" />
-                  <span>Star on GitHub</span>
-                </a>
-                <div className="flex items-center justify-between text-xs text-neutral-400 px-1">
-                  <span>Current Release: v2.0-alpha</span>
-                  <button
-                    type="button"
-                    onClick={toggleTheme}
-                    className="inline-flex items-center gap-1.5 text-neutral-300 hover:text-neutral-100 transition-colors"
-                  >
-                    {theme === 'dark' ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-sky-400" />}
-                    <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
-                  </button>
+              {/* Actual Application Dashboard Preview Card */}
+              <div className="lg:col-span-5 border border-neutral-800 bg-neutral-900/50 rounded-lg overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-neutral-800 bg-neutral-900 flex items-center justify-between text-xs text-neutral-400">
+                  <span className="font-mono text-neutral-200">scribbleit.njuregroup.in/watchtower</span>
+                  <span>Live Workspace Preview</span>
                 </div>
-              </div>
-            </div>
 
-            {/* Hero Image Showcase */}
-            <div className="border border-neutral-800 bg-neutral-900/40 overflow-hidden rounded-lg">
-              {!brokenImages.hero ? (
-                <div className="relative aspect-[16/9] w-full overflow-hidden">
-                  <img
-                    src={heroOpsImg}
-                    alt="Scribble-IT Enterprise ITSM Command Center"
-                    referrerPolicy="no-referrer"
-                    onError={() => markImageBroken('hero')}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-5 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-                    <div>
-                      <div className="text-xs text-emerald-400 font-mono font-semibold">PRODUCTION-READY OPEN SOURCE ITSM</div>
-                      <div className="text-base font-bold text-neutral-50">Unified ITIL Operations, CMDB, and Security Governance</div>
-                    </div>
-                    <Link to="/login" className="px-4 py-2 bg-neutral-900/90 hover:bg-neutral-800 border border-neutral-700 text-xs font-semibold text-white whitespace-nowrap">
-                      Sign In to Portals →
-                    </Link>
-                  </div>
-                </div>
-              ) : (
-                <div className="aspect-[16/9] w-full bg-neutral-900 flex flex-col items-center justify-center gap-3 p-8">
-                  <Layers className="w-10 h-10 text-neutral-500" />
-                  <div className="text-sm font-bold text-neutral-200">Scribble-IT Enterprise Architecture</div>
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-
-        {/* ===================================================== */}
-        {/* 2. CORE CAPABILITIES                                  */}
-        {/* ===================================================== */}
-        <section id="features" className="border-b border-neutral-800 bg-neutral-950/50">
-          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-10">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-              <div className="space-y-2 max-w-2xl">
-                <div className="text-xs text-neutral-400">Comprehensive Feature Suite</div>
-                <h2 className="text-2xl sm:text-3xl font-bold text-neutral-100 tracking-tight">
-                  02. Core Capabilities &amp; Module Status
-                </h2>
-                <p className="text-sm sm:text-[15px] text-neutral-400 leading-relaxed">
-                  Explore the full operational suite. Features are clearly marked as implemented or under development based on the current repository state.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-1 p-1 border border-neutral-800 bg-neutral-900 rounded-lg overflow-x-auto no-scrollbar">
-                {[
-                  { id: 'all' as const, label: 'All Modules' },
-                  { id: 'itsm_ai' as const, label: 'ITSM & AI' },
-                  { id: 'workflows_cmdb' as const, label: 'Workflows & CMDB' },
-                  { id: 'telephony_iam' as const, label: 'Telephony & IAM' },
-                ].map(tab => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setFeatureFilter(tab.id)}
-                    className={`px-3.5 py-2 text-xs font-semibold rounded-md transition-colors whitespace-nowrap ${
-                      featureFilter === tab.id ? 'bg-rose-600 text-white' : 'text-neutral-400 hover:text-neutral-100'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Feature Cards Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
-              {visibleFeatures.map(feature => (
-                <article
-                  key={feature.id}
-                  className={`${feature.span === 'wide' ? 'lg:col-span-7' : 'lg:col-span-5'} border border-neutral-800 bg-neutral-950 rounded-lg overflow-hidden flex flex-col justify-between`}
-                >
-                  {feature.image && (
-                    <div className="aspect-[16/9] w-full border-b border-neutral-800 bg-neutral-900 overflow-hidden">
-                      {!brokenImages[feature.id] ? (
-                        <img
-                          src={feature.image}
-                          alt={feature.imageAlt || feature.title}
-                          referrerPolicy="no-referrer"
-                          onError={() => markImageBroken(feature.id)}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-neutral-500">
-                          <Workflow className="w-8 h-8" />
-                        </div>
-                      )}
+                <div className="relative aspect-[16/10] w-full bg-neutral-900 overflow-hidden border-b border-neutral-800">
+                  {!heroImageBroken ? (
+                    <img
+                      src={heroOpsImg}
+                      alt="Scribble-IT 2.0 operational dashboard and enterprise service management interface"
+                      referrerPolicy="no-referrer"
+                      onError={() => setHeroImageBroken(true)}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-xs text-neutral-500 p-6">
+                      SCRIBBLE-IT 2.0 Operational Workspace
                     </div>
                   )}
-
-                  <div className="p-6 space-y-4 flex-1 flex flex-col justify-between">
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-neutral-400 uppercase tracking-wider">{feature.categoryLabel}</span>
-                        <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">
-                          {feature.status}
-                        </span>
-                      </div>
-                      <h3 className="text-lg font-bold text-neutral-100">{feature.title}</h3>
-                      <p className="text-sm text-neutral-400 leading-relaxed">{feature.summary}</p>
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/55 to-transparent p-4">
+                    <div className="text-xs text-neutral-50/80">
+                      Unified Operations Console · Implemented
                     </div>
-
-                    <ul className="pt-4 border-t border-neutral-800 space-y-2 text-xs text-neutral-300">
-                      {feature.highlights.map(hl => (
-                        <li key={hl} className="flex items-start gap-2.5">
-                          <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                          <span>{hl}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </article>
-              ))}
-            </div>
-
-            {/* Additional Capability List */}
-            <div className="border border-neutral-800 bg-neutral-900/50 rounded-lg p-6 sm:p-8 space-y-6">
-              <h3 className="text-base font-bold text-neutral-100">Additional Enterprise Modules Included in Scribble-IT</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-                {[
-                  { name: 'Incident Management', status: 'Implemented' },
-                  { name: 'Service Request Management', status: 'Implemented' },
-                  { name: 'Problem Management', status: 'Implemented' },
-                  { name: 'Change Management & CAB', status: 'Implemented' },
-                  { name: 'Asset Management & CMDB', status: 'Implemented' },
-                  { name: 'IT Inventory & Software', status: 'Implemented' },
-                  { name: 'SLA Management & Tracking', status: 'Implemented' },
-                  { name: 'Identity & Access Management', status: 'Implemented' },
-                  { name: 'Role-Based Access Control', status: 'Implemented' },
-                  { name: 'Device Trust & Secure SSO', status: 'Implemented' },
-                  { name: 'Knowledge Management & Wiki', status: 'Implemented' },
-                  { name: 'Workflow Automation Engine', status: 'Implemented' },
-                  { name: 'Audit & Governance Logs', status: 'Implemented' },
-                  { name: 'Reporting & Analytics', status: 'Implemented' },
-                  { name: 'AI-Powered ITSM Assistance', status: 'Implemented' },
-                  { name: 'Google Workspace & Telephony', status: 'Implemented' },
-                ].map(mod => (
-                  <div key={mod.name} className="flex items-center justify-between p-3 border border-neutral-800 bg-neutral-950 rounded">
-                    <span className="font-semibold text-neutral-200">{mod.name}</span>
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-900">
-                      {mod.status}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ===================================================== */}
-        {/* 3. TECHNOLOGY ARCHITECTURE                            */}
-        {/* ===================================================== */}
-        <section id="architecture" className="border-b border-neutral-800">
-          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-10">
-            <div className="space-y-3 max-w-2xl">
-              <div className="text-xs text-neutral-400">Enterprise Stack</div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-neutral-100 tracking-tight">
-                03. Technology Architecture &amp; Migration Status
-              </h2>
-              <p className="text-sm sm:text-[15px] text-neutral-400 leading-relaxed">
-                Scribble-IT is engineered with a decoupled, modular architecture designed for high throughput, strict tenant isolation, and future horizontal scaling.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Frontend Stack */}
-              <div className="border border-neutral-800 bg-neutral-950 rounded-lg p-6 space-y-4">
-                <div className="flex items-center gap-3 text-sky-400">
-                  <Laptop className="w-5 h-5" />
-                  <h3 className="text-base font-bold text-neutral-100">Frontend Layer</h3>
-                </div>
-                <ul className="space-y-2.5 text-xs text-neutral-300">
-                  <li className="flex items-center gap-2">
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span><strong>React 19</strong> + TypeScript</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span><strong>Vite</strong> lightning-fast build system</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span><strong>Tailwind CSS</strong> responsive styling</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Lucide icons &amp; adaptive dark/light themes</span>
-                  </li>
-                </ul>
-                <div className="pt-3 border-t border-neutral-800 text-[11px] text-emerald-400 font-mono">
-                  Status: Fully Integrated &amp; Active
-                </div>
-              </div>
-
-              {/* Backend Stack */}
-              <div className="border border-neutral-800 bg-neutral-950 rounded-lg p-6 space-y-4">
-                <div className="flex items-center gap-3 text-rose-400">
-                  <Server className="w-5 h-5" />
-                  <h3 className="text-base font-bold text-neutral-100">Backend Architecture</h3>
-                </div>
-                <ul className="space-y-2.5 text-xs text-neutral-300">
-                  <li className="flex items-center gap-2">
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span><strong>Python 3.11</strong> + <strong>FastAPI</strong></span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span><strong>PostgreSQL 16</strong> + Row-Level Security</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span><strong>SQLAlchemy 2.x</strong> + <strong>Alembic</strong></span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span><strong>Redis 7</strong> cache &amp; rate limiting</span>
-                  </li>
-                </ul>
-                <div className="pt-3 border-t border-neutral-800 text-[11px] text-amber-400 font-mono">
-                  Status: Foundation Built / Preview on Vite+Express
-                </div>
-              </div>
-
-              {/* Infrastructure */}
-              <div className="border border-neutral-800 bg-neutral-950 rounded-lg p-6 space-y-4">
-                <div className="flex items-center gap-3 text-emerald-400">
-                  <Cpu className="w-5 h-5" />
-                  <h3 className="text-base font-bold text-neutral-100">Infrastructure &amp; Ops</h3>
-                </div>
-                <ul className="space-y-2.5 text-xs text-neutral-300">
-                  <li className="flex items-center gap-2">
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span><strong>Docker</strong> &amp; Docker Compose orchestration</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>REST APIs &amp; OpenAPI / Swagger docs</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span><strong>GitHub Actions</strong> CI/CD workflows</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Cloud &amp; Self-hosted deployment specs</span>
-                  </li>
-                </ul>
-                <div className="pt-3 border-t border-neutral-800 text-[11px] text-emerald-400 font-mono">
-                  Status: Ready for Self-Hosting &amp; Cloud
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ===================================================== */}
-        {/* 4. FREE AND OPEN-SOURCE COMMITMENT                    */}
-        {/* ===================================================== */}
-        <section id="opensource" className="border-b border-neutral-800 bg-neutral-950/50">
-          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-10">
-            <div className="border border-neutral-800 bg-neutral-950 rounded-lg p-6 sm:p-10 space-y-6">
-              <div className="space-y-3 max-w-3xl">
-                <div className="text-xs text-emerald-400 font-mono font-semibold">OUR PROMISE TO THE COMMUNITY</div>
-                <h2 className="text-2xl sm:text-3xl font-bold text-neutral-100 tracking-tight">
-                  Enterprise ITSM should not be accessible only to enterprises with large budgets.
-                </h2>
-                <p className="text-base text-neutral-300 leading-relaxed">
-                  Scribble-IT aims to make enterprise-grade IT service management accessible to everyone. We believe that core operational tooling, security governance, and workflow automation are public goods for modern engineering teams.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-4">
-                {[
-                  { title: 'Free to Use', detail: 'The core community edition is 100% free with no hidden user limits or core feature paywalls.' },
-                  { title: 'No Mandatory Subscriptions', detail: 'Run your IT desk without forced monthly cloud licensing fees or artificial paywalls.' },
-                  { title: 'Self-Hosting Flexibility', detail: 'Deploy Scribble-IT on your own private infrastructure using Docker and PostgreSQL.' },
-                  { title: 'Open Source Inspection', detail: 'Inspect, audit, and modify every line of source code under the GNU AGPL-3.0 license.' },
-                  { title: 'Community-Driven', detail: 'Roadmap priorities, security audits, and new modules are guided by community feedback.' },
-                  { title: 'Transparent Governance', detail: 'No proprietary lock-in. Your data remains fully owned and controlled by your organization.' },
-                ].map(commit => (
-                  <div key={commit.title} className="p-4 border border-neutral-800 bg-neutral-900/60 rounded-md space-y-2">
-                    <div className="text-sm font-semibold text-neutral-100 flex items-center gap-2">
-                      <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <span>{commit.title}</span>
-                    </div>
-                    <p className="text-xs text-neutral-400 leading-relaxed">{commit.detail}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="pt-6 border-t border-neutral-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-400">
-                <div>
-                  Licensed under <strong className="text-neutral-200">{OPEN_SOURCE_CONFIG.licenseName}</strong> with Section 7 App Store Exception.
-                </div>
-                <a
-                  href={OPEN_SOURCE_CONFIG.licenseUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-rose-400 hover:underline font-semibold"
-                >
-                  <span>Read License Terms</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ===================================================== */}
-        {/* 5. PROJECT ROADMAP                                    */}
-        {/* ===================================================== */}
-        <section id="roadmap" className="border-b border-neutral-800">
-          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-10">
-            <div className="space-y-3 max-w-2xl">
-              <div className="text-xs text-neutral-400">Development Milestones</div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-neutral-100 tracking-tight">
-                05. Project Roadmap &amp; Progress
-              </h2>
-              <p className="text-sm sm:text-[15px] text-neutral-400 leading-relaxed">
-                Transparent status of our architectural rebuild and enterprise feature rollout.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {ROADMAP_ITEMS.map(item => {
-                const statusColor =
-                  item.status === 'Completed'
-                    ? 'bg-emerald-950 text-emerald-400 border-emerald-800'
-                    : item.status === 'In Progress'
-                    ? 'bg-amber-950 text-amber-400 border-amber-800'
-                    : 'bg-neutral-900 text-neutral-400 border-neutral-800';
-
-                return (
-                  <div key={item.title} className="border border-neutral-800 bg-neutral-950 rounded-lg p-6 space-y-3 flex flex-col justify-between">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${statusColor}`}>
-                          {item.status}
-                        </span>
-                      </div>
-                      <h3 className="text-base font-bold text-neutral-100">{item.title}</h3>
-                      <p className="text-xs text-neutral-400 leading-relaxed">{item.detail}</p>
+                    <div className="text-sm font-bold text-neutral-50 mt-0.5">
+                      Launch any of the 4 operational portals directly
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
-        {/* ===================================================== */}
-        {/* 6. COMMUNITY & CONTRIBUTION                           */}
-        {/* ===================================================== */}
-        <section id="community" className="border-b border-neutral-800 bg-neutral-950/50">
-          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-10">
-            <div className="space-y-3 max-w-2xl">
-              <div className="text-xs text-neutral-400">Collaborative Engineering</div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-neutral-100 tracking-tight">
-                Built for the Community. Improved by the Community.
-              </h2>
-              <p className="text-sm sm:text-[15px] text-neutral-400 leading-relaxed">
-                Whether you are fixing a bug, suggesting a workflow feature, improving documentation, or conducting security reviews, your contribution makes Scribble-IT stronger.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[
-                { title: 'Contribute Code', desc: 'Fork the repository, submit pull requests, and help build new ITSM modules.', icon: Code2, link: OPEN_SOURCE_CONFIG.githubRepoUrl },
-                { title: 'Report Issues', desc: 'Found a bug or security edge case? File an issue on our GitHub tracker.', icon: LifeBuoy, link: OPEN_SOURCE_CONFIG.issueTrackerUrl },
-                { title: 'Improve Documentation', desc: 'Help us write clear deployment guides, API references, and admin tutorials.', icon: FileText, link: OPEN_SOURCE_CONFIG.documentationUrl },
-                { title: 'Participate in Discussions', desc: 'Join community discussions, propose features, and share your ITSM workflows.', icon: MessageSquare, link: OPEN_SOURCE_CONFIG.githubRepoUrl },
-                { title: 'Security Reviews', desc: 'Audit our authentication flows, RLS database policies, and IAM permissions.', icon: Shield, link: OPEN_SOURCE_CONFIG.githubRepoUrl },
-                { title: 'Spread the Word', desc: 'Star the repository and share Scribble-IT with other IT operations professionals.', icon: Github, link: OPEN_SOURCE_CONFIG.githubRepoUrl },
-              ].map(comm => {
-                const Icon = comm.icon;
-                return (
-                  <a
-                    key={comm.title}
-                    href={comm.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="border border-neutral-800 bg-neutral-950 hover:bg-neutral-900 rounded-lg p-6 space-y-3 transition-colors group block"
-                  >
-                    <Icon className="w-5 h-5 text-rose-400 group-hover:scale-110 transition-transform" />
-                    <h3 className="text-base font-bold text-neutral-100 flex items-center justify-between">
-                      <span>{comm.title}</span>
-                      <ArrowRight className="w-4 h-4 text-neutral-500 group-hover:text-neutral-100 transition-colors" />
-                    </h3>
-                    <p className="text-xs text-neutral-400 leading-relaxed">{comm.desc}</p>
-                  </a>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
-        {/* ===================================================== */}
-        {/* 7. SPONSOR AND SUPPORT THE PROJECT                    */}
-        {/* ===================================================== */}
-        <section id="sponsor" className="border-b border-neutral-800">
-          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-10">
-            <div className="border border-neutral-800 bg-neutral-950 rounded-lg p-8 sm:p-12 text-center space-y-6 max-w-3xl mx-auto">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-rose-950/60 text-rose-400 border border-rose-800/80 mx-auto">
-                <Heart className="w-6 h-6 fill-current" />
-              </div>
-
-              <div className="space-y-3">
-                <h2 className="text-2xl sm:text-3xl font-bold text-neutral-100">
-                  Help Us Build Better Open-Source ITSM.
-                </h2>
-                <p className="text-sm sm:text-base text-neutral-400 leading-relaxed max-w-2xl mx-auto">
-                  Scribble-IT is built with the vision of making enterprise ITSM accessible to everyone. Your support helps us maintain the project, improve security, develop new features, maintain infrastructure, and grow the open-source community.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
-                {OPEN_SOURCE_CONFIG.githubSponsorsUrl ? (
-                  <a
-                    href={OPEN_SOURCE_CONFIG.githubSponsorsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-5 py-3 bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold transition-colors inline-flex items-center gap-2"
-                  >
-                    <Heart className="w-4 h-4 fill-current" />
-                    <span>GitHub Sponsors</span>
-                  </a>
-                ) : (
-                  <a
-                    href={OPEN_SOURCE_CONFIG.githubRepoUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-5 py-3 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-neutral-200 text-sm font-semibold transition-colors inline-flex items-center gap-2"
-                  >
-                    <Github className="w-4 h-4" />
-                    <span>Sponsor on GitHub (Configured via URL)</span>
-                  </a>
-                )}
-
-                {OPEN_SOURCE_CONFIG.buyMeACoffeeUrl && (
-                  <a
-                    href={OPEN_SOURCE_CONFIG.buyMeACoffeeUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-5 py-3 bg-amber-600 hover:bg-amber-500 text-white text-sm font-semibold transition-colors inline-flex items-center gap-2"
-                  >
-                    <Coffee className="w-4 h-4" />
-                    <span>Buy Me a Coffee</span>
-                  </a>
-                )}
-
-                <a
-                  href={OPEN_SOURCE_CONFIG.githubRepoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-5 py-3 border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 text-sm font-semibold transition-colors inline-flex items-center gap-2"
-                >
-                  <Code2 className="w-4 h-4" />
-                  <span>Contribute Code</span>
-                </a>
-              </div>
-
-              <div className="text-xs text-neutral-500 pt-2">
-                Donations and financial support are completely voluntary and never required to use the free community edition.
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ===================================================== */}
-        {/* 8. INTERACTIVE DEMO LAUNCHER                          */}
-        {/* ===================================================== */}
-        <section id="portals">
-          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-8">
-            <div className="border border-neutral-800 bg-neutral-950 rounded-lg p-6 sm:p-10 space-y-8">
-              <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 border-b border-neutral-800 pb-8">
-                <div className="space-y-2 max-w-2xl">
-                  <div className="text-xs text-neutral-400">Interactive Sandbox</div>
-                  <h2 className="text-xl sm:text-2xl font-bold text-neutral-100">
-                    Explore Scribble-IT by Role
-                  </h2>
-                  <p className="text-sm text-neutral-400">
-                    Test drive the platform instantly with pre-configured test accounts across all four security portals.
-                  </p>
                 </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => handleLaunchDemo('super_admin', '/watchtower')}
-                    className="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold"
-                  >
-                    Launch Super Admin Demo
-                  </button>
-                  <Link
-                    to="/login"
-                    className="px-4 py-2.5 border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 text-xs font-semibold"
-                  >
-                    Portal Login
-                  </Link>
-                </div>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {[
-                  { id: 'super_admin' as const, route: '/watchtower', title: 'Super Admin Portal', desc: 'Full 31-module suite & tenant controls', icon: ShieldAlert, color: 'text-rose-400' },
-                  { id: 'employee' as const, route: '/incidents', title: 'Service Desk Ops', desc: 'Incident queue, AI triage & CTI phone', icon: Laptop, color: 'text-sky-400' },
-                  { id: 'iam' as const, route: '/iam', title: 'IAM Governance', desc: 'Directory, device enrollment & RBAC', icon: Shield, color: 'text-amber-400' },
-                  { id: 'end_user' as const, route: '/portal', title: 'End-User Self-Service', desc: 'Request catalog & live service status', icon: UserCheck, color: 'text-emerald-400' },
-                ].map(portal => {
-                  const Icon = portal.icon;
-                  return (
-                    <button
-                      key={portal.id}
-                      type="button"
-                      onClick={() => handleLaunchDemo(portal.id, portal.route)}
-                      className="text-left p-5 border border-neutral-800 bg-neutral-900/40 hover:bg-neutral-900 rounded-md transition-colors flex flex-col justify-between gap-4 group"
-                    >
-                      <div className="space-y-3">
-                        <Icon className={`w-5 h-5 ${portal.color}`} />
-                        <div className="space-y-1">
-                          <div className="text-sm font-semibold text-neutral-100">{portal.title}</div>
-                          <p className="text-xs text-neutral-400">{portal.desc}</p>
+                <div className="p-4 space-y-2.5">
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { label: 'Super Admin', route: '/watchtower', portal: 'super_admin' as const, sub: 'Watchtower & Governance' },
+                      { label: 'Employee Ops', route: '/incidents', portal: 'employee' as const, sub: 'Incidents, CAB & CMDB' },
+                      { label: 'IAM Portal', route: '/iam', portal: 'iam' as const, sub: 'RBAC & Device Trust' },
+                      { label: 'End-User Portal', route: '/portal', portal: 'end_user' as const, sub: 'Self-Service Catalog' },
+                    ].map(portal => (
+                      <button
+                        key={portal.label}
+                        type="button"
+                        onClick={() => handleLaunchDemo(portal.portal, portal.route)}
+                        className="text-left p-3 border border-neutral-800 bg-neutral-950 hover:border-rose-500/60 hover:bg-neutral-900 rounded-md transition-colors group"
+                      >
+                        <div className="flex items-center justify-between text-xs font-semibold text-neutral-100 group-hover:text-rose-400">
+                          <span>{portal.label}</span>
+                          <ArrowRight className="w-3 h-3 shrink-0" />
                         </div>
-                      </div>
-                      <div className="text-xs font-semibold text-neutral-200 group-hover:text-white inline-flex items-center gap-1.5">
-                        <span>Launch Workspace</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </div>
-                    </button>
+                        <div className="text-[11px] text-neutral-400 mt-0.5 truncate">{portal.sub}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* =================================================================== */}
+        {/* B. ABOUT SCRIBBLE-IT                                                */}
+        {/* =================================================================== */}
+        <section id="about" className="border-b border-neutral-800">
+          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 space-y-12">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              <div className="lg:col-span-5 space-y-4">
+                <div className="text-xs font-mono text-rose-400 uppercase tracking-wider">
+                  About SCRIBBLE-IT 2.0
+                </div>
+                <h2
+                  className="text-2xl sm:text-3xl font-bold text-neutral-100 leading-tight"
+                  style={{ textWrap: 'balance' }}
+                >
+                  Enterprise ITSM built for operational rigor, without proprietary lock-in.
+                </h2>
+                <p className="text-sm text-neutral-400 leading-relaxed">
+                  Created by <strong className="text-neutral-200">{PROJECT_IDENTITY.organizationFull}</strong>, SCRIBBLE-IT 2.0 was engineered to solve a persistent industry problem: enterprise-grade IT Service Management software is routinely locked behind costly per-agent contracts, opaque closed-source stacks, and fragmented point tools.
+                </p>
+              </div>
+
+              <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[
+                  {
+                    title: 'What It Is',
+                    body: 'A unified open-source ITSM, CMDB, asset, identity, and governance platform combining a modern React workspace with a hardened FastAPI + PostgreSQL backend.',
+                  },
+                  {
+                    title: 'Problems It Solves',
+                    body: 'Eliminates disconnected ticketing tools, unverified manual approvals, shadow asset spreadsheets, and prohibitive enterprise licensing fees.',
+                  },
+                  {
+                    title: 'Open-Source Philosophy',
+                    body: 'Every capability is transparent, inspectable, self-hostable, and licensed under AGPL-3.0-only so organizations retain full sovereignty over their operational data.',
+                  },
+                  {
+                    title: 'Human-Supervised Governance',
+                    body: 'Built-in separation of duties, append-only audit logs, backend RBAC, and advisory-only AI ensure humans remain accountable for sensitive decisions.',
+                  },
+                ].map(card => (
+                  <div
+                    key={card.title}
+                    className="p-5 border border-neutral-800 bg-neutral-900/40 rounded-lg space-y-2"
+                  >
+                    <h3 className="text-sm font-bold text-neutral-100">{card.title}</h3>
+                    <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">{card.body}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Who It Is Built For */}
+            <div className="space-y-4 pt-4 border-t border-neutral-800">
+              <h3 className="text-base font-bold text-neutral-100">Who SCRIBBLE-IT 2.0 Is Built For</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                {AUDIENCES.map(audience => {
+                  const Icon = audience.icon;
+                  return (
+                    <div
+                      key={audience.title}
+                      className="p-4 border border-neutral-800 bg-neutral-950 rounded-lg space-y-2.5"
+                    >
+                      <Icon className="w-4 h-4 text-rose-400" />
+                      <div className="text-sm font-semibold text-neutral-100">{audience.title}</div>
+                      <p className="text-xs text-neutral-400 leading-relaxed">{audience.detail}</p>
+                    </div>
                   );
                 })}
               </div>
             </div>
           </div>
         </section>
+
+        {/* =================================================================== */}
+        {/* C. PLATFORM CAPABILITIES                                            */}
+        {/* =================================================================== */}
+        <section id="features" className="border-b border-neutral-800">
+          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 space-y-8">
+            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+              <div className="space-y-2 max-w-2xl">
+                <div className="text-xs font-mono text-rose-400 uppercase tracking-wider">
+                  Platform Capabilities
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-bold text-neutral-100">
+                  Six unified operational domains in one architecture
+                </h2>
+                <p className="text-sm text-neutral-400">
+                  Every listed module reflects verified repository implementations, clearly distinguishing capabilities available today from planned extensions.
+                </p>
+              </div>
+              <div className="text-xs font-mono text-neutral-400">
+                Status Key: <span className="text-emerald-400">Available</span> · <span className="text-amber-400">In Development</span> · <span className="text-neutral-300">Planned</span>
+              </div>
+            </div>
+
+            {/* Category Filter Tabs */}
+            <div
+              role="tablist"
+              aria-label="Filter platform capabilities"
+              className="flex items-center gap-1 p-1 border border-neutral-800 bg-neutral-900 rounded-lg overflow-x-auto no-scrollbar"
+            >
+              {[
+                { id: 'all' as const, label: 'All Capabilities' },
+                { id: 'itsm' as const, label: 'IT Service Management' },
+                { id: 'cmdb' as const, label: 'Assets & CMDB' },
+                { id: 'iam' as const, label: 'Identity & Access' },
+                { id: 'automation_ai' as const, label: 'Automation & AI' },
+                { id: 'governance' as const, label: 'Governance' },
+                { id: 'integrations' as const, label: 'Integrations' },
+              ].map(tab => {
+                const selected = activeCategory === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    onClick={() => setActiveCategory(tab.id)}
+                    className={`px-3.5 py-2 min-h-[38px] text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 ${
+                      selected
+                        ? 'bg-rose-600 text-white'
+                        : 'text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800/60'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Capability Category Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {visibleCapabilities.map(group => {
+                const CategoryIcon =
+                  group.id === 'itsm'
+                    ? AlertTriangle
+                    : group.id === 'cmdb'
+                    ? Server
+                    : group.id === 'iam'
+                    ? Shield
+                    : group.id === 'automation_ai'
+                    ? Workflow
+                    : group.id === 'governance'
+                    ? Scale
+                    : Plug;
+
+                return (
+                  <div
+                    key={group.id}
+                    className="border border-neutral-800 bg-neutral-950 rounded-lg p-6 space-y-5"
+                  >
+                    <div className="flex items-start gap-3 pb-4 border-b border-neutral-800">
+                      <CategoryIcon className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                      <div>
+                        <h3 className="text-base font-bold text-neutral-100">{group.title}</h3>
+                        <p className="text-xs text-neutral-400 mt-1">{group.subtitle}</p>
+                      </div>
+                    </div>
+
+                    <ul className="space-y-3.5">
+                      {group.items.map(item => (
+                        <li
+                          key={item.name}
+                          className="pb-3.5 border-b border-neutral-800/70 last:border-b-0 last:pb-0 space-y-1"
+                        >
+                          <div className="flex items-baseline justify-between gap-3">
+                            <span className="text-sm font-semibold text-neutral-100">
+                              {item.name}
+                            </span>
+                            <span
+                              className={`text-xs font-mono shrink-0 ${getStatusColorClass(item.status)}`}
+                            >
+                              {item.status}
+                            </span>
+                          </div>
+                          <p className="text-xs text-neutral-400 leading-relaxed">{item.detail}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* =================================================================== */}
+        {/* D. CROSS-PLATFORM ECOSYSTEM                                         */}
+        {/* =================================================================== */}
+        <section id="ecosystem" className="border-b border-neutral-800">
+          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 space-y-8">
+            <div className="space-y-2 max-w-2xl">
+              <div className="text-xs font-mono text-rose-400 uppercase tracking-wider">
+                Cross-Platform Ecosystem
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-neutral-100">
+                Available on the Web today. Expanding to native Desktop and Mobile.
+              </h2>
+              <p className="text-sm text-neutral-400">
+                The web platform is production-ready today. Native desktop and mobile clients are planned on the shared TypeScript and FastAPI architecture—no unverified binaries or placeholder installers are listed.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {ECOSYSTEM_PLATFORMS.map(item => {
+                const Icon = item.icon;
+                return (
+                  <div
+                    key={item.name}
+                    className="border border-neutral-800 bg-neutral-950 rounded-lg p-6 flex flex-col justify-between gap-5"
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <Icon className="w-5 h-5 text-rose-400 shrink-0" />
+                        <span className={`text-xs font-mono ${getStatusColorClass(item.status)}`}>
+                          {item.status}
+                        </span>
+                      </div>
+                      <div>
+                        <h3 className="text-base font-bold text-neutral-100">{item.name}</h3>
+                        <div className="text-xs font-mono text-neutral-400 mt-1">
+                          {item.platforms}
+                        </div>
+                      </div>
+                      <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">
+                        {item.summary}
+                      </p>
+                    </div>
+
+                    <div className="pt-4 border-t border-neutral-800">
+                      {item.status === 'Available' ? (
+                        <button
+                          type="button"
+                          onClick={() => handleLaunchDemo('super_admin', '/watchtower')}
+                          className="text-xs font-semibold text-rose-400 hover:text-rose-300 inline-flex items-center gap-1.5 transition-colors"
+                        >
+                          <span>Launch Web Application</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-2 text-xs text-neutral-500">
+                          <Clock className="w-3.5 h-3.5 shrink-0" />
+                          <span>In roadmap — track updates on GitHub</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* =================================================================== */}
+        {/* E. TECHNOLOGY & ARCHITECTURE                                        */}
+        {/* =================================================================== */}
+        <section id="architecture" className="border-b border-neutral-800">
+          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 space-y-8">
+            <div className="space-y-2 max-w-2xl">
+              <div className="text-xs font-mono text-rose-400 uppercase tracking-wider">
+                Technology &amp; Architecture
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-neutral-100">
+                Modern, auditable, enterprise-ready stack
+              </h2>
+              <p className="text-sm text-neutral-400">
+                Engineered for clear separation of concerns, strict database-level tenant isolation, and portable deployment across cloud and on-premise environments.
+              </p>
+            </div>
+
+            <ArchitectureDiagram />
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[
+                {
+                  icon: Laptop,
+                  title: 'Frontend Architecture',
+                  stack: [
+                    { name: 'React 19 + TypeScript', state: 'Implemented' },
+                    { name: 'Vite 8 Build Pipeline', state: 'Implemented' },
+                    { name: 'Tailwind CSS v4 Design System', state: 'Implemented' },
+                    { name: 'React Router v7 Multi-Portal Routing', state: 'Implemented' },
+                    { name: 'Shared Desktop/Mobile Core Packages', state: 'Planned' },
+                  ],
+                },
+                {
+                  icon: Server,
+                  title: 'Backend Architecture',
+                  stack: [
+                    { name: 'Python + FastAPI (/api/v1)', state: 'Implemented' },
+                    { name: 'PostgreSQL 16 + Row-Level Security', state: 'Implemented' },
+                    { name: 'SQLAlchemy 2.x Async + Alembic', state: 'Implemented' },
+                    { name: 'Redis 7 Cache & Sliding Rate Limits', state: 'Implemented' },
+                    { name: 'Argon2id + PyJWT + Fernet Encryption', state: 'Implemented' },
+                  ],
+                },
+                {
+                  icon: Layers,
+                  title: 'Infrastructure & Delivery',
+                  stack: [
+                    { name: 'Docker & Docker Compose', state: 'Implemented' },
+                    { name: 'Nginx Reverse Proxy + SPA Bundle', state: 'Implemented' },
+                    { name: 'Async Background Workers & Retries', state: 'Implemented' },
+                    { name: 'GitHub Actions CI/CD Workflows', state: 'Implemented' },
+                    { name: 'Native Store Release Pipelines', state: 'Planned' },
+                  ],
+                },
+              ].map(column => {
+                const Icon = column.icon;
+                return (
+                  <div
+                    key={column.title}
+                    className="border border-neutral-800 bg-neutral-950 rounded-lg p-6 space-y-4"
+                  >
+                    <div className="flex items-center gap-2.5 pb-3 border-b border-neutral-800">
+                      <Icon className="w-4 h-4 text-rose-400 shrink-0" />
+                      <h3 className="text-sm font-bold text-neutral-100">{column.title}</h3>
+                    </div>
+                    <ul className="space-y-2.5">
+                      {column.stack.map(entry => (
+                        <li
+                          key={entry.name}
+                          className="flex items-center justify-between gap-2 text-xs"
+                        >
+                          <span className="text-neutral-200 font-medium">{entry.name}</span>
+                          <span
+                            className={`font-mono shrink-0 ${
+                              entry.state === 'Implemented' ? 'text-emerald-400' : 'text-neutral-400'
+                            }`}
+                          >
+                            {entry.state}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* =================================================================== */}
+        {/* F. FREE & OPEN-SOURCE COMMITMENT                                    */}
+        {/* =================================================================== */}
+        <section id="opensource" className="border-b border-neutral-800">
+          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 space-y-8">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              <div className="lg:col-span-6 space-y-4">
+                <div className="text-xs font-mono text-rose-400 uppercase tracking-wider">
+                  Free &amp; Open-Source Commitment
+                </div>
+                <h2
+                  className="text-2xl sm:text-3xl font-bold text-neutral-100 tracking-tight"
+                  style={{ textWrap: 'balance' }}
+                >
+                  POWERFUL ITSM. WITHOUT THE PRICE TAG.
+                </h2>
+                <p className="text-sm sm:text-base text-neutral-400 leading-relaxed">
+                  SCRIBBLE-IT 2.0 is built on the conviction that reliable enterprise IT operations should not be restricted to organizations with six-figure software budgets. Every core capability—from incident queues and CAB governance to PostgreSQL tenant isolation—is free, open-source, and self-hostable.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                  {[
+                    '100% Free to Use & Self-Host',
+                    'Transparent Open-Source Codebase',
+                    'No Mandatory Per-Agent Fees',
+                    'Community-Driven Improvements',
+                  ].map(point => (
+                    <div
+                      key={point}
+                      className="flex items-center gap-2 text-xs sm:text-sm text-neutral-200"
+                    >
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>{point}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="lg:col-span-6 border border-neutral-800 bg-neutral-950 rounded-lg p-6 space-y-4">
+                <div className="flex items-center justify-between gap-3 pb-3 border-b border-neutral-800">
+                  <div className="text-sm font-bold text-neutral-100">Verified Repository Licensing</div>
+                  <span className="text-xs font-mono text-emerald-400">
+                    {PROJECT_IDENTITY.licenseSpdx}
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">
+                  SCRIBBLE-IT 2.0 is licensed under the{' '}
+                  <strong className="text-neutral-200">
+                    GNU Affero General Public License v3.0 (AGPL-3.0-only)
+                  </strong>{' '}
+                  accompanied by an official{' '}
+                  <strong className="text-neutral-200">
+                    Section 7 App Store Distribution Exception
+                  </strong>{' '}
+                  (documented in <code className="text-neutral-200">LICENSE</code> and{' '}
+                  <code className="text-neutral-200">LICENSE-EXCEPTION.md</code>).
+                </p>
+                <ul className="space-y-2 text-xs text-neutral-400">
+                  <li>
+                    · <strong className="text-neutral-200">Network Copyleft Protection:</strong> Modifications deployed as a hosted service remain open to users under AGPL-3.0.
+                  </li>
+                  <li>
+                    · <strong className="text-neutral-200">App Store Distribution Clarity:</strong> Permits distribution on Apple App Store, Mac App Store, Google Play, and Microsoft Store while requiring free Corresponding Source availability.
+                  </li>
+                  <li>
+                    · <strong className="text-neutral-200">Trademark Boundaries:</strong> License permissions cover source code copyright only and do not grant trademark rights to Njure Tech, Njure Group, or Scribble-IT branding.
+                  </li>
+                </ul>
+                <div className="pt-2 flex flex-wrap gap-4 text-xs font-semibold">
+                  <a
+                    href={`${GITHUB_REPOSITORY_URL}/blob/main/LICENSE`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-rose-400 hover:text-rose-300 inline-flex items-center gap-1"
+                  >
+                    <span>Read LICENSE (AGPL-3.0)</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                  <a
+                    href={`${GITHUB_REPOSITORY_URL}/blob/main/LICENSE-EXCEPTION.md`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-rose-400 hover:text-rose-300 inline-flex items-center gap-1"
+                  >
+                    <span>Read Section 7 Exception</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* =================================================================== */}
+        {/* G. SUPPORT & SPONSORSHIP                                            */}
+        {/* =================================================================== */}
+        <section id="sponsor" className="border-b border-neutral-800">
+          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 space-y-8">
+            <div className="max-w-3xl space-y-3">
+              <div className="text-xs font-mono text-rose-400 uppercase tracking-wider">
+                Voluntary Support &amp; Sponsorship
+              </div>
+              <h2
+                className="text-2xl sm:text-3xl font-bold text-neutral-100 tracking-tight"
+                style={{ textWrap: 'balance' }}
+              >
+                HELP US BUILD THE FUTURE OF OPEN-SOURCE ITSM.
+              </h2>
+              <p className="text-sm sm:text-base text-neutral-400 leading-relaxed">
+                SCRIBBLE-IT 2.0 is free for everyone and never places core features behind a paywall. Voluntary contributions directly support active engineering, documentation, security maintenance, infrastructure testing, and upcoming cross-platform apps.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Direct Voluntary Support (Configured) */}
+              <div className="border border-neutral-800 bg-neutral-950 rounded-lg p-6 flex flex-col justify-between gap-5">
+                <div className="space-y-2.5">
+                  <Heart className="w-5 h-5 text-rose-500" />
+                  <h3 className="text-base font-bold text-neutral-100">Support Njure Tech Directly</h3>
+                  <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">
+                    Make a voluntary one-time contribution via the verified Njure Tech payment link to fund hosting, testing, and ongoing releases.
+                  </p>
+                </div>
+                {isConfiguredUrl(NJURE_SUPPORT_PAYMENT_URL) ? (
+                  <a
+                    href={NJURE_SUPPORT_PAYMENT_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2.5 min-h-[42px] bg-rose-600 hover:bg-rose-500 text-white text-xs sm:text-sm font-semibold rounded-md transition-colors inline-flex items-center justify-center gap-2"
+                  >
+                    <span>Support via Payment Link</span>
+                    <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                  </a>
+                ) : (
+                  <div className="text-xs text-neutral-500 font-mono">
+                    Configure VITE_SUPPORT_PAYMENT_URL to enable
+                  </div>
+                )}
+              </div>
+
+              {/* GitHub Sponsors (Configurable Placeholder) */}
+              <div className="border border-neutral-800 bg-neutral-950 rounded-lg p-6 flex flex-col justify-between gap-5">
+                <div className="space-y-2.5">
+                  <Github className="w-5 h-5 text-neutral-200" />
+                  <h3 className="text-base font-bold text-neutral-100">Sponsor on GitHub</h3>
+                  <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">
+                    Recurring community and organizational sponsorship through GitHub Sponsors once the official sponsor profile is activated.
+                  </p>
+                </div>
+                {isConfiguredUrl(GITHUB_SPONSORS_URL) ? (
+                  <a
+                    href={GITHUB_SPONSORS_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2.5 min-h-[42px] border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-100 text-xs sm:text-sm font-semibold rounded-md transition-colors inline-flex items-center justify-center gap-2"
+                  >
+                    <span>Sponsor on GitHub</span>
+                    <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                  </a>
+                ) : (
+                  <div className="pt-3 border-t border-neutral-800 text-xs text-neutral-400">
+                    Placeholder pending activation (<code className="text-neutral-300">GITHUB_SPONSORS_URL</code>)
+                  </div>
+                )}
+              </div>
+
+              {/* Buy Me a Coffee (Configurable Placeholder) */}
+              <div className="border border-neutral-800 bg-neutral-950 rounded-lg p-6 flex flex-col justify-between gap-5">
+                <div className="space-y-2.5">
+                  <Coffee className="w-5 h-5 text-amber-400" />
+                  <h3 className="text-base font-bold text-neutral-100">Buy Me a Coffee</h3>
+                  <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">
+                    Quick voluntary supporter contributions once the official Buy Me a Coffee profile is published and configured.
+                  </p>
+                </div>
+                {isConfiguredUrl(BUY_ME_A_COFFEE_URL) ? (
+                  <a
+                    href={BUY_ME_A_COFFEE_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2.5 min-h-[42px] border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-100 text-xs sm:text-sm font-semibold rounded-md transition-colors inline-flex items-center justify-center gap-2"
+                  >
+                    <span>Buy Me a Coffee</span>
+                    <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                  </a>
+                ) : (
+                  <div className="pt-3 border-t border-neutral-800 text-xs text-neutral-400">
+                    Placeholder pending activation (<code className="text-neutral-300">BUY_ME_A_COFFEE_URL</code>)
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="text-xs text-neutral-400 flex flex-wrap items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+              <span>
+                You can also support the project at zero cost by starring the GitHub repository, sharing feedback, or contributing code and documentation.
+              </span>
+            </div>
+          </div>
+        </section>
+
+        {/* =================================================================== */}
+        {/* H. COMMUNITY & CONTRIBUTIONS                                        */}
+        {/* =================================================================== */}
+        <section id="community" className="border-b border-neutral-800">
+          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 space-y-8">
+            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+              <div className="space-y-2 max-w-2xl">
+                <div className="text-xs font-mono text-rose-400 uppercase tracking-wider">
+                  Community &amp; Contributions
+                </div>
+                <h2
+                  className="text-2xl sm:text-3xl font-bold text-neutral-100 tracking-tight"
+                  style={{ textWrap: 'balance' }}
+                >
+                  BUILT WITH THE COMMUNITY. IMPROVED BY THE COMMUNITY.
+                </h2>
+                <p className="text-sm text-neutral-400">
+                  Every discipline makes enterprise ITSM stronger—from Python and React engineers to ITIL administrators, QA testers, designers, and technical writers.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2.5">
+                <a
+                  href={`${GITHUB_REPOSITORY_URL}/blob/main/CONTRIBUTING.md`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2.5 min-h-[40px] border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-100 text-xs font-semibold rounded-md transition-colors inline-flex items-center gap-2"
+                >
+                  <GitPullRequest className="w-3.5 h-3.5" />
+                  <span>Contributing Guide</span>
+                </a>
+                <a
+                  href={ISSUES_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2.5 min-h-[40px] border border-neutral-800 bg-neutral-950 hover:bg-neutral-900 text-neutral-200 text-xs font-semibold rounded-md transition-colors inline-flex items-center gap-2"
+                >
+                  <Bug className="w-3.5 h-3.5" />
+                  <span>Open an Issue</span>
+                </a>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {CONTRIBUTION_PATHS.map(path => {
+                const Icon = path.icon;
+                return (
+                  <div
+                    key={path.title}
+                    className="border border-neutral-800 bg-neutral-950 rounded-lg p-5 space-y-2.5"
+                  >
+                    <Icon className="w-4 h-4 text-rose-400" />
+                    <h3 className="text-sm font-bold text-neutral-100">{path.title}</h3>
+                    <p className="text-xs text-neutral-400 leading-relaxed">{path.detail}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* =================================================================== */}
+        {/* I. PROJECT ROADMAP                                                  */}
+        {/* =================================================================== */}
+        <section id="roadmap" className="border-b border-neutral-800">
+          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 space-y-8">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+              <div className="space-y-2 max-w-2xl">
+                <div className="text-xs font-mono text-rose-400 uppercase tracking-wider">
+                  Project Roadmap
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-bold text-neutral-100">
+                  Transparent engineering milestones
+                </h2>
+                <p className="text-sm text-neutral-400">
+                  Clear visibility into what is completed in the repository, what is actively being refined, and what comes next.
+                </p>
+              </div>
+              <div className="text-xs font-mono text-neutral-400">
+                <span className="text-emerald-400">Completed</span> · <span className="text-amber-400">In Progress</span> · <span className="text-sky-400">Coming Soon</span> · <span>Planned</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {ROADMAP_MILESTONES.map(milestone => (
+                <div
+                  key={milestone.phase}
+                  className="border border-neutral-800 bg-neutral-950 rounded-lg p-5 flex items-start gap-4"
+                >
+                  <div className="text-xs font-mono tabular-nums text-neutral-500 pt-0.5 shrink-0">
+                    {milestone.phase}
+                  </div>
+                  <div className="space-y-1.5 flex-1 min-w-0">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <h3 className="text-sm font-bold text-neutral-100">{milestone.title}</h3>
+                      <span
+                        className={`text-xs font-mono shrink-0 ${getStatusColorClass(milestone.status)}`}
+                      >
+                        {milestone.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-neutral-400 leading-relaxed">{milestone.summary}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* =================================================================== */}
+        {/* J. PRODUCT SCREENSHOTS & INTERACTIVE MODULE PREVIEWS                */}
+        {/* =================================================================== */}
+        <section id="screenshots" className="border-b border-neutral-800">
+          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 space-y-8">
+            <div className="space-y-2 max-w-2xl">
+              <div className="text-xs font-mono text-rose-400 uppercase tracking-wider">
+                Product Previews
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-neutral-100">
+                Inspect core operational workspaces before launching
+              </h2>
+              <p className="text-sm text-neutral-400">
+                Browse each verified module below and launch directly into the live SCRIBBLE-IT 2.0 application workspace.
+              </p>
+            </div>
+
+            <ProductPreviewShowcase onLaunchModule={handleLaunchDemo} />
+          </div>
+        </section>
+
+        {/* =================================================================== */}
+        {/* K. DOCUMENTATION & RESOURCES                                        */}
+        {/* =================================================================== */}
+        <section id="resources" className="border-b border-neutral-800">
+          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 space-y-8">
+            <div className="space-y-2 max-w-2xl">
+              <div className="text-xs font-mono text-rose-400 uppercase tracking-wider">
+                Documentation &amp; Resources
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-neutral-100">
+                Everything needed to deploy, integrate, and contribute
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {docsResources.map(resource => {
+                if (resource.sectionTarget) {
+                  return (
+                    <button
+                      key={resource.title}
+                      type="button"
+                      onClick={() => scrollToSection(resource.sectionTarget!)}
+                      className="text-left border border-neutral-800 bg-neutral-950 hover:border-neutral-600 rounded-lg p-5 space-y-2 transition-colors group"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-bold text-neutral-100 group-hover:text-rose-400 transition-colors">
+                          {resource.title}
+                        </span>
+                        <ArrowRight className="w-4 h-4 text-neutral-500 group-hover:text-rose-400 shrink-0" />
+                      </div>
+                      <p className="text-xs text-neutral-400 leading-relaxed">{resource.description}</p>
+                    </button>
+                  );
+                }
+
+                if (resource.configured) {
+                  return (
+                    <a
+                      key={resource.title}
+                      href={resource.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="border border-neutral-800 bg-neutral-950 hover:border-neutral-600 rounded-lg p-5 space-y-2 transition-colors group block"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-bold text-neutral-100 group-hover:text-rose-400 transition-colors">
+                          {resource.title}
+                        </span>
+                        <ExternalLink className="w-3.5 h-3.5 text-neutral-500 group-hover:text-rose-400 shrink-0" />
+                      </div>
+                      <p className="text-xs text-neutral-400 leading-relaxed">{resource.description}</p>
+                    </a>
+                  );
+                }
+
+                return (
+                  <div
+                    key={resource.title}
+                    className="border border-neutral-800/80 bg-neutral-950/60 rounded-lg p-5 space-y-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-bold text-neutral-200">{resource.title}</span>
+                      <span className="text-[11px] font-mono text-neutral-500">Not Configured</span>
+                    </div>
+                    <p className="text-xs text-neutral-400 leading-relaxed">{resource.description}</p>
+                    {resource.placeholderVar && (
+                      <div className="text-[11px] font-mono text-neutral-500 pt-1">
+                        Set <code>{resource.placeholderVar}</code> in openSourceConfig.ts
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* =================================================================== */}
+        {/* L. FREQUENTLY ASKED QUESTIONS                                       */}
+        {/* =================================================================== */}
+        <section id="faq" className="border-b border-neutral-800">
+          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 space-y-8">
+            <div className="space-y-2 max-w-2xl">
+              <div className="text-xs font-mono text-rose-400 uppercase tracking-wider">
+                Frequently Asked Questions
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-neutral-100">
+                Straight answers on licensing, security, AI, and self-hosting
+              </h2>
+            </div>
+
+            <div className="divide-y divide-neutral-800 border border-neutral-800 bg-neutral-950 rounded-lg">
+              {FAQ_ITEMS.map((item, idx) => {
+                const isOpen = openFaqIdx === idx;
+                const panelId = `faq-panel-${idx}`;
+                return (
+                  <div key={item.question}>
+                    <button
+                      type="button"
+                      aria-expanded={isOpen}
+                      aria-controls={panelId}
+                      onClick={() => setOpenFaqIdx(isOpen ? null : idx)}
+                      className="w-full px-5 py-4 min-h-[52px] text-left flex items-center justify-between gap-4 hover:bg-neutral-900/50 transition-colors"
+                    >
+                      <span className="text-sm font-semibold text-neutral-100">{item.question}</span>
+                      {isOpen ? (
+                        <ChevronUp className="w-4 h-4 text-rose-400 shrink-0" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-neutral-400 shrink-0" />
+                      )}
+                    </button>
+                    {isOpen && (
+                      <div
+                        id={panelId}
+                        className="px-5 pb-5 text-xs sm:text-sm text-neutral-400 leading-relaxed"
+                      >
+                        {item.answer}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* =================================================================== */}
+        {/* M. FOUNDER & ORGANIZATION SECTION                                   */}
+        {/* =================================================================== */}
+        <section id="founder" className="border-b border-neutral-800">
+          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20">
+            <div className="border border-neutral-800 bg-neutral-950 rounded-lg p-6 sm:p-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+              <div className="lg:col-span-5 space-y-5">
+                <div className="text-xs font-mono text-rose-400 uppercase tracking-wider">
+                  Founder &amp; Organization
+                </div>
+                <div className="py-2">
+                  <DotMatrixText text="NJURE TECH" size="md" />
+                </div>
+                <div className="space-y-1">
+                  <div className="text-lg font-bold text-neutral-100">
+                    {PROJECT_IDENTITY.founderName}
+                  </div>
+                  <div className="text-sm font-medium text-neutral-300">
+                    {PROJECT_IDENTITY.founderRole}
+                  </div>
+                  <div className="text-xs text-neutral-400">
+                    {PROJECT_IDENTITY.organizationFull}
+                  </div>
+                </div>
+                <div className="pt-2 flex flex-wrap items-center gap-4 text-xs">
+                  <a
+                    href={PROJECT_IDENTITY.officialWebsiteUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-rose-400 hover:text-rose-300 font-semibold inline-flex items-center gap-1"
+                  >
+                    <span>scribbleit.njuregroup.in</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                  <a
+                    href={GITHUB_REPOSITORY_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-neutral-300 hover:text-neutral-100 font-semibold inline-flex items-center gap-1"
+                  >
+                    <Github className="w-3.5 h-3.5" />
+                    <span>GitHub</span>
+                  </a>
+                </div>
+              </div>
+
+              <div className="lg:col-span-7 space-y-4 lg:border-l lg:border-neutral-800 lg:pl-8">
+                <p className="text-sm sm:text-base text-neutral-300 leading-relaxed">
+                  {PROJECT_IDENTITY.productName} is developed and maintained under{' '}
+                  <strong className="text-neutral-100">{PROJECT_IDENTITY.organizationFull}</strong>{' '}
+                  with a clear long-term mission: making dependable, security-first enterprise IT Service Management openly accessible to every organization, institution, and IT operator worldwide.
+                </p>
+                <div className="p-4 border border-neutral-800 bg-neutral-900/40 rounded-md space-y-1">
+                  <div className="text-sm font-bold text-neutral-100">
+                    {PROJECT_IDENTITY.founderAttribution}
+                  </div>
+                  <div className="text-xs text-neutral-400">
+                    {PROJECT_IDENTITY.founderAttributionSubline}
+                  </div>
+                </div>
+                <p className="text-xs text-neutral-400 leading-relaxed">
+                  {PROJECT_IDENTITY.finalBrandStatement}
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-neutral-800 bg-neutral-950">
-        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-400">
-          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-            <span className="font-semibold text-neutral-100">Scribble-IT — Enterprise ITSM</span>
-            <span aria-hidden="true">·</span>
-            <span>Open Source (AGPL-3.0)</span>
+      {/* ===================================================================== */}
+      {/* N. FOOTER                                                             */}
+      {/* ===================================================================== */}
+      <footer className="bg-neutral-950 border-t border-neutral-800">
+        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
+            {/* Brand & Founder Attribution */}
+            <div className="md:col-span-5 space-y-3">
+              <div className="text-base font-bold text-neutral-100">
+                {PROJECT_IDENTITY.productName}
+              </div>
+              <div className="text-sm text-neutral-300">{PROJECT_IDENTITY.tagline}</div>
+              <div className="pt-2 space-y-0.5 text-xs text-neutral-400">
+                <div className="font-semibold text-neutral-200">
+                  {PROJECT_IDENTITY.founderAttribution}
+                </div>
+                <div>{PROJECT_IDENTITY.founderAttributionSubline}</div>
+              </div>
+              <p className="text-xs text-neutral-500 pt-1">
+                {PROJECT_IDENTITY.finalBrandStatement}
+              </p>
+            </div>
+
+            {/* Platform Links */}
+            <div className="md:col-span-2 space-y-2.5 text-xs">
+              <div className="font-semibold text-neutral-200 uppercase tracking-wider">Platform</div>
+              <ul className="space-y-2 text-neutral-400">
+                <li>
+                  <button type="button" onClick={() => scrollToSection('about')} className="hover:text-neutral-100 transition-colors">
+                    About
+                  </button>
+                </li>
+                <li>
+                  <button type="button" onClick={() => handleLaunchDemo('super_admin', '/watchtower')} className="hover:text-neutral-100 transition-colors">
+                    Platform
+                  </button>
+                </li>
+                <li>
+                  <button type="button" onClick={() => scrollToSection('features')} className="hover:text-neutral-100 transition-colors">
+                    Features
+                  </button>
+                </li>
+                <li>
+                  <button type="button" onClick={() => scrollToSection('roadmap')} className="hover:text-neutral-100 transition-colors">
+                    Roadmap
+                  </button>
+                </li>
+              </ul>
+            </div>
+
+            {/* Open Source Links */}
+            <div className="md:col-span-3 space-y-2.5 text-xs">
+              <div className="font-semibold text-neutral-200 uppercase tracking-wider">Open Source</div>
+              <ul className="space-y-2 text-neutral-400">
+                <li>
+                  <a href={DOCUMENTATION_URL} target="_blank" rel="noopener noreferrer" className="hover:text-neutral-100 transition-colors">
+                    Documentation
+                  </a>
+                </li>
+                <li>
+                  <a href={GITHUB_REPOSITORY_URL} target="_blank" rel="noopener noreferrer" className="hover:text-neutral-100 transition-colors">
+                    GitHub
+                  </a>
+                </li>
+                <li>
+                  {isConfiguredUrl(COMMUNITY_URL) ? (
+                    <a href={COMMUNITY_URL} target="_blank" rel="noopener noreferrer" className="hover:text-neutral-100 transition-colors">
+                      Community
+                    </a>
+                  ) : (
+                    <button type="button" onClick={() => scrollToSection('community')} className="hover:text-neutral-100 transition-colors">
+                      Community
+                    </button>
+                  )}
+                </li>
+                <li>
+                  <button type="button" onClick={() => scrollToSection('sponsor')} className="hover:text-neutral-100 transition-colors">
+                    Support
+                  </button>
+                </li>
+              </ul>
+            </div>
+
+            {/* Legal & Theme */}
+            <div className="md:col-span-2 space-y-2.5 text-xs">
+              <div className="font-semibold text-neutral-200 uppercase tracking-wider">Legal</div>
+              <ul className="space-y-2 text-neutral-400">
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => setLegalModal('privacy')}
+                    className="hover:text-neutral-100 transition-colors"
+                  >
+                    Privacy Policy
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => setLegalModal('terms')}
+                    className="hover:text-neutral-100 transition-colors"
+                  >
+                    Terms
+                  </button>
+                </li>
+                <li>
+                  <a
+                    href={`${GITHUB_REPOSITORY_URL}/blob/main/LICENSE`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-neutral-100 transition-colors"
+                  >
+                    AGPL-3.0 License
+                  </a>
+                </li>
+              </ul>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-5">
-            <a href={OPEN_SOURCE_CONFIG.githubRepoUrl} target="_blank" rel="noopener noreferrer" className="hover:text-neutral-100">GitHub</a>
-            <a href={OPEN_SOURCE_CONFIG.documentationUrl} target="_blank" rel="noopener noreferrer" className="hover:text-neutral-100">Documentation</a>
-            <button type="button" onClick={() => scrollToSection('opensource')} className="hover:text-neutral-100">License</button>
-            <Link to="/login" className="hover:text-neutral-100">Sign In</Link>
+          <div className="pt-6 border-t border-neutral-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs text-neutral-500">
+            <div>
+              © {currentYear} {PROJECT_IDENTITY.organizationFull}. Licensed under {PROJECT_IDENTITY.licenseSpdx}.
+            </div>
+            <div className="flex items-center gap-4">
+              <a
+                href={PROJECT_IDENTITY.officialWebsiteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-neutral-200 transition-colors"
+              >
+                {PROJECT_IDENTITY.officialWebsiteUrl}
+              </a>
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="inline-flex items-center gap-1.5 text-neutral-400 hover:text-neutral-100 transition-colors"
+              >
+                {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+                <span>{theme === 'dark' ? 'Light' : 'Dark'}</span>
+              </button>
+            </div>
           </div>
         </div>
       </footer>
+
+      {/* ===================================================================== */}
+      {/* LEGAL NOTICE MODAL (PRIVACY POLICY & TERMS — ZERO DEAD LINKS)         */}
+      {/* ===================================================================== */}
+      {legalModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={legalModal === 'privacy' ? 'Privacy Policy' : 'Terms of Use & Licensing'}
+          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
+          onClick={() => setLegalModal(null)}
+        >
+          <div
+            className="w-full max-w-xl border border-neutral-800 bg-neutral-950 rounded-lg p-6 space-y-4 shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 pb-3 border-b border-neutral-800">
+              <div className="flex items-center gap-2 text-sm font-bold text-neutral-100">
+                <FileText className="w-4 h-4 text-rose-400" />
+                <span>
+                  {legalModal === 'privacy'
+                    ? 'SCRIBBLE-IT 2.0 — Privacy Policy'
+                    : 'SCRIBBLE-IT 2.0 — Terms & Open-Source License'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLegalModal(null)}
+                aria-label="Close legal notice"
+                className="p-1.5 text-neutral-400 hover:text-neutral-100 rounded"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {legalModal === 'privacy' ? (
+              <div className="space-y-3 text-xs sm:text-sm text-neutral-400 leading-relaxed">
+                <p>
+                  <strong className="text-neutral-200">Self-Hosted Sovereignty:</strong> When you deploy SCRIBBLE-IT 2.0 on your own infrastructure, all operational, identity, and audit data remains strictly within your PostgreSQL and Redis instances. Njure Tech does not collect telemetry from self-hosted deployments.
+                </p>
+                <p>
+                  <strong className="text-neutral-200">Demo &amp; Browser Storage:</strong> Interactive demo sessions launched from this public overview page store sandbox state locally in your browser unless explicitly connected to a configured backend API.
+                </p>
+                <p>
+                  <strong className="text-neutral-200">AI &amp; External Integrations:</strong> Optional Gemini AI features and external connectors (Google Workspace, Twilio, Webhooks) execute strictly through your configured backend credentials and audit logs.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3 text-xs sm:text-sm text-neutral-400 leading-relaxed">
+                <p>
+                  <strong className="text-neutral-200">Software License:</strong> SCRIBBLE-IT 2.0 is provided free of charge under the GNU Affero General Public License v3.0 (AGPL-3.0-only) with the Section 7 App Store Distribution Exception published in <code className="text-neutral-200">LICENSE</code> and <code className="text-neutral-200">LICENSE-EXCEPTION.md</code>.
+                </p>
+                <p>
+                  <strong className="text-neutral-200">No Warranty:</strong> In accordance with AGPL-3.0 Sections 15–16, the software is provided &ldquo;AS IS&rdquo; without warranty of any kind. Operators are responsible for configuring TLS, backups, secrets, and compliance controls for production deployments.
+                </p>
+                <p>
+                  <strong className="text-neutral-200">Trademarks:</strong> Neither the license nor the Section 7 exception grants rights to Njure Tech, Njure Group, or Scribble-IT trademarks or logos.
+                </p>
+              </div>
+            )}
+
+            <div className="pt-3 border-t border-neutral-800 flex items-center justify-between gap-3 text-xs">
+              <div className="text-neutral-500">
+                <Terminal className="w-3.5 h-3.5 inline mr-1" />
+                {PROJECT_IDENTITY.organizationFull}
+              </div>
+              <button
+                type="button"
+                onClick={() => setLegalModal(null)}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-semibold rounded-md transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
