@@ -59,8 +59,8 @@ import {
 } from '../../config/openSourceConfig';
 import { ArchitectureDiagram } from '../../components/public/ArchitectureDiagram';
 import { ProductPreviewShowcase } from '../../components/public/ProductPreviewShowcase';
-import { DotMatrixText } from '../../components/common/DotMatrixDisplay';
 import heroOpsImg from '../../assets/images/hero_scribbleit_ops_1795074484892.jpg';
+import njureTechLogo from '../../assets/images/njure_tech_logo.png';
 
 type CapabilityCategoryId =
   | 'all'
@@ -1671,8 +1671,22 @@ export const LandingWebsitePage: React.FC = () => {
                 <div className="text-xs font-mono text-rose-400 uppercase tracking-wider">
                   Founder &amp; Organization
                 </div>
-                <div className="py-2">
-                  <DotMatrixText text="NJURE TECH" size="md" />
+                <div className="pt-1">
+                  <a
+                    href={PROJECT_IDENTITY.njureTechWebsiteUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center bg-white px-4 py-2.5 rounded-md border border-neutral-200 hover:opacity-95 transition-opacity"
+                    aria-label="Njure Tech — A Njure Group Company"
+                  >
+                    <img
+                      src={njureTechLogo}
+                      alt="Njure Tech — A Njure Group Company Logo"
+                      width={456}
+                      height={174}
+                      className="h-12 w-auto object-contain"
+                    />
+                  </a>
                 </div>
                 <div className="space-y-1">
                   <div className="text-lg font-bold text-neutral-100">
@@ -1685,12 +1699,30 @@ export const LandingWebsitePage: React.FC = () => {
                     {PROJECT_IDENTITY.organizationFull}
                   </div>
                 </div>
-                <div className="pt-2 flex flex-wrap items-center gap-4 text-xs">
+                <div className="pt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+                  <a
+                    href={PROJECT_IDENTITY.njureTechWebsiteUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-rose-400 hover:text-rose-300 font-semibold inline-flex items-center gap-1"
+                  >
+                    <span>Njure Tech (tech.njuregroup.in)</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                  <a
+                    href={PROJECT_IDENTITY.njureGroupWebsiteUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-neutral-300 hover:text-neutral-100 font-semibold inline-flex items-center gap-1"
+                  >
+                    <span>Njure Group (njuregroup.in)</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
                   <a
                     href={PROJECT_IDENTITY.officialWebsiteUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-rose-400 hover:text-rose-300 font-semibold inline-flex items-center gap-1"
+                    className="text-neutral-300 hover:text-neutral-100 font-semibold inline-flex items-center gap-1"
                   >
                     <span>scribbleit.njuregroup.in</span>
                     <ExternalLink className="w-3.5 h-3.5" />
@@ -1738,8 +1770,25 @@ export const LandingWebsitePage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
             {/* Brand & Founder Attribution */}
             <div className="md:col-span-5 space-y-3">
-              <div className="text-base font-bold text-neutral-100">
-                {PROJECT_IDENTITY.productName}
+              <div className="flex flex-wrap items-center gap-3">
+                <a
+                  href={PROJECT_IDENTITY.njureTechWebsiteUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center bg-white px-2.5 py-1.5 rounded border border-neutral-200 hover:opacity-95 transition-opacity shrink-0"
+                  aria-label="Njure Tech — Official Website"
+                >
+                  <img
+                    src={njureTechLogo}
+                    alt="Njure Tech — A Njure Group Company Logo"
+                    width={456}
+                    height={174}
+                    className="h-7 w-auto object-contain"
+                  />
+                </a>
+                <div className="text-base font-bold text-neutral-100">
+                  {PROJECT_IDENTITY.productName}
+                </div>
               </div>
               <div className="text-sm text-neutral-300">{PROJECT_IDENTITY.tagline}</div>
               <div className="pt-2 space-y-0.5 text-xs text-neutral-400">
@@ -1853,14 +1902,30 @@ export const LandingWebsitePage: React.FC = () => {
             <div>
               © {currentYear} {PROJECT_IDENTITY.organizationFull}. Licensed under {PROJECT_IDENTITY.licenseSpdx}.
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-4">
+              <a
+                href={PROJECT_IDENTITY.njureTechWebsiteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-neutral-200 transition-colors"
+              >
+                tech.njuregroup.in
+              </a>
+              <a
+                href={PROJECT_IDENTITY.njureGroupWebsiteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-neutral-200 transition-colors"
+              >
+                njuregroup.in
+              </a>
               <a
                 href={PROJECT_IDENTITY.officialWebsiteUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-neutral-200 transition-colors"
               >
-                {PROJECT_IDENTITY.officialWebsiteUrl}
+                scribbleit.njuregroup.in
               </a>
               <button
                 type="button"

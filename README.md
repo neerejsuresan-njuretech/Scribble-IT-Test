@@ -6,6 +6,7 @@
 Founder & CEO — Njure Tech (formerly Njure Group).
 
 Official Website: [https://scribbleit.njuregroup.in](https://scribbleit.njuregroup.in)  
+Njure Tech: [https://tech.njuregroup.in](https://tech.njuregroup.in) · Njure Group (Former): [https://njuregroup.in](https://njuregroup.in)  
 Repository: [https://github.com/neerejsuresan-njuretech/Scribble-IT-Test](https://github.com/neerejsuresan-njuretech/Scribble-IT-Test)  
 License: `AGPL-3.0-only WITH Appstore-exception` ([LICENSE](./LICENSE) · [LICENSE-EXCEPTION.md](./LICENSE-EXCEPTION.md))
 
@@ -490,11 +491,17 @@ Key summary:
 
 ## 26. Founder & Organization
 
+<a href="https://tech.njuregroup.in">
+  <img src="src/assets/images/njure_tech_logo.png" alt="Njure Tech — A Njure Group Company Logo" width="220" />
+</a>
+
 **Developed by NEEREJ S SURESAN**  
 **Founder & CEO — Njure Tech (formerly Njure Group).**
 
 - **Organization:** Njure Tech (formerly Njure Group)
-- **Official Website:** [https://scribbleit.njuregroup.in](https://scribbleit.njuregroup.in)
+- **Njure Tech:** [https://tech.njuregroup.in](https://tech.njuregroup.in)
+- **Njure Group:** [https://njuregroup.in](https://njuregroup.in)
+- **Official Product Website:** [https://scribbleit.njuregroup.in](https://scribbleit.njuregroup.in)
 
 ---
 

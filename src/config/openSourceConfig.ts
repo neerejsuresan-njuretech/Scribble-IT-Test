@@ -41,12 +41,17 @@ export const PROJECT_IDENTITY = {
   founderAttribution: 'Developed by NEEREJ S SURESAN',
   founderAttributionSubline: 'Founder & CEO — Njure Tech (formerly Njure Group).',
   officialWebsiteUrl: 'https://scribbleit.njuregroup.in',
+  njureTechWebsiteUrl: 'https://tech.njuregroup.in',
+  njureGroupWebsiteUrl: 'https://njuregroup.in',
   licenseSpdx: 'AGPL-3.0-only WITH Appstore-exception',
   licenseName: 'GNU Affero General Public License v3.0 (AGPL-3.0-only) + Section 7 App Store Distribution Exception',
   licenseUrl: 'https://www.gnu.org/licenses/agpl-3.0.en.html',
   finalBrandStatement:
     'A community-driven enterprise ITSM platform. Built for everyone. Improved together.',
 } as const;
+
+export const NJURE_TECH_URL = PROJECT_IDENTITY.njureTechWebsiteUrl;
+export const NJURE_GROUP_URL = PROJECT_IDENTITY.njureGroupWebsiteUrl;
 
 // ============================================================================
 // Centralized Configurable External URLs (Explicit Placeholders for Unconfigured Targets)
@@ -83,6 +88,8 @@ export interface SponsorConfig {
   roadmapUrl: string;
   changelogUrl: string;
   officialWebsiteUrl: string;
+  njureTechWebsiteUrl: string;
+  njureGroupWebsiteUrl: string;
   licenseName: string;
   licenseSpdx: string;
   licenseUrl: string;
@@ -99,6 +106,8 @@ export const OPEN_SOURCE_CONFIG: SponsorConfig = {
   roadmapUrl: ROADMAP_URL,
   changelogUrl: CHANGELOG_URL,
   officialWebsiteUrl: PROJECT_IDENTITY.officialWebsiteUrl,
+  njureTechWebsiteUrl: PROJECT_IDENTITY.njureTechWebsiteUrl,
+  njureGroupWebsiteUrl: PROJECT_IDENTITY.njureGroupWebsiteUrl,
   licenseName: PROJECT_IDENTITY.licenseName,
   licenseSpdx: PROJECT_IDENTITY.licenseSpdx,
   licenseUrl: PROJECT_IDENTITY.licenseUrl,

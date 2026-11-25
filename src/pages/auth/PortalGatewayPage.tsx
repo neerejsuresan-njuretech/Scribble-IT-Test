@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useITSM } from '../../context/ITSMContext';
 import { DotMatrixText } from '../../components/common/DotMatrixDisplay';
+import { PROJECT_IDENTITY } from '../../config/openSourceConfig';
+import njureTechLogo from '../../assets/images/njure_tech_logo.png';
 import { ShieldAlert, Laptop, UserCheck, Shield, ArrowRight, CheckCircle2, LogIn, Sun, Moon, Cloud, Loader2 } from 'lucide-react';
 
 export const PortalGatewayPage: React.FC = () => {
@@ -80,9 +82,22 @@ export const PortalGatewayPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 dot-matrix-bg font-sans text-xs flex flex-col justify-between p-4 sm:p-6 overflow-x-clip">
       <div className="max-w-4xl w-full mx-auto flex flex-wrap items-center justify-between gap-2.5 sm:gap-4">
-        <div className="flex items-center gap-2 text-[11px] font-medium text-neutral-400 min-w-0">
-          <span className="w-2 h-2 bg-rose-600 rounded-xs inline-block shrink-0" />
-          <span className="tracking-wide uppercase font-semibold text-neutral-200 whitespace-nowrap">Njure Tech</span>
+        <div className="flex items-center gap-2.5 text-[11px] font-medium text-neutral-400 min-w-0">
+          <a
+            href={PROJECT_IDENTITY.njureTechWebsiteUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center bg-white px-2 py-1 rounded border border-neutral-200 hover:opacity-95 transition-opacity shrink-0"
+            aria-label="Njure Tech — A Njure Group Company"
+          >
+            <img
+              src={njureTechLogo}
+              alt="Njure Tech — A Njure Group Company Logo"
+              width={456}
+              height={174}
+              className="h-6 w-auto object-contain"
+            />
+          </a>
           <span aria-hidden="true" className="hidden sm:inline">·</span>
           <span className="hidden sm:inline truncate">Enterprise ITSM Platform</span>
         </div>
