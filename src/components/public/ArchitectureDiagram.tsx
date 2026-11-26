@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 
 /**
- * Architectural system diagram reflecting the verified Scribble-IT 2.0 stack:
+ * Architectural system diagram reflecting the verified SCRIBBLE-IT stack:
  * Frontend clients -> Nginx/API v1 -> FastAPI (RBAC/JWT/RLS) -> PostgreSQL 16,
  * Redis 7, Async Background Workers, Backend-Only Gemini AI, and External Integrations.
  */
@@ -19,7 +19,7 @@ export const ArchitectureDiagram: React.FC = () => {
   return (
     <div
       role="region"
-      aria-label="Scribble-IT 2.0 System Architecture Diagram"
+      aria-label="SCRIBBLE-IT System Architecture Diagram"
       className="border border-neutral-800 bg-neutral-950 rounded-lg p-6 sm:p-8 space-y-6"
     >
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-neutral-800">

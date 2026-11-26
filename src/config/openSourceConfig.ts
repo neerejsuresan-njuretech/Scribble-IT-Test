@@ -1,6 +1,6 @@
 /**
  * Centralized Open-Source Project Identity & Configurable External URLs
- * for SCRIBBLE-IT 2.0 (Njure Tech, formerly Njure Group).
+ * for SCRIBBLE-IT (Njure Tech, formerly Njure Group).
  *
  * Unconfigured third-party URLs intentionally default to empty strings ('')
  * so unverified destinations are never fabricated or rendered as broken links.
@@ -30,8 +30,10 @@ export function isConfiguredUrl(url?: string | null): url is string {
 // Official Project Identity Constants
 // ============================================================================
 export const PROJECT_IDENTITY = {
-  productName: 'SCRIBBLE-IT 2.0',
+  productName: 'SCRIBBLE-IT',
+  wordmark: 'Scribble IT',
   shortName: 'Scribble-IT',
+  productAttribution: 'A Njure Tech product.',
   tagline: 'Enterprise IT Management. Open to Everyone.',
   organization: 'Njure Tech',
   formerOrganization: 'Njure Group',

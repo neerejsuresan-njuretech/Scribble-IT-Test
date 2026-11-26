@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 360" width="1400" height="360" role="img" aria-label="SCRIBBLE-IT Horizontal Wordmark">
+  <title>SCRIBBLE-IT Horizontal Wordmark</title>
+  <defs>
+    <linearGradient id="logo-horizontal-transparent-dark-text-doc-stroke" x1="210" y1="128" x2="814" y2="896" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0B1F3B" />
+      <stop offset="48%" stop-color="#0A84FF" />
+      <stop offset="100%" stop-color="#005FCC" />
+    </linearGradient>
+    <linearGradient id="logo-horizontal-transparent-dark-text-s-grad" x1="330" y1="300" x2="690" y2="755" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#22D3EE" />
+      <stop offset="55%" stop-color="#0A84FF" />
+      <stop offset="100%" stop-color="#0B1F3B" />
+    </linearGradient>
+    <linearGradient id="logo-horizontal-transparent-dark-text-pencil-body" x1="590" y1="260" x2="770" y2="560" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#22D3EE" />
+      <stop offset="100%" stop-color="#0A84FF" />
+    </linearGradient>
+    <linearGradient id="logo-horizontal-transparent-dark-text-doc-fill" x1="216" y1="132" x2="808" y2="892" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.96" />
+      <stop offset="100%" stop-color="#E6F0FF" stop-opacity="0.92" />
+    </linearGradient>
+  </defs>
+  
+  <g id="layer-symbol" transform="translate(48 44) scale(0.27)">
+    
+    <g id="logo-horizontal-transparent-dark-text-layer-document">
+      <!-- Enterprise Document / Page Outline with Folded Top-Right Corner -->
+      <path
+        d="M 284 140
+           H 606
+           L 796 330
+           V 816
+           A 68 68 0 0 1 728 884
+           H 284
+           A 68 68 0 0 1 216 816
+           V 208
+           A 68 68 0 0 1 284 140 Z"
+        fill="url(#logo-horizontal-transparent-dark-text-doc-fill)"
+        stroke="url(#logo-horizontal-transparent-dark-text-doc-stroke)"
+        stroke-width="42"
+        stroke-linejoin="round"
+      />
+      <!-- Crisp Folded Corner Crease -->
+      <path
+        d="M 606 140 V 286 A 44 44 0 0 0 650 330 H 796"
+        fill="#D9ECFF"
+        fill-opacity="0.45"
+        stroke="url(#logo-horizontal-transparent-dark-text-doc-stroke)"
+        stroke-width="38"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+      <!-- Minimal Document Reference Lines (top-left) -->
+      <line x1="304" y1="248" x2="496" y2="248" stroke="url(#logo-horizontal-transparent-dark-text-doc-stroke)" stroke-width="26" stroke-linecap="round" opacity="0.55" />
+      <line x1="304" y1="308" x2="432" y2="308" stroke="url(#logo-horizontal-transparent-dark-text-doc-stroke)" stroke-width="22" stroke-linecap="round" opacity="0.4" />
+    </g>
+
+    <g id="logo-horizontal-transparent-dark-text-layer-s-pencil">
+      <!-- Stylized Geometric 'S' Monogram Sweeping Through the Document -->
+      <path
+        d="M 594 416
+           C 562 366, 488 352, 424 374
+           C 356 398, 338 468, 384 514
+           C 424 554, 520 554, 570 594
+           C 626 640, 610 730, 534 762
+           C 462 792, 376 774, 336 724"
+        fill="none"
+        stroke="url(#logo-horizontal-transparent-dark-text-s-grad)"
+        stroke-width="64"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+
+      <!-- Integrated Precision Diagonal Pencil Writing Into the S Curve -->
+      <g transform="translate(650 470) rotate(38)">
+        <!-- Pencil Eraser Cap -->
+        <rect x="-32" y="-176" width="64" height="44" rx="18" fill="#22D3EE" />
+        <!-- Metallic Ferrule Band -->
+        <rect x="-32" y="-124" width="64" height="24" rx="6" fill="#0B1F3B" />
+        <!-- Pencil Shaft Body -->
+        <rect x="-32" y="-92" width="64" height="196" rx="10" fill="url(#logo-horizontal-transparent-dark-text-pencil-body)" />
+        <!-- Facet Highlight Along Shaft -->
+        <rect x="-10" y="-86" width="16" height="184" rx="6" fill="#FFFFFF" opacity="0.26" />
+        <!-- Tapered Wooden/Metallic Tip Cone -->
+        <polygon points="-32,110 32,110 0,188" fill="#0B1F3B" />
+        <!-- Precision Graphite/Cyan Nib -->
+        <polygon points="-13,156 13,156 0,188" fill="#22D3EE" />
+      </g>
+
+      <!-- Precision Ink/Scribble Baseline Stroke -->
+      <path
+        d="M 526 776 C 584 776, 636 764, 694 742"
+        fill="none"
+        stroke="#22D3EE"
+        stroke-width="28"
+        stroke-linecap="round"
+      />
+    </g>
+  </g>
+  <g id="layer-wordmark">
+    <text x="364" y="196" font-family="Manrope, Inter, sans-serif" font-size="112" font-weight="800" letter-spacing="-3" fill="#0B1F3B">Scribble <tspan fill="#0A84FF">IT</tspan></text>
+  </g>
+  <g id="layer-attribution">
+    <text x="368" y="256" font-family="Inter, Manrope, sans-serif" font-size="34" font-weight="500" letter-spacing="0.4" fill="#476285" opacity="1">A Njure Tech product.</text>
+  </g>
+</svg>

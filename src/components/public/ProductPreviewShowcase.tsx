@@ -319,7 +319,7 @@ export const ProductPreviewShowcase: React.FC<ProductPreviewShowcaseProps> = ({
             </button>
             <div className="flex items-center justify-center gap-2 text-[11px] text-neutral-500">
               <Clock className="w-3.5 h-3.5 shrink-0" />
-              <span>Launches the actual interactive module inside Scribble-IT 2.0</span>
+              <span>Launches the actual interactive module inside SCRIBBLE-IT</span>
             </div>
           </div>
         </div>

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=SCRIBBLE-IT
+GenericName=Enterprise IT Service Management
+Comment=Enterprise IT Management. Open to Everyone. A Njure Tech product.
+Exec=scribble-it %U
+Icon=scribble-it
+Terminal=false
+Categories=Office;Network;System;Utility;
+StartupWMClass=scribble-it
+Keywords=ITSM;ServiceDesk;CMDB;IAM;Incidents;Changes;

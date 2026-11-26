@@ -1777,7 +1777,7 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         applyHydratedBackendSnapshot(snapshot);
         showToast({
           variant: 'success',
-          title: 'Connected to Scribble-IT 2.0 Backend',
+          title: 'Connected to SCRIBBLE-IT Backend',
           description: `Authenticated as ${me.email} (${me.permissions.length} backend-verified scopes).`,
         });
         return { ok: true };

@@ -19,7 +19,15 @@
     "paths": {
       "@/*": [
         "./*"
-      ]
+      ],
+      "@scribble-it/types": ["./packages/types/src/index.ts"],
+      "@scribble-it/types/*": ["./packages/types/src/*"],
+      "@scribble-it/api-client": ["./packages/api-client/src/index.ts"],
+      "@scribble-it/api-client/*": ["./packages/api-client/src/*"],
+      "@scribble-it/rbac": ["./packages/rbac/src/index.ts"],
+      "@scribble-it/rbac/*": ["./packages/rbac/src/*"],
+      "@scribble-it/design-tokens": ["./packages/design-tokens/src/index.ts"],
+      "@scribble-it/design-tokens/*": ["./packages/design-tokens/src/*"]
     },
     "allowImportingTsExtensions": true,
     "noEmit": true

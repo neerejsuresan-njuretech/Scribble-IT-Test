@@ -1,0 +1,30 @@
+{
+  "name": "@scribble-it/rbac",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Platform-agnostic RBAC evaluation, clearance formatting, and 9-group navigation authorization engine for SCRIBBLE-IT (zero React or DOM dependencies).",
+  "type": "module",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./navigation": {
+      "types": "./src/navigationAccess.ts",
+      "default": "./src/navigationAccess.ts"
+    },
+    "./permissions": {
+      "types": "./src/permissions.ts",
+      "default": "./src/permissions.ts"
+    }
+  },
+  "dependencies": {
+    "@scribble-it/types": "*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}

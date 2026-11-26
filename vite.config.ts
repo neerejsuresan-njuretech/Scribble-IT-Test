@@ -10,6 +10,10 @@ export default defineConfig(({ command }) => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
+        '@scribble-it/types': path.resolve(__dirname, 'packages/types/src/index.ts'),
+        '@scribble-it/api-client': path.resolve(__dirname, 'packages/api-client/src/index.ts'),
+        '@scribble-it/rbac': path.resolve(__dirname, 'packages/rbac/src/index.ts'),
+        '@scribble-it/design-tokens': path.resolve(__dirname, 'packages/design-tokens/src/index.ts'),
       },
     },
     server: {

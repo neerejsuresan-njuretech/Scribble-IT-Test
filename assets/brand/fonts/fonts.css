@@ -1,0 +1,71 @@
+/* SCRIBBLE-IT Locally Bundled Typography (SIL Open Font License 1.1) */
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src:
+    url('./Inter/inter-latin-400-normal.woff2') format('woff2'),
+    url('./Inter/Inter-Variable.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src:
+    url('./Inter/inter-latin-500-normal.woff2') format('woff2'),
+    url('./Inter/Inter-Variable.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src:
+    url('./Inter/inter-latin-600-normal.woff2') format('woff2'),
+    url('./Inter/Inter-Variable.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src:
+    url('./Inter/inter-latin-700-normal.woff2') format('woff2'),
+    url('./Inter/Inter-Variable.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src:
+    url('./Manrope/manrope-latin-600-normal.woff2') format('woff2'),
+    url('./Manrope/Manrope-Variable.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src:
+    url('./Manrope/manrope-latin-700-normal.woff2') format('woff2'),
+    url('./Manrope/Manrope-Variable.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src:
+    url('./Manrope/manrope-latin-800-normal.woff2') format('woff2'),
+    url('./Manrope/Manrope-Variable.ttf') format('truetype');
+}

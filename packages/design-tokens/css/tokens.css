@@ -1,0 +1,37 @@
+/* SCRIBBLE-IT Official Brand & Theme CSS Custom Properties (Tailwind CSS v4 compatible) */
+:root {
+  --scribble-navy: #0B1F3B;
+  --scribble-blue: #0A84FF;
+  --scribble-cyan: #22D3EE;
+  --scribble-surface: #F5F8FF;
+
+  --scribble-font-sans: 'Inter', 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --scribble-font-display: 'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --scribble-font-mono: 'JetBrains Mono', 'Space Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --scribble-bg-canvas: #F5F8FF;
+  --scribble-bg-surface: #FFFFFF;
+  --scribble-bg-subtle: #EAF0FA;
+  --scribble-text-primary: #0B1F3B;
+  --scribble-text-secondary: #374E70;
+  --scribble-text-muted: #556E94;
+  --scribble-border-default: #D4DFEE;
+  --scribble-border-focus: #0A84FF;
+
+  --scribble-radius-sm: 6px;
+  --scribble-radius-md: 8px;
+  --scribble-radius-lg: 12px;
+  --scribble-radius-xl: 16px;
+}
+
+.dark,
+[data-theme='dark'] {
+  --scribble-bg-canvas: #071426;
+  --scribble-bg-surface: #0B1F3B;
+  --scribble-bg-subtle: #132744;
+  --scribble-text-primary: #F5F8FF;
+  --scribble-text-secondary: #B0C2DC;
+  --scribble-text-muted: #7D95B8;
+  --scribble-border-default: #213554;
+  --scribble-border-focus: #22D3EE;
+}

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="and-bg" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#132D56" />
+      <stop offset="50%" stop-color="#0B1F3B" />
+      <stop offset="100%" stop-color="#071426" />
+    </linearGradient>
+    <radialGradient id="and-glow" cx="72%" cy="24%" r="58%">
+      <stop offset="0%" stop-color="#22D3EE" stop-opacity="0.22" />
+      <stop offset="55%" stop-color="#0A84FF" stop-opacity="0.10" />
+      <stop offset="100%" stop-color="#0B1F3B" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <rect x="0" y="0" width="1024" height="1024" fill="url(#and-bg)" />
+  <rect x="0" y="0" width="1024" height="1024" fill="url(#and-glow)" />
+</svg>

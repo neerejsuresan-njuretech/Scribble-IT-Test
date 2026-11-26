@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 164 314" width="164" height="314">
+  <defs>
+    <linearGradient id="win-nsis-sidebar-doc-stroke" x1="210" y1="128" x2="814" y2="896" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#22D3EE" />
+      <stop offset="48%" stop-color="#0A84FF" />
+      <stop offset="100%" stop-color="#38BDF8" />
+    </linearGradient>
+    <linearGradient id="win-nsis-sidebar-s-grad" x1="330" y1="300" x2="690" y2="755" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#22D3EE" />
+      <stop offset="55%" stop-color="#0A84FF" />
+      <stop offset="100%" stop-color="#60B5FF" />
+    </linearGradient>
+    <linearGradient id="win-nsis-sidebar-pencil-body" x1="590" y1="260" x2="770" y2="560" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#22D3EE" />
+      <stop offset="100%" stop-color="#0A84FF" />
+    </linearGradient>
+    <linearGradient id="win-nsis-sidebar-doc-fill" x1="216" y1="132" x2="808" y2="892" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#14335E" stop-opacity="0.68" />
+      <stop offset="100%" stop-color="#0B1F3B" stop-opacity="0.88" />
+    </linearGradient></defs>
+  <rect width="164" height="314" fill="#0B1F3B" />
+  <rect x="0" y="0" width="164" height="4" fill="#22D3EE" />
+  <g transform="translate(26 46) scale(0.11)">
+    <g id="win-nsis-sidebar-layer-document">
+      <!-- Enterprise Document / Page Outline with Folded Top-Right Corner -->
+      <path
+        d="M 284 140
+           H 606
+           L 796 330
+           V 816
+           A 68 68 0 0 1 728 884
+           H 284
+           A 68 68 0 0 1 216 816
+           V 208
+           A 68 68 0 0 1 284 140 Z"
+        fill="url(#win-nsis-sidebar-doc-fill)"
+        stroke="url(#win-nsis-sidebar-doc-stroke)"
+        stroke-width="42"
+        stroke-linejoin="round"
+      />
+      <!-- Crisp Folded Corner Crease -->
+      <path
+        d="M 606 140 V 286 A 44 44 0 0 0 650 330 H 796"
+        fill="#183C6E"
+        fill-opacity="0.45"
+        stroke="url(#win-nsis-sidebar-doc-stroke)"
+        stroke-width="38"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+      <!-- Minimal Document Reference Lines (top-left) -->
+      <line x1="304" y1="248" x2="496" y2="248" stroke="url(#win-nsis-sidebar-doc-stroke)" stroke-width="26" stroke-linecap="round" opacity="0.55" />
+      <line x1="304" y1="308" x2="432" y2="308" stroke="url(#win-nsis-sidebar-doc-stroke)" stroke-width="22" stroke-linecap="round" opacity="0.4" />
+    </g>
+
+    <g id="win-nsis-sidebar-layer-s-pencil">
+      <!-- Stylized Geometric 'S' Monogram Sweeping Through the Document -->
+      <path
+        d="M 594 416
+           C 562 366, 488 352, 424 374
+           C 356 398, 338 468, 384 514
+           C 424 554, 520 554, 570 594
+           C 626 640, 610 730, 534 762
+           C 462 792, 376 774, 336 724"
+        fill="none"
+        stroke="url(#win-nsis-sidebar-s-grad)"
+        stroke-width="64"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+
+      <!-- Integrated Precision Diagonal Pencil Writing Into the S Curve -->
+      <g transform="translate(650 470) rotate(38)">
+        <!-- Pencil Eraser Cap -->
+        <rect x="-32" y="-176" width="64" height="44" rx="18" fill="#22D3EE" />
+        <!-- Metallic Ferrule Band -->
+        <rect x="-32" y="-124" width="64" height="24" rx="6" fill="#F5F8FF" />
+        <!-- Pencil Shaft Body -->
+        <rect x="-32" y="-92" width="64" height="196" rx="10" fill="url(#win-nsis-sidebar-pencil-body)" />
+        <!-- Facet Highlight Along Shaft -->
+        <rect x="-10" y="-86" width="16" height="184" rx="6" fill="#FFFFFF" opacity="0.26" />
+        <!-- Tapered Wooden/Metallic Tip Cone -->
+        <polygon points="-32,110 32,110 0,188" fill="#F5F8FF" />
+        <!-- Precision Graphite/Cyan Nib -->
+        <polygon points="-13,156 13,156 0,188" fill="#22D3EE" />
+      </g>
+
+      <!-- Precision Ink/Scribble Baseline Stroke -->
+      <path
+        d="M 526 776 C 584 776, 636 764, 694 742"
+        fill="none"
+        stroke="#22D3EE"
+        stroke-width="28"
+        stroke-linecap="round"
+      />
+    </g></g>
+  <text x="82" y="188" text-anchor="middle" font-family="Manrope, Inter, sans-serif" font-size="20" font-weight="800" fill="#F5F8FF">Scribble <tspan fill="#22D3EE">IT</tspan></text>
+  <text x="82" y="210" text-anchor="middle" font-family="Inter, sans-serif" font-size="10" font-weight="500" fill="#94B2D8">A Njure Tech product.</text>
+  <text x="82" y="286" text-anchor="middle" font-family="Inter, sans-serif" font-size="9" font-weight="500" fill="#94B2D8">Open to Everyone.</text>
+</svg>

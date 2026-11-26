@@ -413,7 +413,7 @@ const FAQ_ITEMS = [
   {
     question: 'Is Scribble-IT really free?',
     answer:
-      'Yes. SCRIBBLE-IT 2.0 is free and open-source software licensed under the GNU Affero General Public License v3.0 (AGPL-3.0-only) with a Section 7 App Store Distribution Exception. There are no per-seat license fees, artificial feature locks, or mandatory subscriptions.',
+      'Yes. SCRIBBLE-IT is free and open-source software licensed under the GNU Affero General Public License v3.0 (AGPL-3.0-only) with a Section 7 App Store Distribution Exception. There are no per-seat license fees, artificial feature locks, or mandatory subscriptions.',
   },
   {
     question: 'Can organizations self-host Scribble-IT?',
@@ -443,7 +443,7 @@ const FAQ_ITEMS = [
   {
     question: 'How is data security handled?',
     answer:
-      'SCRIBBLE-IT 2.0 enforces Argon2id password hashing, short-lived JWT access tokens, hashed refresh-token rotation with reuse detection, server-computed RBAC, PostgreSQL Row-Level Security (RLS) tenant isolation, append-only audit logs, encrypted integration credentials, HMAC webhook verification, and SSRF egress protection.',
+      'SCRIBBLE-IT enforces Argon2id password hashing, short-lived JWT access tokens, hashed refresh-token rotation with reuse detection, server-computed RBAC, PostgreSQL Row-Level Security (RLS) tenant isolation, append-only audit logs, encrypted integration credentials, HMAC webhook verification, and SSRF egress protection.',
   },
   {
     question: 'Can I contribute to the project?',
@@ -453,7 +453,7 @@ const FAQ_ITEMS = [
   {
     question: 'Can businesses use Scribble-IT in production?',
     answer:
-      'Yes. Businesses, startups, educational institutions, and IT departments may deploy SCRIBBLE-IT 2.0 in production in accordance with AGPL-3.0-only terms (including making Corresponding Source available to network users if modified). Follow docs/deployment/production-cloud-guide.md or docs/deployment/self-hosted-guide.md to configure production secrets, TLS, and backups.',
+      'Yes. Businesses, startups, educational institutions, and IT departments may deploy SCRIBBLE-IT in production in accordance with AGPL-3.0-only terms (including making Corresponding Source available to network users if modified). Follow docs/deployment/production-cloud-guide.md or docs/deployment/self-hosted-guide.md to configure production secrets, TLS, and backups.',
   },
 ];
 
@@ -814,14 +814,14 @@ export const LandingWebsitePage: React.FC = () => {
                   {!heroImageBroken ? (
                     <img
                       src={heroOpsImg}
-                      alt="Scribble-IT 2.0 operational dashboard and enterprise service management interface"
+                      alt="SCRIBBLE-IT operational dashboard and enterprise service management interface"
                       referrerPolicy="no-referrer"
                       onError={() => setHeroImageBroken(true)}
                       className="w-full h-full object-cover"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-xs text-neutral-500 p-6">
-                      SCRIBBLE-IT 2.0 Operational Workspace
+                      SCRIBBLE-IT Operational Workspace
                     </div>
                   )}
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/55 to-transparent p-4">
@@ -870,7 +870,7 @@ export const LandingWebsitePage: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
               <div className="lg:col-span-5 space-y-4">
                 <div className="text-xs font-mono text-rose-400 uppercase tracking-wider">
-                  About SCRIBBLE-IT 2.0
+                  About SCRIBBLE-IT
                 </div>
                 <h2
                   className="text-2xl sm:text-3xl font-bold text-neutral-100 leading-tight"
@@ -879,7 +879,7 @@ export const LandingWebsitePage: React.FC = () => {
                   Enterprise ITSM built for operational rigor, without proprietary lock-in.
                 </h2>
                 <p className="text-sm text-neutral-400 leading-relaxed">
-                  Created by <strong className="text-neutral-200">{PROJECT_IDENTITY.organizationFull}</strong>, SCRIBBLE-IT 2.0 was engineered to solve a persistent industry problem: enterprise-grade IT Service Management software is routinely locked behind costly per-agent contracts, opaque closed-source stacks, and fragmented point tools.
+                  Created by <strong className="text-neutral-200">{PROJECT_IDENTITY.organizationFull}</strong>, SCRIBBLE-IT was engineered to solve a persistent industry problem: enterprise-grade IT Service Management software is routinely locked behind costly per-agent contracts, opaque closed-source stacks, and fragmented point tools.
                 </p>
               </div>
 
@@ -915,7 +915,7 @@ export const LandingWebsitePage: React.FC = () => {
 
             {/* Who It Is Built For */}
             <div className="space-y-4 pt-4 border-t border-neutral-800">
-              <h3 className="text-base font-bold text-neutral-100">Who SCRIBBLE-IT 2.0 Is Built For</h3>
+              <h3 className="text-base font-bold text-neutral-100">Who SCRIBBLE-IT Is Built For</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 {AUDIENCES.map(audience => {
                   const Icon = audience.icon;
@@ -1221,7 +1221,7 @@ export const LandingWebsitePage: React.FC = () => {
                   POWERFUL ITSM. WITHOUT THE PRICE TAG.
                 </h2>
                 <p className="text-sm sm:text-base text-neutral-400 leading-relaxed">
-                  SCRIBBLE-IT 2.0 is built on the conviction that reliable enterprise IT operations should not be restricted to organizations with six-figure software budgets. Every core capability—from incident queues and CAB governance to PostgreSQL tenant isolation—is free, open-source, and self-hostable.
+                  SCRIBBLE-IT is built on the conviction that reliable enterprise IT operations should not be restricted to organizations with six-figure software budgets. Every core capability—from incident queues and CAB governance to PostgreSQL tenant isolation—is free, open-source, and self-hostable.
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
@@ -1250,7 +1250,7 @@ export const LandingWebsitePage: React.FC = () => {
                   </span>
                 </div>
                 <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">
-                  SCRIBBLE-IT 2.0 is licensed under the{' '}
+                  SCRIBBLE-IT is licensed under the{' '}
                   <strong className="text-neutral-200">
                     GNU Affero General Public License v3.0 (AGPL-3.0-only)
                   </strong>{' '}
@@ -1313,7 +1313,7 @@ export const LandingWebsitePage: React.FC = () => {
                 HELP US BUILD THE FUTURE OF OPEN-SOURCE ITSM.
               </h2>
               <p className="text-sm sm:text-base text-neutral-400 leading-relaxed">
-                SCRIBBLE-IT 2.0 is free for everyone and never places core features behind a paywall. Voluntary contributions directly support active engineering, documentation, security maintenance, infrastructure testing, and upcoming cross-platform apps.
+                SCRIBBLE-IT is free for everyone and never places core features behind a paywall. Voluntary contributions directly support active engineering, documentation, security maintenance, infrastructure testing, and upcoming cross-platform apps.
               </p>
             </div>
 
@@ -1527,7 +1527,7 @@ export const LandingWebsitePage: React.FC = () => {
                 Inspect core operational workspaces before launching
               </h2>
               <p className="text-sm text-neutral-400">
-                Browse each verified module below and launch directly into the live SCRIBBLE-IT 2.0 application workspace.
+                Browse each verified module below and launch directly into the live SCRIBBLE-IT application workspace.
               </p>
             </div>
 
@@ -1960,8 +1960,8 @@ export const LandingWebsitePage: React.FC = () => {
                 <FileText className="w-4 h-4 text-rose-400" />
                 <span>
                   {legalModal === 'privacy'
-                    ? 'SCRIBBLE-IT 2.0 — Privacy Policy'
-                    : 'SCRIBBLE-IT 2.0 — Terms & Open-Source License'}
+                    ? 'SCRIBBLE-IT — Privacy Policy'
+                    : 'SCRIBBLE-IT — Terms & Open-Source License'}
                 </span>
               </div>
               <button
@@ -1977,7 +1977,7 @@ export const LandingWebsitePage: React.FC = () => {
             {legalModal === 'privacy' ? (
               <div className="space-y-3 text-xs sm:text-sm text-neutral-400 leading-relaxed">
                 <p>
-                  <strong className="text-neutral-200">Self-Hosted Sovereignty:</strong> When you deploy SCRIBBLE-IT 2.0 on your own infrastructure, all operational, identity, and audit data remains strictly within your PostgreSQL and Redis instances. Njure Tech does not collect telemetry from self-hosted deployments.
+                  <strong className="text-neutral-200">Self-Hosted Sovereignty:</strong> When you deploy SCRIBBLE-IT on your own infrastructure, all operational, identity, and audit data remains strictly within your PostgreSQL and Redis instances. Njure Tech does not collect telemetry from self-hosted deployments.
                 </p>
                 <p>
                   <strong className="text-neutral-200">Demo &amp; Browser Storage:</strong> Interactive demo sessions launched from this public overview page store sandbox state locally in your browser unless explicitly connected to a configured backend API.
@@ -1989,7 +1989,7 @@ export const LandingWebsitePage: React.FC = () => {
             ) : (
               <div className="space-y-3 text-xs sm:text-sm text-neutral-400 leading-relaxed">
                 <p>
-                  <strong className="text-neutral-200">Software License:</strong> SCRIBBLE-IT 2.0 is provided free of charge under the GNU Affero General Public License v3.0 (AGPL-3.0-only) with the Section 7 App Store Distribution Exception published in <code className="text-neutral-200">LICENSE</code> and <code className="text-neutral-200">LICENSE-EXCEPTION.md</code>.
+                  <strong className="text-neutral-200">Software License:</strong> SCRIBBLE-IT is provided free of charge under the GNU Affero General Public License v3.0 (AGPL-3.0-only) with the Section 7 App Store Distribution Exception published in <code className="text-neutral-200">LICENSE</code> and <code className="text-neutral-200">LICENSE-EXCEPTION.md</code>.
                 </p>
                 <p>
                   <strong className="text-neutral-200">No Warranty:</strong> In accordance with AGPL-3.0 Sections 15–16, the software is provided &ldquo;AS IS&rdquo; without warranty of any kind. Operators are responsible for configuring TLS, backups, secrets, and compliance controls for production deployments.

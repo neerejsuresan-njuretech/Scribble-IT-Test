@@ -1,0 +1,40 @@
+{
+  "name": "@scribble-it/design-tokens",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Official SCRIBBLE-IT brand identity tokens, light/dark themes, typography, spacing, radii, and ITSM priority/SLA/status color systems compatible with Tailwind CSS and React Native.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./colors": {
+      "types": "./src/colors.ts",
+      "default": "./src/colors.ts"
+    },
+    "./themes": {
+      "types": "./src/themes.ts",
+      "default": "./src/themes.ts"
+    },
+    "./typography": {
+      "types": "./src/typography.ts",
+      "default": "./src/typography.ts"
+    },
+    "./layout": {
+      "types": "./src/layout.ts",
+      "default": "./src/layout.ts"
+    },
+    "./status": {
+      "types": "./src/status.ts",
+      "default": "./src/status.ts"
+    },
+    "./css": "./css/tokens.css"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "name": "@scribble-it/api-client",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cross-platform FastAPI /api/v1 client for SCRIBBLE-IT with injectable TokenStorageAdapter, BaseUrlProvider, single-flight refresh-token rotation, and zero DOM/Express dependencies.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./http": {
+      "types": "./src/httpClient.ts",
+      "default": "./src/httpClient.ts"
+    },
+    "./storage": {
+      "types": "./src/storage.ts",
+      "default": "./src/storage.ts"
+    },
+    "./auth": {
+      "types": "./src/authApi.ts",
+      "default": "./src/authApi.ts"
+    },
+    "./itsm": {
+      "types": "./src/itsmApi.ts",
+      "default": "./src/itsmApi.ts"
+    },
+    "./cmdb": {
+      "types": "./src/cmdbApi.ts",
+      "default": "./src/cmdbApi.ts"
+    },
+    "./operations": {
+      "types": "./src/operationsApi.ts",
+      "default": "./src/operationsApi.ts"
+    },
+    "./integrations": {
+      "types": "./src/integrationsApi.ts",
+      "default": "./src/integrationsApi.ts"
+    },
+    "./ai": {
+      "types": "./src/aiApi.ts",
+      "default": "./src/aiApi.ts"
+    }
+  },
+  "dependencies": {
+    "@scribble-it/types": "*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}

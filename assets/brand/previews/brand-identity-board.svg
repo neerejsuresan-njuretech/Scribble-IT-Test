@@ -1,0 +1,564 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1080" width="1600" height="1080" role="img" aria-label="SCRIBBLE-IT Official Brand Identity Board">
+  <title>SCRIBBLE-IT Official Brand Identity Board</title>
+  <defs>
+    
+    <linearGradient id="board-dark-doc-stroke" x1="210" y1="128" x2="814" y2="896" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#22D3EE" />
+      <stop offset="48%" stop-color="#0A84FF" />
+      <stop offset="100%" stop-color="#38BDF8" />
+    </linearGradient>
+    <linearGradient id="board-dark-s-grad" x1="330" y1="300" x2="690" y2="755" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#22D3EE" />
+      <stop offset="55%" stop-color="#0A84FF" />
+      <stop offset="100%" stop-color="#60B5FF" />
+    </linearGradient>
+    <linearGradient id="board-dark-pencil-body" x1="590" y1="260" x2="770" y2="560" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#22D3EE" />
+      <stop offset="100%" stop-color="#0A84FF" />
+    </linearGradient>
+    <linearGradient id="board-dark-doc-fill" x1="216" y1="132" x2="808" y2="892" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#14335E" stop-opacity="0.68" />
+      <stop offset="100%" stop-color="#0B1F3B" stop-opacity="0.88" />
+    </linearGradient>
+    
+    <linearGradient id="board-light-doc-stroke" x1="210" y1="128" x2="814" y2="896" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0B1F3B" />
+      <stop offset="48%" stop-color="#0A84FF" />
+      <stop offset="100%" stop-color="#005FCC" />
+    </linearGradient>
+    <linearGradient id="board-light-s-grad" x1="330" y1="300" x2="690" y2="755" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#22D3EE" />
+      <stop offset="55%" stop-color="#0A84FF" />
+      <stop offset="100%" stop-color="#0B1F3B" />
+    </linearGradient>
+    <linearGradient id="board-light-pencil-body" x1="590" y1="260" x2="770" y2="560" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#22D3EE" />
+      <stop offset="100%" stop-color="#0A84FF" />
+    </linearGradient>
+    <linearGradient id="board-light-doc-fill" x1="216" y1="132" x2="808" y2="892" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.96" />
+      <stop offset="100%" stop-color="#E6F0FF" stop-opacity="0.92" />
+    </linearGradient>
+    <linearGradient id="board-hero-bg" x1="0" y1="0" x2="1600" y2="380" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0E274A" />
+      <stop offset="100%" stop-color="#0B1F3B" />
+    </linearGradient>
+  </defs>
+
+  <!-- Canvas -->
+  <rect width="1600" height="1080" fill="#F5F8FF" />
+
+  <!-- Top Header Bar -->
+  <rect x="0" y="0" width="1600" height="104" fill="#0B1F3B" />
+  <rect x="0" y="100" width="1600" height="4" fill="#0A84FF" />
+  <text x="56" y="64" font-family="Manrope, Inter, sans-serif" font-size="28" font-weight="800" letter-spacing="1.2" fill="#F5F8FF">SCRIBBLE-IT <tspan font-weight="500" fill="#22D3EE">BRAND IDENTITY BOARD</tspan></text>
+  <text x="1544" y="64" text-anchor="end" font-family="Inter, sans-serif" font-size="18" font-weight="500" fill="#94B2D8">A Njure Tech product.  ·  Enterprise IT Management. Open to Everyone.</text>
+
+  <!-- Panel 1: Primary Dark Logo -->
+  <rect x="56" y="144" width="724" height="360" rx="24" fill="url(#board-hero-bg)" />
+  <g transform="translate(106 208) scale(0.22)">
+    <g id="board-dark-layer-document">
+      <!-- Enterprise Document / Page Outline with Folded Top-Right Corner -->
+      <path
+        d="M 284 140
+           H 606
+           L 796 330
+           V 816
+           A 68 68 0 0 1 728 884
+           H 284
+           A 68 68 0 0 1 216 816
+           V 208
+           A 68 68 0 0 1 284 140 Z"
+        fill="url(#board-dark-doc-fill)"
+        stroke="url(#board-dark-doc-stroke)"
+        stroke-width="42"
+        stroke-linejoin="round"
+      />
+      <!-- Crisp Folded Corner Crease -->
+      <path
+        d="M 606 140 V 286 A 44 44 0 0 0 650 330 H 796"
+        fill="#183C6E"
+        fill-opacity="0.45"
+        stroke="url(#board-dark-doc-stroke)"
+        stroke-width="38"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+      <!-- Minimal Document Reference Lines (top-left) -->
+      <line x1="304" y1="248" x2="496" y2="248" stroke="url(#board-dark-doc-stroke)" stroke-width="26" stroke-linecap="round" opacity="0.55" />
+      <line x1="304" y1="308" x2="432" y2="308" stroke="url(#board-dark-doc-stroke)" stroke-width="22" stroke-linecap="round" opacity="0.4" />
+    </g>
+
+    <g id="board-dark-layer-s-pencil">
+      <!-- Stylized Geometric 'S' Monogram Sweeping Through the Document -->
+      <path
+        d="M 594 416
+           C 562 366, 488 352, 424 374
+           C 356 398, 338 468, 384 514
+           C 424 554, 520 554, 570 594
+           C 626 640, 610 730, 534 762
+           C 462 792, 376 774, 336 724"
+        fill="none"
+        stroke="url(#board-dark-s-grad)"
+        stroke-width="64"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+
+      <!-- Integrated Precision Diagonal Pencil Writing Into the S Curve -->
+      <g transform="translate(650 470) rotate(38)">
+        <!-- Pencil Eraser Cap -->
+        <rect x="-32" y="-176" width="64" height="44" rx="18" fill="#22D3EE" />
+        <!-- Metallic Ferrule Band -->
+        <rect x="-32" y="-124" width="64" height="24" rx="6" fill="#F5F8FF" />
+        <!-- Pencil Shaft Body -->
+        <rect x="-32" y="-92" width="64" height="196" rx="10" fill="url(#board-dark-pencil-body)" />
+        <!-- Facet Highlight Along Shaft -->
+        <rect x="-10" y="-86" width="16" height="184" rx="6" fill="#FFFFFF" opacity="0.26" />
+        <!-- Tapered Wooden/Metallic Tip Cone -->
+        <polygon points="-32,110 32,110 0,188" fill="#F5F8FF" />
+        <!-- Precision Graphite/Cyan Nib -->
+        <polygon points="-13,156 13,156 0,188" fill="#22D3EE" />
+      </g>
+
+      <!-- Precision Ink/Scribble Baseline Stroke -->
+      <path
+        d="M 526 776 C 584 776, 636 764, 694 742"
+        fill="none"
+        stroke="#22D3EE"
+        stroke-width="28"
+        stroke-linecap="round"
+      />
+    </g></g>
+  <text x="364" y="330" font-family="Manrope, Inter, sans-serif" font-size="84" font-weight="800" letter-spacing="-2.4" fill="#F5F8FF">Scribble <tspan fill="#22D3EE">IT</tspan></text>
+  <text x="368" y="378" font-family="Inter, sans-serif" font-size="26" font-weight="500" fill="#94B2D8">A Njure Tech product.</text>
+  <text x="86" y="476" font-family="Inter, sans-serif" font-size="14" font-weight="600" letter-spacing="1.2" fill="#22D3EE">PRIMARY DARK LOCKUP (#0B1F3B)</text>
+
+  <!-- Panel 2: Primary Light Logo -->
+  <rect x="820" y="144" width="724" height="360" rx="24" fill="#FFFFFF" stroke="#D4DFEE" stroke-width="2" />
+  <g transform="translate(870 208) scale(0.22)">
+    <g id="board-light-layer-document">
+      <!-- Enterprise Document / Page Outline with Folded Top-Right Corner -->
+      <path
+        d="M 284 140
+           H 606
+           L 796 330
+           V 816
+           A 68 68 0 0 1 728 884
+           H 284
+           A 68 68 0 0 1 216 816
+           V 208
+           A 68 68 0 0 1 284 140 Z"
+        fill="url(#board-light-doc-fill)"
+        stroke="url(#board-light-doc-stroke)"
+        stroke-width="42"
+        stroke-linejoin="round"
+      />
+      <!-- Crisp Folded Corner Crease -->
+      <path
+        d="M 606 140 V 286 A 44 44 0 0 0 650 330 H 796"
+        fill="#D9ECFF"
+        fill-opacity="0.45"
+        stroke="url(#board-light-doc-stroke)"
+        stroke-width="38"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+      <!-- Minimal Document Reference Lines (top-left) -->
+      <line x1="304" y1="248" x2="496" y2="248" stroke="url(#board-light-doc-stroke)" stroke-width="26" stroke-linecap="round" opacity="0.55" />
+      <line x1="304" y1="308" x2="432" y2="308" stroke="url(#board-light-doc-stroke)" stroke-width="22" stroke-linecap="round" opacity="0.4" />
+    </g>
+
+    <g id="board-light-layer-s-pencil">
+      <!-- Stylized Geometric 'S' Monogram Sweeping Through the Document -->
+      <path
+        d="M 594 416
+           C 562 366, 488 352, 424 374
+           C 356 398, 338 468, 384 514
+           C 424 554, 520 554, 570 594
+           C 626 640, 610 730, 534 762
+           C 462 792, 376 774, 336 724"
+        fill="none"
+        stroke="url(#board-light-s-grad)"
+        stroke-width="64"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+
+      <!-- Integrated Precision Diagonal Pencil Writing Into the S Curve -->
+      <g transform="translate(650 470) rotate(38)">
+        <!-- Pencil Eraser Cap -->
+        <rect x="-32" y="-176" width="64" height="44" rx="18" fill="#22D3EE" />
+        <!-- Metallic Ferrule Band -->
+        <rect x="-32" y="-124" width="64" height="24" rx="6" fill="#0B1F3B" />
+        <!-- Pencil Shaft Body -->
+        <rect x="-32" y="-92" width="64" height="196" rx="10" fill="url(#board-light-pencil-body)" />
+        <!-- Facet Highlight Along Shaft -->
+        <rect x="-10" y="-86" width="16" height="184" rx="6" fill="#FFFFFF" opacity="0.26" />
+        <!-- Tapered Wooden/Metallic Tip Cone -->
+        <polygon points="-32,110 32,110 0,188" fill="#0B1F3B" />
+        <!-- Precision Graphite/Cyan Nib -->
+        <polygon points="-13,156 13,156 0,188" fill="#22D3EE" />
+      </g>
+
+      <!-- Precision Ink/Scribble Baseline Stroke -->
+      <path
+        d="M 526 776 C 584 776, 636 764, 694 742"
+        fill="none"
+        stroke="#22D3EE"
+        stroke-width="28"
+        stroke-linecap="round"
+      />
+    </g></g>
+  <text x="1128" y="330" font-family="Manrope, Inter, sans-serif" font-size="84" font-weight="800" letter-spacing="-2.4" fill="#0B1F3B">Scribble <tspan fill="#0A84FF">IT</tspan></text>
+  <text x="1132" y="378" font-family="Inter, sans-serif" font-size="26" font-weight="500" fill="#476285">A Njure Tech product.</text>
+  <text x="850" y="476" font-family="Inter, sans-serif" font-size="14" font-weight="600" letter-spacing="1.2" fill="#0A84FF">PRIMARY LIGHT LOCKUP (#F5F8FF / #FFFFFF)</text>
+
+  <!-- Panel 3: Official Brand Palette -->
+  <rect x="56" y="540" width="724" height="232" rx="20" fill="#FFFFFF" stroke="#D4DFEE" stroke-width="2" />
+  <text x="86" y="582" font-family="Manrope, Inter, sans-serif" font-size="16" font-weight="700" letter-spacing="1" fill="#0B1F3B">OFFICIAL COLOR PALETTE</text>
+
+  <!-- Swatch 1: Deep Navy -->
+  <rect x="86" y="604" width="152" height="96" rx="14" fill="#0B1F3B" />
+  <text x="86" y="726" font-family="Inter, sans-serif" font-size="15" font-weight="700" fill="#0B1F3B">Deep Navy</text>
+  <text x="86" y="748" font-family="Inter, sans-serif" font-size="14" font-weight="500" fill="#476285">#0B1F3B</text>
+
+  <!-- Swatch 2: Njure Blue -->
+  <rect x="256" y="604" width="152" height="96" rx="14" fill="#0A84FF" />
+  <text x="256" y="726" font-family="Inter, sans-serif" font-size="15" font-weight="700" fill="#0B1F3B">Njure Blue</text>
+  <text x="256" y="748" font-family="Inter, sans-serif" font-size="14" font-weight="500" fill="#476285">#0A84FF</text>
+
+  <!-- Swatch 3: Accent Cyan -->
+  <rect x="426" y="604" width="152" height="96" rx="14" fill="#22D3EE" />
+  <text x="426" y="726" font-family="Inter, sans-serif" font-size="15" font-weight="700" fill="#0B1F3B">Accent Cyan</text>
+  <text x="426" y="748" font-family="Inter, sans-serif" font-size="14" font-weight="500" fill="#476285">#22D3EE</text>
+
+  <!-- Swatch 4: Surface -->
+  <rect x="596" y="604" width="152" height="96" rx="14" fill="#F5F8FF" stroke="#CBD8EC" stroke-width="2" />
+  <text x="596" y="726" font-family="Inter, sans-serif" font-size="15" font-weight="700" fill="#0B1F3B">Surface</text>
+  <text x="596" y="748" font-family="Inter, sans-serif" font-size="14" font-weight="500" fill="#476285">#F5F8FF</text>
+
+  <!-- Panel 4: Monochrome & Compact Variants + Unified App Icons -->
+  <rect x="820" y="540" width="724" height="232" rx="20" fill="#FFFFFF" stroke="#D4DFEE" stroke-width="2" />
+  <text x="850" y="582" font-family="Manrope, Inter, sans-serif" font-size="16" font-weight="700" letter-spacing="1" fill="#0B1F3B">APP ICON &amp; MONOCHROME SYSTEM</text>
+
+  <!-- Rounded App Tile Preview -->
+  <rect x="850" y="604" width="128" height="128" rx="30" fill="#0B1F3B" />
+  <g transform="translate(864 618) scale(0.098)">
+    <g id="board-dark-layer-document">
+      <!-- Enterprise Document / Page Outline with Folded Top-Right Corner -->
+      <path
+        d="M 284 140
+           H 606
+           L 796 330
+           V 816
+           A 68 68 0 0 1 728 884
+           H 284
+           A 68 68 0 0 1 216 816
+           V 208
+           A 68 68 0 0 1 284 140 Z"
+        fill="url(#board-dark-doc-fill)"
+        stroke="url(#board-dark-doc-stroke)"
+        stroke-width="42"
+        stroke-linejoin="round"
+      />
+      <!-- Crisp Folded Corner Crease -->
+      <path
+        d="M 606 140 V 286 A 44 44 0 0 0 650 330 H 796"
+        fill="#183C6E"
+        fill-opacity="0.45"
+        stroke="url(#board-dark-doc-stroke)"
+        stroke-width="38"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+      <!-- Minimal Document Reference Lines (top-left) -->
+      <line x1="304" y1="248" x2="496" y2="248" stroke="url(#board-dark-doc-stroke)" stroke-width="26" stroke-linecap="round" opacity="0.55" />
+      <line x1="304" y1="308" x2="432" y2="308" stroke="url(#board-dark-doc-stroke)" stroke-width="22" stroke-linecap="round" opacity="0.4" />
+    </g>
+
+    <g id="board-dark-layer-s-pencil">
+      <!-- Stylized Geometric 'S' Monogram Sweeping Through the Document -->
+      <path
+        d="M 594 416
+           C 562 366, 488 352, 424 374
+           C 356 398, 338 468, 384 514
+           C 424 554, 520 554, 570 594
+           C 626 640, 610 730, 534 762
+           C 462 792, 376 774, 336 724"
+        fill="none"
+        stroke="url(#board-dark-s-grad)"
+        stroke-width="64"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+
+      <!-- Integrated Precision Diagonal Pencil Writing Into the S Curve -->
+      <g transform="translate(650 470) rotate(38)">
+        <!-- Pencil Eraser Cap -->
+        <rect x="-32" y="-176" width="64" height="44" rx="18" fill="#22D3EE" />
+        <!-- Metallic Ferrule Band -->
+        <rect x="-32" y="-124" width="64" height="24" rx="6" fill="#F5F8FF" />
+        <!-- Pencil Shaft Body -->
+        <rect x="-32" y="-92" width="64" height="196" rx="10" fill="url(#board-dark-pencil-body)" />
+        <!-- Facet Highlight Along Shaft -->
+        <rect x="-10" y="-86" width="16" height="184" rx="6" fill="#FFFFFF" opacity="0.26" />
+        <!-- Tapered Wooden/Metallic Tip Cone -->
+        <polygon points="-32,110 32,110 0,188" fill="#F5F8FF" />
+        <!-- Precision Graphite/Cyan Nib -->
+        <polygon points="-13,156 13,156 0,188" fill="#22D3EE" />
+      </g>
+
+      <!-- Precision Ink/Scribble Baseline Stroke -->
+      <path
+        d="M 526 776 C 584 776, 636 764, 694 742"
+        fill="none"
+        stroke="#22D3EE"
+        stroke-width="28"
+        stroke-linecap="round"
+      />
+    </g></g>
+  <text x="914" y="754" text-anchor="middle" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#476285">App Icon</text>
+
+  <!-- Circle Adaptive Preview -->
+  <circle cx="1078" cy="668" r="64" fill="#0B1F3B" />
+  <g transform="translate(1033 623) scale(0.088)">
+    <g id="board-dark-layer-document">
+      <!-- Enterprise Document / Page Outline with Folded Top-Right Corner -->
+      <path
+        d="M 284 140
+           H 606
+           L 796 330
+           V 816
+           A 68 68 0 0 1 728 884
+           H 284
+           A 68 68 0 0 1 216 816
+           V 208
+           A 68 68 0 0 1 284 140 Z"
+        fill="url(#board-dark-doc-fill)"
+        stroke="url(#board-dark-doc-stroke)"
+        stroke-width="42"
+        stroke-linejoin="round"
+      />
+      <!-- Crisp Folded Corner Crease -->
+      <path
+        d="M 606 140 V 286 A 44 44 0 0 0 650 330 H 796"
+        fill="#183C6E"
+        fill-opacity="0.45"
+        stroke="url(#board-dark-doc-stroke)"
+        stroke-width="38"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+      <!-- Minimal Document Reference Lines (top-left) -->
+      <line x1="304" y1="248" x2="496" y2="248" stroke="url(#board-dark-doc-stroke)" stroke-width="26" stroke-linecap="round" opacity="0.55" />
+      <line x1="304" y1="308" x2="432" y2="308" stroke="url(#board-dark-doc-stroke)" stroke-width="22" stroke-linecap="round" opacity="0.4" />
+    </g>
+
+    <g id="board-dark-layer-s-pencil">
+      <!-- Stylized Geometric 'S' Monogram Sweeping Through the Document -->
+      <path
+        d="M 594 416
+           C 562 366, 488 352, 424 374
+           C 356 398, 338 468, 384 514
+           C 424 554, 520 554, 570 594
+           C 626 640, 610 730, 534 762
+           C 462 792, 376 774, 336 724"
+        fill="none"
+        stroke="url(#board-dark-s-grad)"
+        stroke-width="64"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+
+      <!-- Integrated Precision Diagonal Pencil Writing Into the S Curve -->
+      <g transform="translate(650 470) rotate(38)">
+        <!-- Pencil Eraser Cap -->
+        <rect x="-32" y="-176" width="64" height="44" rx="18" fill="#22D3EE" />
+        <!-- Metallic Ferrule Band -->
+        <rect x="-32" y="-124" width="64" height="24" rx="6" fill="#F5F8FF" />
+        <!-- Pencil Shaft Body -->
+        <rect x="-32" y="-92" width="64" height="196" rx="10" fill="url(#board-dark-pencil-body)" />
+        <!-- Facet Highlight Along Shaft -->
+        <rect x="-10" y="-86" width="16" height="184" rx="6" fill="#FFFFFF" opacity="0.26" />
+        <!-- Tapered Wooden/Metallic Tip Cone -->
+        <polygon points="-32,110 32,110 0,188" fill="#F5F8FF" />
+        <!-- Precision Graphite/Cyan Nib -->
+        <polygon points="-13,156 13,156 0,188" fill="#22D3EE" />
+      </g>
+
+      <!-- Precision Ink/Scribble Baseline Stroke -->
+      <path
+        d="M 526 776 C 584 776, 636 764, 694 742"
+        fill="none"
+        stroke="#22D3EE"
+        stroke-width="28"
+        stroke-linecap="round"
+      />
+    </g></g>
+  <text x="1078" y="754" text-anchor="middle" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#476285">Adaptive Circle</text>
+
+  <!-- Monochrome Dark Preview -->
+  <rect x="1186" y="604" width="128" height="128" rx="20" fill="#F5F8FF" stroke="#CBD8EC" stroke-width="2" />
+  <g transform="translate(1200 618) scale(0.098)">
+    <g id="board-monod-layer-document">
+      <!-- Enterprise Document / Page Outline with Folded Top-Right Corner -->
+      <path
+        d="M 284 140
+           H 606
+           L 796 330
+           V 816
+           A 68 68 0 0 1 728 884
+           H 284
+           A 68 68 0 0 1 216 816
+           V 208
+           A 68 68 0 0 1 284 140 Z"
+        fill="none"
+        stroke="#0B1F3B"
+        stroke-width="42"
+        stroke-linejoin="round"
+      />
+      <!-- Crisp Folded Corner Crease -->
+      <path
+        d="M 606 140 V 286 A 44 44 0 0 0 650 330 H 796"
+        fill="none"
+        fill-opacity="0"
+        stroke="#0B1F3B"
+        stroke-width="38"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+      <!-- Minimal Document Reference Lines (top-left) -->
+      <line x1="304" y1="248" x2="496" y2="248" stroke="#0B1F3B" stroke-width="26" stroke-linecap="round" opacity="0.85" />
+      <line x1="304" y1="308" x2="432" y2="308" stroke="#0B1F3B" stroke-width="22" stroke-linecap="round" opacity="0.65" />
+    </g>
+
+    <g id="board-monod-layer-s-pencil">
+      <!-- Stylized Geometric 'S' Monogram Sweeping Through the Document -->
+      <path
+        d="M 594 416
+           C 562 366, 488 352, 424 374
+           C 356 398, 338 468, 384 514
+           C 424 554, 520 554, 570 594
+           C 626 640, 610 730, 534 762
+           C 462 792, 376 774, 336 724"
+        fill="none"
+        stroke="#0B1F3B"
+        stroke-width="64"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+
+      <!-- Integrated Precision Diagonal Pencil Writing Into the S Curve -->
+      <g transform="translate(650 470) rotate(38)">
+        <!-- Pencil Eraser Cap -->
+        <rect x="-32" y="-176" width="64" height="44" rx="18" fill="#0B1F3B" />
+        <!-- Metallic Ferrule Band -->
+        <rect x="-32" y="-124" width="64" height="24" rx="6" fill="#0B1F3B" />
+        <!-- Pencil Shaft Body -->
+        <rect x="-32" y="-92" width="64" height="196" rx="10" fill="#0B1F3B" />
+        <!-- Facet Highlight Along Shaft -->
+        <rect x="-10" y="-86" width="16" height="184" rx="6" fill="#F5F8FF" opacity="0.28" />
+        <!-- Tapered Wooden/Metallic Tip Cone -->
+        <polygon points="-32,110 32,110 0,188" fill="#0B1F3B" />
+        <!-- Precision Graphite/Cyan Nib -->
+        <polygon points="-13,156 13,156 0,188" fill="#0B1F3B" />
+      </g>
+
+      <!-- Precision Ink/Scribble Baseline Stroke -->
+      <path
+        d="M 526 776 C 584 776, 636 764, 694 742"
+        fill="none"
+        stroke="#0B1F3B"
+        stroke-width="28"
+        stroke-linecap="round"
+      />
+    </g></g>
+  <text x="1250" y="754" text-anchor="middle" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#476285">Mono Navy</text>
+
+  <!-- Monochrome Light Preview -->
+  <rect x="1354" y="604" width="128" height="128" rx="20" fill="#0B1F3B" />
+  <g transform="translate(1368 618) scale(0.098)">
+    <g id="board-monol-layer-document">
+      <!-- Enterprise Document / Page Outline with Folded Top-Right Corner -->
+      <path
+        d="M 284 140
+           H 606
+           L 796 330
+           V 816
+           A 68 68 0 0 1 728 884
+           H 284
+           A 68 68 0 0 1 216 816
+           V 208
+           A 68 68 0 0 1 284 140 Z"
+        fill="none"
+        stroke="#F5F8FF"
+        stroke-width="42"
+        stroke-linejoin="round"
+      />
+      <!-- Crisp Folded Corner Crease -->
+      <path
+        d="M 606 140 V 286 A 44 44 0 0 0 650 330 H 796"
+        fill="none"
+        fill-opacity="0"
+        stroke="#F5F8FF"
+        stroke-width="38"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+      <!-- Minimal Document Reference Lines (top-left) -->
+      <line x1="304" y1="248" x2="496" y2="248" stroke="#F5F8FF" stroke-width="26" stroke-linecap="round" opacity="0.85" />
+      <line x1="304" y1="308" x2="432" y2="308" stroke="#F5F8FF" stroke-width="22" stroke-linecap="round" opacity="0.65" />
+    </g>
+
+    <g id="board-monol-layer-s-pencil">
+      <!-- Stylized Geometric 'S' Monogram Sweeping Through the Document -->
+      <path
+        d="M 594 416
+           C 562 366, 488 352, 424 374
+           C 356 398, 338 468, 384 514
+           C 424 554, 520 554, 570 594
+           C 626 640, 610 730, 534 762
+           C 462 792, 376 774, 336 724"
+        fill="none"
+        stroke="#F5F8FF"
+        stroke-width="64"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+
+      <!-- Integrated Precision Diagonal Pencil Writing Into the S Curve -->
+      <g transform="translate(650 470) rotate(38)">
+        <!-- Pencil Eraser Cap -->
+        <rect x="-32" y="-176" width="64" height="44" rx="18" fill="#F5F8FF" />
+        <!-- Metallic Ferrule Band -->
+        <rect x="-32" y="-124" width="64" height="24" rx="6" fill="#F5F8FF" />
+        <!-- Pencil Shaft Body -->
+        <rect x="-32" y="-92" width="64" height="196" rx="10" fill="#F5F8FF" />
+        <!-- Facet Highlight Along Shaft -->
+        <rect x="-10" y="-86" width="16" height="184" rx="6" fill="#FFFFFF" opacity="0.28" />
+        <!-- Tapered Wooden/Metallic Tip Cone -->
+        <polygon points="-32,110 32,110 0,188" fill="#F5F8FF" />
+        <!-- Precision Graphite/Cyan Nib -->
+        <polygon points="-13,156 13,156 0,188" fill="#F5F8FF" />
+      </g>
+
+      <!-- Precision Ink/Scribble Baseline Stroke -->
+      <path
+        d="M 526 776 C 584 776, 636 764, 694 742"
+        fill="none"
+        stroke="#F5F8FF"
+        stroke-width="28"
+        stroke-linecap="round"
+      />
+    </g></g>
+  <text x="1418" y="754" text-anchor="middle" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#476285">Mono Light</text>
+
+  <!-- Panel 5: Typography & Attribution Bar -->
+  <rect x="56" y="806" width="1488" height="218" rx="20" fill="#FFFFFF" stroke="#D4DFEE" stroke-width="2" />
+  <text x="86" y="848" font-family="Manrope, Inter, sans-serif" font-size="16" font-weight="700" letter-spacing="1" fill="#0B1F3B">TYPOGRAPHY &amp; OFFICIAL ATTRIBUTION</text>
+  <text x="86" y="904" font-family="Manrope, Inter, sans-serif" font-size="38" font-weight="800" fill="#0B1F3B">Manrope &amp; Inter — Enterprise IT Management. Open to Everyone.</text>
+  <text x="86" y="948" font-family="Inter, sans-serif" font-size="20" font-weight="500" fill="#476285">Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww Xx Yy Zz  ·  0123456789</text>
+  <text x="86" y="996" font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="#0B1F3B">SCRIBBLE-IT  ·  A Njure Tech product.  ·  Developed by NEEREJ S SURESAN — Founder &amp; CEO — Njure Tech (formerly Njure Group).</text>
+</svg>

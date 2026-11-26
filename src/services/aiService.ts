@@ -1,113 +1,36 @@
-import type { IncidentCategory, IncidentPriority, RiskLevel } from '../types/itsm';
+import {
+  aiApi,
+  getAccessToken,
+  isBackendApiConfigured,
+} from '@scribble-it/api-client';
+import type {
+  ChangeAssessResponse,
+  CopilotResponse,
+  CopilotTurnMessage,
+  DraftKbResponse,
+  IncidentTriageResponse,
+  MatchedKbSuggestion,
+  SuggestedNewKbTopic,
+  TriageAssistantKbPayload,
+  TriageAssistantResponse,
+  WikiAssistResponse,
+} from '@scribble-it/types';
 import { apiUrl, parseApiJson } from '../utils/apiClient';
-import { apiRequest, getAccessToken, isBackendApiConfigured } from './api/httpClient';
 
-export interface IncidentTriageResponse {
-  recommendedPriority: IncidentPriority;
-  recommendedCategory: IncidentCategory;
-  suggestedQueue: string;
-  rootCauseHypothesis: string;
-  diagnosticSteps: string[];
-  draftResolutionNote: string;
-  draftCustomerReply: string;
-  generatedAt: string;
-  requiresHumanApproval?: boolean;
-}
+export type {
+  ChangeAssessResponse,
+  CopilotResponse,
+  CopilotTurnMessage,
+  DraftKbResponse,
+  IncidentTriageResponse,
+  MatchedKbSuggestion,
+  SuggestedNewKbTopic,
+  TriageAssistantKbPayload,
+  TriageAssistantResponse,
+  WikiAssistResponse,
+};
 
-export interface ChangeAssessResponse {
-  assessedRisk: RiskLevel;
-  readinessScore: number;
-  riskFindings: string[];
-  missingControls: string[];
-  recommendedCabGuidance: string;
-  generatedAt: string;
-  requiresHumanApproval?: boolean;
-}
-
-export interface DraftKbResponse {
-  title: string;
-  category: string;
-  tags: string[];
-  content: string;
-  generatedAt: string;
-  requiresHumanApproval?: boolean;
-}
-
-export interface WikiAssistResponse {
-  summary: string;
-  sources: Array<{ title: string; uri: string }>;
-  searchQueries: string[];
-  model: string;
-  generatedAt: string;
-  requiresHumanApproval?: boolean;
-}
-
-export interface CopilotTurnMessage {
-  role: 'user' | 'model';
-  text: string;
-}
-
-export interface CopilotResponse {
-  reply: string;
-  model: string;
-  generatedAt: string;
-  requiresHumanApproval?: boolean;
-}
-
-export interface MatchedKbSuggestion {
-  kbId: string;
-  title: string;
-  relevanceReason: string;
-  matchConfidence: 'high' | 'medium' | 'low';
-}
-
-export interface SuggestedNewKbTopic {
-  title: string;
-  category: string;
-  summary: string;
-  draftBody: string;
-}
-
-export interface TriageAssistantResponse {
-  realTimeSummary: string;
-  urgencySignal: 'critical' | 'elevated' | 'normal';
-  slaAssessment: string;
-  recommendedPriority: IncidentPriority;
-  recommendedCategory: IncidentCategory;
-  suggestedQueue: string;
-  rootCauseHypothesis: string;
-  nextSteps: string[];
-  matchedKbArticles: MatchedKbSuggestion[];
-  suggestedNewKbTopics: SuggestedNewKbTopic[];
-  draftResolutionNote: string;
-  draftCustomerReply: string;
-  model: string;
-  generatedAt: string;
-  requiresHumanApproval?: boolean;
-}
-
-export interface TriageAssistantKbPayload {
-  id: string;
-  title: string;
-  category: string;
-  tags: string[];
-  excerpt: string;
-}
-
-async function postAiJson<TReq, TRes>(
-  legacyUrl: string,
-  fastApiPath: string,
-  payload: TReq,
-): Promise<TRes> {
-  // Prefer authenticated, quota-enforced FastAPI /api/v1/ai/* whenever backend session is active
-  if (isBackendApiConfigured() && getAccessToken()) {
-    return apiRequest<TRes>(fastApiPath, {
-      method: 'POST',
-      body: payload,
-      timeoutMs: 35000,
-    });
-  }
-
+async function postWebAiFallback<TReq, TRes>(legacyUrl: string, payload: TReq): Promise<TRes> {
   const res = await fetch(apiUrl(legacyUrl), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -120,6 +43,16 @@ async function postAiJson<TReq, TRes>(
   return data as TRes;
 }
 
+function shouldUseFastApi(): boolean {
+  return isBackendApiConfigured() && Boolean(getAccessToken());
+}
+
+/**
+ * Web-facing AI service wrapper.
+ * Routes through the shared FastAPI `/api/v1/ai/*` client (`@scribble-it/api-client`)
+ * whenever an authenticated backend session is active, while preserving local web dev
+ * compatibility without leaking Express routes into shared native packages.
+ */
 export const aiService = {
   triageIncident(payload: {
     id?: string;
@@ -130,10 +63,12 @@ export const aiService = {
     affectedCI?: string;
     recentActivity?: string[];
     availableQueues?: string[];
-  }) {
-    return postAiJson<typeof payload, IncidentTriageResponse>(
+  }): Promise<IncidentTriageResponse> {
+    if (shouldUseFastApi()) {
+      return aiApi.triageIncident(payload);
+    }
+    return postWebAiFallback<typeof payload, IncidentTriageResponse>(
       '/api/ai/triage-incident',
-      '/ai/triage-incident',
       payload,
     );
   },
@@ -150,10 +85,12 @@ export const aiService = {
     slaDeadline?: string;
     recentActivity?: string[];
     kbArticles?: TriageAssistantKbPayload[];
-  }) {
-    return postAiJson<typeof payload, TriageAssistantResponse>(
+  }): Promise<TriageAssistantResponse> {
+    if (shouldUseFastApi()) {
+      return aiApi.runTriageAssistant(payload);
+    }
+    return postWebAiFallback<typeof payload, TriageAssistantResponse>(
       '/api/ai/triage-assistant',
-      '/ai/triage-assistant',
       payload,
     );
   },
@@ -166,10 +103,12 @@ export const aiService = {
     implementationPlan: string;
     rollbackPlan: string;
     testPlan: string;
-  }) {
-    return postAiJson<typeof payload, ChangeAssessResponse>(
+  }): Promise<ChangeAssessResponse> {
+    if (shouldUseFastApi()) {
+      return aiApi.assessChange(payload);
+    }
+    return postWebAiFallback<typeof payload, ChangeAssessResponse>(
       '/api/ai/assess-change',
-      '/ai/assess-change',
       payload,
     );
   },
@@ -180,12 +119,11 @@ export const aiService = {
     sourceIncidentTitle?: string;
     sourceIncidentDescription?: string;
     sourceResolution?: string;
-  }) {
-    return postAiJson<typeof payload, DraftKbResponse>(
-      '/api/ai/draft-kb',
-      '/ai/draft-kb',
-      payload,
-    );
+  }): Promise<DraftKbResponse> {
+    if (shouldUseFastApi()) {
+      return aiApi.draftKbArticle(payload);
+    }
+    return postWebAiFallback<typeof payload, DraftKbResponse>('/api/ai/draft-kb', payload);
   },
 
   assistWiki(payload: {
@@ -194,24 +132,21 @@ export const aiService = {
     existingTitle?: string;
     existingContent?: string;
     existingSection?: string;
-  }) {
-    return postAiJson<typeof payload, WikiAssistResponse>(
-      '/api/ai/wiki-assist',
-      '/ai/wiki-assist',
-      payload,
-    );
+  }): Promise<WikiAssistResponse> {
+    if (shouldUseFastApi()) {
+      return aiApi.assistWiki(payload);
+    }
+    return postWebAiFallback<typeof payload, WikiAssistResponse>('/api/ai/wiki-assist', payload);
   },
 
   askCopilot(payload: {
     message: string;
     history?: CopilotTurnMessage[];
     tenantContext: string;
-  }) {
-    return postAiJson<typeof payload, CopilotResponse>(
-      '/api/ai/copilot',
-      '/ai/copilot',
-      payload,
-    );
+  }): Promise<CopilotResponse> {
+    if (shouldUseFastApi()) {
+      return aiApi.askCopilot(payload);
+    }
+    return postWebAiFallback<typeof payload, CopilotResponse>('/api/ai/copilot', payload);
   },
 };
-
