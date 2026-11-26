@@ -3,7 +3,8 @@
 **Product:** SCRIBBLE-IT (`Enterprise IT Management. Open to Everyone.`)  
 **Organization:** Njure Tech (formally Njure Group)  
 **App Identifier:** `in.njuretech.scribbleit`  
-**Current Release Status:** In Development (`v1.0.0` unsigned CI builds; signed public release pending)
+**Build Architecture:** Windows 10 (1809+) & Windows 11 (`x86_64` 64-bit)  
+**Signing Status:** Unsigned CI Release (`certificateThumbprint: null`; Authenticode signing certificate pending)
 
 ---
 
@@ -18,30 +19,30 @@
 
 ---
 
-## 2. Installer Formats
+## 2. Downloading Official Installers
 
-SCRIBBLE-IT provides two Windows installer packages configured in `src-tauri/tauri.conf.json`:
+Official Windows installers are published via GitHub Releases (`neerejsuresan-njuretech/Scribble-IT-Test/releases`) and linked directly from [scribbleit.njuregroup.in/#windows-desktop](https://scribbleit.njuregroup.in):
 
-1. **NSIS Setup Executable (`.exe`)** — Standard interactive per-user Windows installer (`installMode: "currentUser"`, no administrator privileges required).
-2. **WiX Windows Installer (`.msi`)** — Enterprise deployment package compatible with Microsoft Intune, Group Policy (GPO), SCCM, and silent unattended rollouts.
+1. **NSIS Setup Executable (`SCRIBBLE-IT_1.0.0_x64-setup.exe`)** — Recommended primary interactive per-user Windows installer (`installMode: "currentUser"`, no administrator privileges required).
+2. **WiX Windows Installer (`SCRIBBLE-IT_1.0.0_x64_en-US.msi`)** — Optional enterprise deployment package compatible with Microsoft Intune, Group Policy (GPO), SCCM, and silent unattended rollouts.
 
-> **Important Status Notice:** Official signed `.exe` / `.msi` downloads on [scribbleit.njuregroup.in](https://scribbleit.njuregroup.in) remain gated behind **"In Development"** until a verified Windows Authenticode code-signing certificate is provisioned and checksummed releases are published. Until then, administrators and contributors may inspect or test unsigned CI artifacts from `.github/workflows/windows-desktop-ci.yml` or build locally from source.
+> **Honest Availability Note:** If no published GitHub Release asset is present yet, the product page automatically remains in **In Development** without placeholder downloads until `.github/workflows/windows-desktop-ci.yml` publishes verified release assets.
 
 ---
 
 ## 3. Verifying Installer Integrity (SHA-256)
 
-Always verify the downloaded installer checksum against the published `SHA256SUMS.txt` file before running setup:
+Always verify the downloaded installer checksum against the published `SHA256SUMS.txt` asset attached to the GitHub Release before running setup:
 
 ```powershell
 Get-FileHash .\SCRIBBLE-IT_1.0.0_x64-setup.exe -Algorithm SHA256
 ```
 
-Compare the output hash cleanly against the expected 64-character SHA-256 digest before proceeding.
+Compare the 64-character SHA-256 output against the published `SHA256SUMS.txt` value shown on the product page and in the GitHub Release notes.
 
-### Windows SmartScreen Note (Unsigned Pre-Release Builds)
+### Windows SmartScreen Note (Unsigned Builds)
 
-During pre-release testing before Authenticode code signing is active, Windows Defender SmartScreen may show *"Windows protected your PC"*. Only click **More info -> Run anyway** if you built the installer yourself from source or verified the CI artifact SHA-256 hash from the official repository.
+Because `src-tauri/tauri.conf.json` specifies `"certificateThumbprint": null`, current installers are unsigned until an organization Authenticode certificate is provisioned. Windows Defender SmartScreen may display *"Windows protected your PC"*. Only click **More info -> Run anyway** after verifying that the file's `Get-FileHash` SHA-256 digest matches the official GitHub Release `SHA256SUMS.txt`.
 
 ---
 

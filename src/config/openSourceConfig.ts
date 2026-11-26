@@ -119,8 +119,16 @@ export interface WindowsDesktopReleaseConfig {
   version: string;
   availabilityStatus: 'Available' | 'In Development';
   installerUrl: string;
+  installerName: string;
+  installerSizeBytes: number | null;
+  installerSizeLabel: string;
   msiInstallerUrl: string;
+  msiInstallerName: string;
+  msiSizeBytes: number | null;
+  msiSizeLabel: string;
   installerSha256: string;
+  sha256SumsUrl: string;
+  releasePageUrl: string;
   architecture: string;
   minimumOs: string;
   runtimeRequirement: string;
@@ -131,19 +139,177 @@ export interface WindowsDesktopReleaseConfig {
   releaseNotesUrl: string;
 }
 
+export function formatInstallerSize(bytes?: number | null): string {
+  if (typeof bytes !== 'number' || !Number.isFinite(bytes) || bytes <= 0) {
+    return '';
+  }
+  const mib = bytes / (1024 * 1024);
+  if (mib >= 1) {
+    return `${mib.toFixed(2)} MiB`;
+  }
+  const kib = bytes / 1024;
+  return `${kib.toFixed(1)} KiB`;
+}
+
+export function isDirectGitHubReleaseAssetUrl(
+  url: string | undefined | null,
+  repoUrl: string,
+  expectedExtension: '.exe' | '.msi' | '.txt'
+): boolean {
+  if (!url) return false;
+  const trimmed = url.trim();
+  const base = repoUrl.replace(/\/+$/, '');
+  const lower = trimmed.toLowerCase();
+  if (!lower.startsWith(`${base.toLowerCase()}/releases/download/`)) {
+    return false;
+  }
+  if (lower.includes('/archive/') || lower.includes('/actions/')) {
+    return false;
+  }
+  return lower.endsWith(expectedExtension);
+}
+
+interface GitHubReleaseAssetLike {
+  name?: unknown;
+  size?: unknown;
+  browser_download_url?: unknown;
+  digest?: unknown;
+}
+
+interface GitHubReleaseLike {
+  tag_name?: unknown;
+  html_url?: unknown;
+  draft?: unknown;
+  assets?: unknown;
+}
+
+export function parseGitHubWindowsRelease(
+  releasesPayload: unknown,
+  repoUrl: string = GITHUB_REPOSITORY_URL
+): WindowsDesktopReleaseConfig | null {
+  if (!Array.isArray(releasesPayload)) return null;
+
+  for (const rawRel of releasesPayload as GitHubReleaseLike[]) {
+    if (!rawRel || rawRel.draft === true || !Array.isArray(rawRel.assets)) continue;
+    const assets = rawRel.assets as GitHubReleaseAssetLike[];
+
+    const exeAsset = assets.find(
+      a =>
+        typeof a?.name === 'string' &&
+        typeof a?.browser_download_url === 'string' &&
+        typeof a?.size === 'number' &&
+        a.size > 0 &&
+        isDirectGitHubReleaseAssetUrl(a.browser_download_url, repoUrl, '.exe')
+    );
+    if (!exeAsset) continue;
+
+    const digestRaw = typeof exeAsset.digest === 'string' ? exeAsset.digest.trim() : '';
+    const digestMatch = /^sha256:([a-f0-9]{64})$/i.exec(digestRaw);
+    const sha256 = digestMatch ? digestMatch[1].toLowerCase() : '';
+
+    const msiAsset = assets.find(
+      a =>
+        typeof a?.name === 'string' &&
+        typeof a?.browser_download_url === 'string' &&
+        typeof a?.size === 'number' &&
+        a.size > 0 &&
+        isDirectGitHubReleaseAssetUrl(a.browser_download_url, repoUrl, '.msi')
+    );
+
+    const sumsAsset = assets.find(
+      a =>
+        typeof a?.name === 'string' &&
+        a.name === 'SHA256SUMS.txt' &&
+        typeof a?.browser_download_url === 'string' &&
+        isDirectGitHubReleaseAssetUrl(a.browser_download_url, repoUrl, '.txt')
+    );
+
+    const rawTag = typeof rawRel.tag_name === 'string' ? rawRel.tag_name.trim() : '';
+    const version = rawTag.replace(/^v/i, '') || WINDOWS_DESKTOP_CONFIG.version;
+    const exeSize = exeAsset.size as number;
+    const msiSize = msiAsset && typeof msiAsset.size === 'number' ? msiAsset.size : null;
+
+    if (!sha256) {
+      // Checksum must be present (either via GitHub asset digest or resolved SHA256SUMS.txt before marking verified)
+      return {
+        ...WINDOWS_DESKTOP_CONFIG,
+        version,
+        availabilityStatus: 'In Development',
+        installerUrl: exeAsset.browser_download_url as string,
+        installerName: exeAsset.name as string,
+        installerSizeBytes: exeSize,
+        installerSizeLabel: formatInstallerSize(exeSize),
+        msiInstallerUrl: msiAsset ? (msiAsset.browser_download_url as string) : '',
+        msiInstallerName: msiAsset ? (msiAsset.name as string) : '',
+        msiSizeBytes: msiSize,
+        msiSizeLabel: formatInstallerSize(msiSize),
+        installerSha256: '',
+        sha256SumsUrl: sumsAsset ? (sumsAsset.browser_download_url as string) : '',
+        releasePageUrl: typeof rawRel.html_url === 'string' ? rawRel.html_url : '',
+      };
+    }
+
+    return {
+      ...WINDOWS_DESKTOP_CONFIG,
+      version,
+      availabilityStatus: 'Available',
+      installerUrl: exeAsset.browser_download_url as string,
+      installerName: exeAsset.name as string,
+      installerSizeBytes: exeSize,
+      installerSizeLabel: formatInstallerSize(exeSize),
+      msiInstallerUrl: msiAsset ? (msiAsset.browser_download_url as string) : '',
+      msiInstallerName: msiAsset ? (msiAsset.name as string) : '',
+      msiSizeBytes: msiSize,
+      msiSizeLabel: formatInstallerSize(msiSize),
+      installerSha256: sha256,
+      sha256SumsUrl: sumsAsset ? (sumsAsset.browser_download_url as string) : '',
+      releasePageUrl: typeof rawRel.html_url === 'string' ? rawRel.html_url : '',
+    };
+  }
+
+  return null;
+}
+
+const configuredVersion = readEnv('VITE_WINDOWS_RELEASE_VERSION') || '1.0.0';
 const configuredExeUrl = readEnv('VITE_WINDOWS_INSTALLER_URL');
 const configuredMsiUrl = readEnv('VITE_WINDOWS_MSI_URL');
 const configuredSha256 = readEnv('VITE_WINDOWS_INSTALLER_SHA256');
+const configuredSumsUrl = readEnv('VITE_WINDOWS_SHA256SUMS_URL');
+const configuredReleaseUrl = readEnv('VITE_WINDOWS_RELEASE_URL');
+const parsedExeSize = Number.parseInt(readEnv('VITE_WINDOWS_INSTALLER_SIZE_BYTES'), 10);
+const parsedMsiSize = Number.parseInt(readEnv('VITE_WINDOWS_MSI_SIZE_BYTES'), 10);
+const configuredExeSizeBytes = Number.isFinite(parsedExeSize) && parsedExeSize > 0 ? parsedExeSize : null;
+const configuredMsiSizeBytes = Number.isFinite(parsedMsiSize) && parsedMsiSize > 0 ? parsedMsiSize : null;
+
 const hasVerifiedWindowsBinary =
   isConfiguredUrl(configuredExeUrl) && /^[a-f0-9]{64}$/i.test(configuredSha256);
 
 export const WINDOWS_DESKTOP_CONFIG: WindowsDesktopReleaseConfig = {
-  version: '1.0.0',
+  version: configuredVersion,
   availabilityStatus: hasVerifiedWindowsBinary ? 'Available' : 'In Development',
   installerUrl: hasVerifiedWindowsBinary ? configuredExeUrl : '',
+  installerName: hasVerifiedWindowsBinary
+    ? configuredExeUrl.split('/').pop() || `SCRIBBLE-IT_${configuredVersion}_x64-setup.exe`
+    : '',
+  installerSizeBytes: hasVerifiedWindowsBinary ? configuredExeSizeBytes : null,
+  installerSizeLabel: hasVerifiedWindowsBinary ? formatInstallerSize(configuredExeSizeBytes) : '',
   msiInstallerUrl:
     hasVerifiedWindowsBinary && isConfiguredUrl(configuredMsiUrl) ? configuredMsiUrl : '',
-  installerSha256: hasVerifiedWindowsBinary ? configuredSha256 : '',
+  msiInstallerName:
+    hasVerifiedWindowsBinary && isConfiguredUrl(configuredMsiUrl)
+      ? configuredMsiUrl.split('/').pop() || `SCRIBBLE-IT_${configuredVersion}_x64_en-US.msi`
+      : '',
+  msiSizeBytes:
+    hasVerifiedWindowsBinary && isConfiguredUrl(configuredMsiUrl) ? configuredMsiSizeBytes : null,
+  msiSizeLabel:
+    hasVerifiedWindowsBinary && isConfiguredUrl(configuredMsiUrl)
+      ? formatInstallerSize(configuredMsiSizeBytes)
+      : '',
+  installerSha256: hasVerifiedWindowsBinary ? configuredSha256.toLowerCase() : '',
+  sha256SumsUrl:
+    hasVerifiedWindowsBinary && isConfiguredUrl(configuredSumsUrl) ? configuredSumsUrl : '',
+  releasePageUrl:
+    hasVerifiedWindowsBinary && isConfiguredUrl(configuredReleaseUrl) ? configuredReleaseUrl : '',
   architecture: 'Windows x86_64 (64-bit)',
   minimumOs: 'Windows 10 (Version 1809+) or Windows 11 (64-bit)',
   runtimeRequirement: 'Microsoft Edge WebView2 Runtime (auto-bootstrapped)',

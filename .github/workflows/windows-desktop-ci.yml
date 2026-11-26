@@ -6,6 +6,8 @@ on:
       - main
       - master
       - develop
+    tags:
+      - 'v*'
     paths:
       - 'src/**'
       - 'src-tauri/**'
@@ -34,7 +36,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   windows-desktop:
@@ -92,6 +94,79 @@ jobs:
           Write-Host "Verified MSI artifact: $($msiFiles[0].Name) ($($msiFiles[0].Length) bytes)"
           Get-Content "release/windows/SHA256SUMS.txt"
           Get-Content "release/windows/installation-verification.txt"
+
+      - name: Publish verified Windows installers & checksums to GitHub Releases
+        if: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $conf = Get-Content 'src-tauri/tauri.conf.json' -Raw | ConvertFrom-Json
+          $version = [string]$conf.version
+          $tag = if ($env:GITHUB_REF -like 'refs/tags/*') { $env:GITHUB_REF_NAME } else { "v$version" }
+
+          $exe = (Get-ChildItem -Path 'release/windows' -Filter '*.exe' -File | Select-Object -First 1)
+          $msi = (Get-ChildItem -Path 'release/windows' -Filter '*.msi' -File | Select-Object -First 1)
+          $shaSums = Get-Content 'release/windows/SHA256SUMS.txt' -Raw
+          $verifyLog = Get-Content 'release/windows/installation-verification.txt' -Raw
+
+          $exeMb = [Math]::Round($exe.Length / 1MB, 2)
+          $msiMb = [Math]::Round($msi.Length / 1MB, 2)
+
+          $notes = @(
+            "# SCRIBBLE-IT for Windows v$version"
+            ""
+            "**Organization:** Njure Tech (formally Njure Group)"
+            "**Compatibility:** Windows 10 (1809+) and Windows 11 (x86_64 64-bit)"
+            "**Application ID:** ``$($conf.identifier)``"
+            ""
+            "## Installers & Sizes"
+            "- **Primary NSIS Installer (.exe):** ``$($exe.Name)`` ($exeMb MiB / $($exe.Length) bytes)"
+            "- **Enterprise WiX Installer (.msi):** ``$($msi.Name)`` ($msiMb MiB / $($msi.Length) bytes)"
+            ""
+            "## SHA-256 Checksums"
+            "``````text"
+            $shaSums.TrimEnd()
+            "``````"
+            ""
+            "## Automated Installation & Uninstall Verification"
+            "``````text"
+            $verifyLog.TrimEnd()
+            "``````"
+            ""
+            "> **Note on Code Signing:** Installers built by CI currently have ``certificateThumbprint: null`` (unsigned). Always verify the downloaded file's SHA-256 hash using ``Get-FileHash .\$($exe.Name) -Algorithm SHA256``."
+          ) -join "`n"
+
+          $notesPath = Join-Path $env:RUNNER_TEMP 'release-notes.md'
+          $notes | Out-File -FilePath $notesPath -Encoding utf8
+
+          $assets = @(
+            $exe.FullName,
+            $msi.FullName,
+            'release/windows/SHA256SUMS.txt',
+            "$($exe.FullName).sha256",
+            "$($msi.FullName).sha256",
+            'release/windows/BUILD_INFO.txt',
+            'release/windows/installation-verification.txt'
+          )
+
+          $existing = $null
+          try {
+            $existing = gh release view $tag --json url 2>$null
+          } catch {
+            $existing = $null
+          }
+
+          if ($existing) {
+            gh release upload $tag @assets --clobber
+            gh release edit $tag --title "SCRIBBLE-IT v$version for Windows" --notes-file $notesPath
+          } else {
+            gh release create $tag @assets --target $env:GITHUB_SHA --title "SCRIBBLE-IT v$version for Windows" --notes-file $notesPath
+          }
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed publishing Windows release assets to GitHub Release $tag"
+          }
 
       - name: Upload Windows installer release bundle & verification logs (Unsigned CI artifact)
         uses: actions/upload-artifact@v4

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
@@ -12,6 +12,9 @@ import {
   Heart,
   Coffee,
   ExternalLink,
+  Download,
+  Copy,
+  Check,
   Shield,
   Server,
   Workflow,
@@ -56,6 +59,8 @@ import {
   ROADMAP_URL,
   CHANGELOG_URL,
   WINDOWS_DESKTOP_CONFIG,
+  type WindowsDesktopReleaseConfig,
+  parseGitHubWindowsRelease,
   isConfiguredUrl,
 } from '../../config/openSourceConfig';
 import { ArchitectureDiagram } from '../../components/public/ArchitectureDiagram';
@@ -512,8 +517,70 @@ export const LandingWebsitePage: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [heroImageBroken, setHeroImageBroken] = useState(false);
   const [legalModal, setLegalModal] = useState<'privacy' | 'terms' | null>(null);
+  const [desktopRelease, setDesktopRelease] =
+    useState<WindowsDesktopReleaseConfig>(WINDOWS_DESKTOP_CONFIG);
+  const [copiedSha256, setCopiedSha256] = useState(false);
 
   const currentYear = new Date().getFullYear();
+
+  useEffect(() => {
+    if (WINDOWS_DESKTOP_CONFIG.availabilityStatus === 'Available') return;
+    const match = /github\.com\/([^/]+\/[^/]+?)(?:\.git|\/)?$/i.exec(GITHUB_REPOSITORY_URL);
+    if (!match) return;
+    const controller = new AbortController();
+
+    fetch(`https://api.github.com/repos/${match[1]}/releases?per_page=5`, {
+      headers: { Accept: 'application/vnd.github+json' },
+      signal: controller.signal,
+    })
+      .then(res => (res.ok ? res.json() : null))
+      .then(async payload => {
+        const parsed = parseGitHubWindowsRelease(payload, GITHUB_REPOSITORY_URL);
+        if (!parsed) return;
+        if (parsed.availabilityStatus === 'Available' && parsed.installerSha256) {
+          setDesktopRelease(parsed);
+          return;
+        }
+        if (parsed.sha256SumsUrl && parsed.installerName) {
+          try {
+            const sumRes = await fetch(parsed.sha256SumsUrl, { signal: controller.signal });
+            if (!sumRes.ok) return;
+            const text = await sumRes.text();
+            for (const line of text.split(/\r?\n/)) {
+              if (line.includes(parsed.installerName)) {
+                const hm = /\b([a-f0-9]{64})\b/i.exec(line);
+                if (hm) {
+                  setDesktopRelease({
+                    ...parsed,
+                    availabilityStatus: 'Available',
+                    installerSha256: hm[1].toLowerCase(),
+                  });
+                  return;
+                }
+              }
+            }
+          } catch {
+            // Keep In Development if checksum could not be verified
+          }
+        }
+      })
+      .catch(() => {
+        // Ignore network/abort errors; stay cleanly in In Development
+      });
+
+    return () => controller.abort();
+  }, []);
+
+  const handleCopySha256 = async () => {
+    if (!desktopRelease.installerSha256) return;
+    try {
+      await navigator.clipboard.writeText(desktopRelease.installerSha256);
+      setCopiedSha256(true);
+      setTimeout(() => setCopiedSha256(false), 2500);
+    } catch {
+      // Clipboard API unavailable
+    }
+  };
 
   const visibleCapabilities = useMemo(() => {
     if (activeCategory === 'all') return CAPABILITY_GROUPS;
@@ -778,15 +845,32 @@ export const LandingWebsitePage: React.FC = () => {
                     <ArrowRight className="w-4 h-4 shrink-0" />
                   </button>
 
-                  <a
-                    href={GITHUB_REPOSITORY_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-5 py-3 min-h-[44px] border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-100 text-sm font-semibold rounded-md transition-colors inline-flex items-center gap-2 whitespace-nowrap"
-                  >
-                    <Github className="w-4 h-4 shrink-0" />
-                    <span>View GitHub</span>
-                  </a>
+                  {desktopRelease.availabilityStatus === 'Available' &&
+                  desktopRelease.installerUrl ? (
+                    <a
+                      href={desktopRelease.installerUrl}
+                      download={desktopRelease.installerName}
+                      className="px-5 py-3 min-h-[44px] bg-[#0A84FF] hover:bg-[#0A84FF]/90 text-white text-sm font-semibold rounded-md transition-colors inline-flex items-center gap-2 whitespace-nowrap"
+                    >
+                      <Download className="w-4 h-4 shrink-0" />
+                      <span>
+                        Download for Windows (.exe)
+                        {desktopRelease.installerSizeLabel
+                          ? ` · ${desktopRelease.installerSizeLabel}`
+                          : ''}
+                      </span>
+                    </a>
+                  ) : (
+                    <a
+                      href={GITHUB_REPOSITORY_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-5 py-3 min-h-[44px] border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-100 text-sm font-semibold rounded-md transition-colors inline-flex items-center gap-2 whitespace-nowrap"
+                    >
+                      <Github className="w-4 h-4 shrink-0" />
+                      <span>View GitHub</span>
+                    </a>
+                  )}
 
                   <button
                     type="button"
@@ -1081,6 +1165,19 @@ export const LandingWebsitePage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {ECOSYSTEM_PLATFORMS.map(item => {
                 const Icon = item.icon;
+                const resolvedStatus =
+                  item.sectionTarget === 'windows-desktop'
+                    ? desktopRelease.availabilityStatus
+                    : item.status;
+                const resolvedSummary =
+                  item.sectionTarget === 'windows-desktop' &&
+                  desktopRelease.availabilityStatus === 'Available'
+                    ? `Native Tauri 2 Windows installer (v${desktopRelease.version}${
+                        desktopRelease.installerSizeLabel
+                          ? `, ${desktopRelease.installerSizeLabel}`
+                          : ''
+                      }) with Windows Credential Manager token storage, native Windows alerts, file attachments, and scribbleit:// deep links.`
+                    : item.summary;
                 return (
                   <div
                     key={item.name}
@@ -1089,8 +1186,8 @@ export const LandingWebsitePage: React.FC = () => {
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-3">
                         <Icon className="w-5 h-5 text-rose-400 shrink-0" />
-                        <span className={`text-xs font-mono ${getStatusColorClass(item.status)}`}>
-                          {item.status}
+                        <span className={`text-xs font-mono ${getStatusColorClass(resolvedStatus)}`}>
+                          {resolvedStatus}
                         </span>
                       </div>
                       <div>
@@ -1100,27 +1197,31 @@ export const LandingWebsitePage: React.FC = () => {
                         </div>
                       </div>
                       <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">
-                        {item.summary}
+                        {resolvedSummary}
                       </p>
                     </div>
 
                     <div className="pt-4 border-t border-neutral-800">
-                      {item.status === 'Available' ? (
+                      {item.sectionTarget === 'windows-desktop' ? (
+                        <button
+                          type="button"
+                          onClick={() => scrollToSection('windows-desktop')}
+                          className="text-xs font-semibold text-[#22D3EE] hover:text-[#F5F8FF] inline-flex items-center gap-1.5 transition-colors"
+                        >
+                          <span>
+                            {resolvedStatus === 'Available'
+                              ? 'Download Windows Installer (.exe)'
+                              : 'View Windows Desktop Details'}
+                          </span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      ) : resolvedStatus === 'Available' ? (
                         <button
                           type="button"
                           onClick={() => handleLaunchDemo('super_admin', '/watchtower')}
                           className="text-xs font-semibold text-rose-400 hover:text-rose-300 inline-flex items-center gap-1.5 transition-colors"
                         >
                           <span>Launch Web Application</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </button>
-                      ) : item.sectionTarget ? (
-                        <button
-                          type="button"
-                          onClick={() => scrollToSection(item.sectionTarget!)}
-                          className="text-xs font-semibold text-[#22D3EE] hover:text-[#F5F8FF] inline-flex items-center gap-1.5 transition-colors"
-                        >
-                          <span>View Windows Desktop Details</span>
                           <ArrowRight className="w-3.5 h-3.5" />
                         </button>
                       ) : (
@@ -1164,12 +1265,15 @@ export const LandingWebsitePage: React.FC = () => {
               <div className="border border-[#0A84FF]/40 bg-[#0B1F3B]/80 rounded-lg px-4 py-3 shrink-0 space-y-1">
                 <div className="text-[11px] font-mono text-neutral-400">Release Status</div>
                 <div className="text-sm font-bold text-[#22D3EE]">
-                  {WINDOWS_DESKTOP_CONFIG.availabilityStatus === 'Available'
-                    ? `Available · v${WINDOWS_DESKTOP_CONFIG.version}`
-                    : `In Development · v${WINDOWS_DESKTOP_CONFIG.version} Source Ready`}
+                  {desktopRelease.availabilityStatus === 'Available'
+                    ? `Available · v${desktopRelease.version}`
+                    : `In Development · v${desktopRelease.version} Source Ready`}
                 </div>
                 <div className="text-[11px] text-neutral-400">
-                  {WINDOWS_DESKTOP_CONFIG.architecture}
+                  {desktopRelease.architecture}
+                  {desktopRelease.installerSizeLabel
+                    ? ` · ${desktopRelease.installerSizeLabel}`
+                    : ''}
                 </div>
               </div>
             </div>
@@ -1231,58 +1335,136 @@ export const LandingWebsitePage: React.FC = () => {
                     </h3>
                     <span
                       className={`text-xs font-mono ${
-                        WINDOWS_DESKTOP_CONFIG.availabilityStatus === 'Available'
+                        desktopRelease.availabilityStatus === 'Available'
                           ? 'text-emerald-400'
                           : 'text-amber-400'
                       }`}
                     >
-                      {WINDOWS_DESKTOP_CONFIG.availabilityStatus}
+                      {desktopRelease.availabilityStatus}
                     </span>
                   </div>
 
-                  {WINDOWS_DESKTOP_CONFIG.installerUrl ? (
+                  {desktopRelease.availabilityStatus === 'Available' &&
+                  desktopRelease.installerUrl ? (
                     <div className="space-y-3">
                       <a
-                        href={WINDOWS_DESKTOP_CONFIG.installerUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full px-4 py-2.5 min-h-[42px] bg-[#0A84FF] hover:bg-[#0A84FF]/90 text-white text-xs sm:text-sm font-semibold rounded-md transition-colors inline-flex items-center justify-center gap-2"
+                        href={desktopRelease.installerUrl}
+                        download={desktopRelease.installerName}
+                        className="w-full px-4 py-3 min-h-[44px] bg-[#0A84FF] hover:bg-[#0A84FF]/90 text-white text-xs sm:text-sm font-semibold rounded-md transition-colors inline-flex items-center justify-center gap-2"
                       >
-                        <span>Download Windows Installer (.exe) — v{WINDOWS_DESKTOP_CONFIG.version}</span>
-                        <ExternalLink className="w-3.5 h-3.5" />
+                        <Download className="w-4 h-4 shrink-0" />
+                        <span>Download for Windows (.exe)</span>
                       </a>
-                      {WINDOWS_DESKTOP_CONFIG.msiInstallerUrl && (
+
+                      <div className="grid grid-cols-3 gap-2 text-[11px] bg-neutral-900/70 border border-neutral-800 rounded-md p-2.5">
+                        <div>
+                          <div className="text-neutral-500">Version</div>
+                          <div className="font-mono font-semibold text-neutral-100">
+                            v{desktopRelease.version}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-neutral-500">Platform</div>
+                          <div className="font-mono font-semibold text-neutral-100">
+                            Win 10/11 x64
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-neutral-500">Installer Size</div>
+                          <div className="font-mono font-semibold text-neutral-100">
+                            {desktopRelease.installerSizeLabel || 'Verified'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {desktopRelease.msiInstallerUrl && (
                         <a
-                          href={WINDOWS_DESKTOP_CONFIG.msiInstallerUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="w-full px-3.5 py-2 border border-neutral-700 hover:border-[#22D3EE]/60 text-neutral-200 text-xs font-semibold rounded-md transition-colors inline-flex items-center justify-center gap-2"
+                          href={desktopRelease.msiInstallerUrl}
+                          download={desktopRelease.msiInstallerName}
+                          className="w-full px-3.5 py-2 min-h-[38px] border border-neutral-700 hover:border-[#22D3EE]/60 text-neutral-200 text-xs font-semibold rounded-md transition-colors inline-flex items-center justify-center gap-2"
                         >
-                          <span>Enterprise WiX Installer (.msi)</span>
-                          <ExternalLink className="w-3.5 h-3.5" />
+                          <Download className="w-3.5 h-3.5 shrink-0" />
+                          <span>
+                            Enterprise WiX Installer (.msi)
+                            {desktopRelease.msiSizeLabel
+                              ? ` — ${desktopRelease.msiSizeLabel}`
+                              : ''}
+                          </span>
                         </a>
                       )}
-                      <div className="text-[11px] font-mono text-neutral-400 break-all">
-                        SHA-256: {WINDOWS_DESKTOP_CONFIG.installerSha256}
+
+                      <div className="p-3 border border-neutral-800 bg-neutral-900/50 rounded-md space-y-2">
+                        <div className="flex items-center justify-between gap-2 text-[11px]">
+                          <span className="font-semibold text-neutral-300">
+                            SHA-256 Checksum ({desktopRelease.installerName})
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={handleCopySha256}
+                              className="inline-flex items-center gap-1 text-[#22D3EE] hover:underline font-medium"
+                            >
+                              {copiedSha256 ? (
+                                <>
+                                  <Check className="w-3 h-3" />
+                                  <span>Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3 h-3" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+                            {desktopRelease.sha256SumsUrl && (
+                              <a
+                                href={desktopRelease.sha256SumsUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-neutral-300 hover:text-white underline"
+                              >
+                                SHA256SUMS.txt
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-[11px] font-mono text-neutral-300 break-all select-all">
+                          {desktopRelease.installerSha256}
+                        </div>
+                        <div className="text-[10px] font-mono text-neutral-400 break-all">
+                          PowerShell: Get-FileHash .\{desktopRelease.installerName} -Algorithm SHA256
+                        </div>
                       </div>
+
                       <p className="text-[11px] text-amber-300/90 leading-relaxed">
-                        {WINDOWS_DESKTOP_CONFIG.codeSigningStatus}. If Windows SmartScreen warns on an unsigned build, verify the SHA-256 hash above before running setup.
+                        {desktopRelease.codeSigningStatus}. Verify the SHA-256 checksum above after downloading; if SmartScreen prompts on an unsigned build, inspect the hash before continuing.
                       </p>
                     </div>
                   ) : (
                     <div className="space-y-3 text-xs text-neutral-300 leading-relaxed">
                       <p>
-                        <strong className="text-[#F5F8FF]">Pre-built Windows installers (.exe / .msi) are not yet published.</strong> The complete Tauri 2 project (<code className="text-[#22D3EE]">src-tauri/</code>), NSIS &amp; WiX MSI configurations, and <code className="text-[#22D3EE]">windows-latest</code> CI workflow are committed in GitHub, awaiting execution on a Windows build host.
+                        <strong className="text-[#F5F8FF]">GitHub Release assets (.exe / .msi) are not yet published.</strong> The Tauri 2 Windows build &amp; verification workflow passes in CI; publish the release assets from <code className="text-[#22D3EE]">.github/workflows/windows-desktop-ci.yml</code> on GitHub Releases to enable direct downloads here.
                       </p>
                       <p className="text-neutral-400">
-                        {WINDOWS_DESKTOP_CONFIG.codeSigningStatus}. Build and verify locally on Windows 10/11 via <code className="text-neutral-200">scripts/build-windows-release.ps1</code> or trigger the Windows CI workflow.
+                        {desktopRelease.codeSigningStatus}. Build and verify locally on Windows 10/11 via <code className="text-neutral-200">scripts/build-windows-release.ps1</code> or trigger a tagged Windows release build.
                       </p>
                     </div>
                   )}
 
                   <div className="pt-2 border-t border-neutral-800 flex flex-wrap gap-x-4 gap-y-2 text-xs font-semibold">
+                    {desktopRelease.releasePageUrl && (
+                      <a
+                        href={desktopRelease.releasePageUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-emerald-400 hover:underline inline-flex items-center gap-1"
+                      >
+                        <span>GitHub Release</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
                     <a
-                      href={WINDOWS_DESKTOP_CONFIG.installGuideUrl}
+                      href={desktopRelease.installGuideUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-[#22D3EE] hover:underline inline-flex items-center gap-1"
@@ -1291,7 +1473,7 @@ export const LandingWebsitePage: React.FC = () => {
                       <ExternalLink className="w-3 h-3" />
                     </a>
                     <a
-                      href={WINDOWS_DESKTOP_CONFIG.buildGuideUrl}
+                      href={desktopRelease.buildGuideUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-[#0A84FF] hover:underline inline-flex items-center gap-1"
@@ -1300,7 +1482,7 @@ export const LandingWebsitePage: React.FC = () => {
                       <ExternalLink className="w-3 h-3" />
                     </a>
                     <a
-                      href={WINDOWS_DESKTOP_CONFIG.securityGuideUrl}
+                      href={desktopRelease.securityGuideUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-neutral-200 hover:underline inline-flex items-center gap-1"
@@ -1309,7 +1491,7 @@ export const LandingWebsitePage: React.FC = () => {
                       <ExternalLink className="w-3 h-3" />
                     </a>
                     <a
-                      href={WINDOWS_DESKTOP_CONFIG.releaseNotesUrl}
+                      href={desktopRelease.releaseNotesUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-neutral-300 hover:underline inline-flex items-center gap-1"
@@ -1325,8 +1507,8 @@ export const LandingWebsitePage: React.FC = () => {
                     Windows System Requirements &amp; Known Limitations
                   </h3>
                   <ul className="space-y-1.5 text-neutral-400">
-                    <li>· <strong className="text-neutral-200">OS:</strong> {WINDOWS_DESKTOP_CONFIG.minimumOs}</li>
-                    <li>· <strong className="text-neutral-200">Runtime:</strong> {WINDOWS_DESKTOP_CONFIG.runtimeRequirement}</li>
+                    <li>· <strong className="text-neutral-200">OS:</strong> {desktopRelease.minimumOs}</li>
+                    <li>· <strong className="text-neutral-200">Runtime:</strong> {desktopRelease.runtimeRequirement}</li>
                     <li>· <strong className="text-neutral-200">Hardware:</strong> 64-bit CPU, 4 GB RAM min (8 GB recommended), 200 MB free disk</li>
                     <li>· <strong className="text-neutral-200">Trust Boundary:</strong> Local device fingerprint aids session identification and is not treated as independent MDM attestation; IAM enrollment remains admin-controlled.</li>
                     <li>· <strong className="text-neutral-200">Scope Notice:</strong> macOS, Linux, Android, and iOS builds remain Coming Soon.</li>

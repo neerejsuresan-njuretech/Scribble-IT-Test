@@ -13,7 +13,13 @@ import {
   WindowsCredentialTokenStorage,
   type WindowsVaultBridge,
 } from '../../src/desktop/windowsTokenStorage';
-import { WINDOWS_DESKTOP_CONFIG } from '../../src/config/openSourceConfig';
+import {
+  formatInstallerSize,
+  GITHUB_REPOSITORY_URL,
+  isDirectGitHubReleaseAssetUrl,
+  parseGitHubWindowsRelease,
+  WINDOWS_DESKTOP_CONFIG,
+} from '../../src/config/openSourceConfig';
 
 const REPO_ROOT = path.resolve(process.cwd());
 
@@ -167,6 +173,61 @@ test('WINDOWS_DESKTOP_CONFIG truthfully avoids fabricated installer binaries whe
   assert.equal(WINDOWS_DESKTOP_CONFIG.msiInstallerUrl, '');
   assert.equal(WINDOWS_DESKTOP_CONFIG.installerSha256, '');
   assert.match(WINDOWS_DESKTOP_CONFIG.codeSigningStatus, /Unsigned/i);
+});
+
+test('parseGitHubWindowsRelease accepts verified direct GitHub Release .exe/.msi/SHA-256 assets and rejects source ZIPs or drafts', () => {
+  const validSha = 'a'.repeat(64);
+  const exeUrl = `${GITHUB_REPOSITORY_URL}/releases/download/v1.0.0/SCRIBBLE-IT_1.0.0_x64-setup.exe`;
+  const msiUrl = `${GITHUB_REPOSITORY_URL}/releases/download/v1.0.0/SCRIBBLE-IT_1.0.0_x64_en-US.msi`;
+  const sumsUrl = `${GITHUB_REPOSITORY_URL}/releases/download/v1.0.0/SHA256SUMS.txt`;
+
+  assert.equal(formatInstallerSize(6_459_228), '6.16 MiB');
+  assert.equal(isDirectGitHubReleaseAssetUrl(exeUrl, GITHUB_REPOSITORY_URL, '.exe'), true);
+  assert.equal(
+    isDirectGitHubReleaseAssetUrl(`${GITHUB_REPOSITORY_URL}/archive/refs/tags/v1.0.0.zip`, GITHUB_REPOSITORY_URL, '.exe'),
+    false
+  );
+  assert.equal(
+    isDirectGitHubReleaseAssetUrl(`${GITHUB_REPOSITORY_URL}/actions/runs/45817200966`, GITHUB_REPOSITORY_URL, '.exe'),
+    false
+  );
+
+  // Draft releases must be ignored
+  assert.equal(
+    parseGitHubWindowsRelease([
+      {
+        tag_name: 'v1.0.0',
+        draft: true,
+        assets: [
+          { name: 'SCRIBBLE-IT_1.0.0_x64-setup.exe', size: 6459228, browser_download_url: exeUrl, digest: `sha256:${validSha}` },
+        ],
+      },
+    ]),
+    null
+  );
+
+  const resolved = parseGitHubWindowsRelease([
+    {
+      tag_name: 'v1.0.0',
+      html_url: `${GITHUB_REPOSITORY_URL}/releases/tag/v1.0.0`,
+      draft: false,
+      assets: [
+        { name: 'SCRIBBLE-IT_1.0.0_x64-setup.exe', size: 6_459_228, browser_download_url: exeUrl, digest: `sha256:${validSha}` },
+        { name: 'SCRIBBLE-IT_1.0.0_x64_en-US.msi', size: 8_105_984, browser_download_url: msiUrl },
+        { name: 'SHA256SUMS.txt', size: 220, browser_download_url: sumsUrl },
+      ],
+    },
+  ]);
+
+  assert.ok(resolved);
+  assert.equal(resolved.availabilityStatus, 'Available');
+  assert.equal(resolved.version, '1.0.0');
+  assert.equal(resolved.installerUrl, exeUrl);
+  assert.equal(resolved.installerSizeLabel, '6.16 MiB');
+  assert.equal(resolved.msiInstallerUrl, msiUrl);
+  assert.equal(resolved.msiSizeLabel, '7.73 MiB');
+  assert.equal(resolved.installerSha256, validSha);
+  assert.equal(resolved.sha256SumsUrl, sumsUrl);
 });
 
 test('Tauri Windows configuration and least-privilege capabilities enforce security & verified Task 5.2 icon paths', () => {

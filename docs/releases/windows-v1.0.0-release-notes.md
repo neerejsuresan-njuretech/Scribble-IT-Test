@@ -1,16 +1,16 @@
-# SCRIBBLE-IT for Windows — v1.0.0 Pre-Release Notes
+# SCRIBBLE-IT for Windows — v1.0.0 Release Notes
 
 **Product:** SCRIBBLE-IT  
 **Tagline:** Enterprise IT Management. Open to Everyone.  
 **Organization:** Njure Tech (formally Njure Group)  
 **Target Platform:** Windows 10 (1809+) & Windows 11 (`x86_64`)  
-**Release Status:** In Development (Source Complete · Signed Public Installer Pending)
+**Distribution:** GitHub Releases (`SCRIBBLE-IT_1.0.0_x64-setup.exe`, optional `SCRIBBLE-IT_1.0.0_x64_en-US.msi`, and `SHA256SUMS.txt`)
 
 ---
 
 ## Summary
 
-Task 5.4.1 introduces the Tauri 2 Windows Desktop client for SCRIBBLE-IT and integrates Windows desktop documentation and availability status into the official product website.
+v1.0.0 delivers the native Tauri 2 Windows Desktop client for SCRIBBLE-IT alongside automated Windows CI NSIS (`.exe`) and WiX (`.msi`) installer build, silent install/launch/uninstall verification, and direct website integration on `https://scribbleit.njuregroup.in`.
 
 ## Highlights
 
@@ -22,9 +22,12 @@ Task 5.4.1 introduces the Tauri 2 Windows Desktop client for SCRIBBLE-IT and int
   - Bounded 10 MiB native file picker with path sanitization and SHA-256 verification for incident attachments.
   - Safe `scribbleit://` deep-link handler with strict route allowlist and anti-auth-bypass validation.
   - Optional Launch on Windows Sign-In (`tauri-plugin-autostart`).
-- **NSIS & WiX Bundling + CI:** Configured `.exe` and `.msi` installers with verified Task 5.2 icon and wizard BMP assets and a dedicated GitHub Actions workflow (`.github/workflows/windows-desktop-ci.yml`).
+- **Verified NSIS & WiX Bundling + CI:** Generates and smoke-tests `SCRIBBLE-IT_1.0.0_x64-setup.exe` and `SCRIBBLE-IT_1.0.0_x64_en-US.msi` on `windows-latest` with `SHA256SUMS.txt` and `installation-verification.txt`.
 
-## Known Limitations / Pending Verification
+## Checksum Verification & Signing Notice
 
 - Installers are currently **unsigned** (`certificateThumbprint: null`) pending an organization Windows Authenticode certificate.
-- Rust compilation (`cargo test`) and `.exe` / `.msi` bundling (`tauri build`) require a Windows host or the GitHub Actions `windows-latest` runner and have not yet been executed inside the Linux build sandbox.
+- Before executing a downloaded installer, verify its SHA-256 hash against the `SHA256SUMS.txt` asset attached to the GitHub Release:
+  ```powershell
+  Get-FileHash .\SCRIBBLE-IT_1.0.0_x64-setup.exe -Algorithm SHA256
+  ```

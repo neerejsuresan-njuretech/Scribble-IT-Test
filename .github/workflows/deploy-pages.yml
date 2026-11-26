@@ -5,6 +5,11 @@ on:
     branches:
       - main
       - master
+  workflow_run:
+    workflows:
+      - "Build & Verify Windows Desktop Application"
+    types:
+      - completed
   workflow_dispatch:
 
 permissions:
@@ -18,6 +23,7 @@ concurrency:
 
 jobs:
   build:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -30,7 +36,91 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
- 
+
+      - name: Resolve published Windows GitHub Release metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          python3 - <<'PYEOF'
+          import json, os, re, urllib.request
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          token = os.environ.get("GH_TOKEN", "")
+          headers = {"Accept": "application/vnd.github+json", "User-Agent": "scribble-it-pages-ci"}
+          if token:
+              headers["Authorization"] = f"Bearer {token}"
+
+          req = urllib.request.Request(
+              f"https://api.github.com/repos/{repo}/releases?per_page=10",
+              headers=headers,
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=15) as resp:
+                  releases = json.loads(resp.read().decode("utf-8"))
+          except Exception as exc:
+              print(f"No GitHub release metadata resolved ({exc}); keeping In Development state.")
+              releases = []
+
+          selected = None
+          for rel in releases:
+              if rel.get("draft"):
+                  continue
+              assets = rel.get("assets") or []
+              exe = next((a for a in assets if str(a.get("name", "")).lower().endswith(".exe") and int(a.get("size", 0)) > 0), None)
+              if exe:
+                  selected = (rel, exe, assets)
+                  break
+
+          if not selected:
+              print("No published non-draft Windows .exe GitHub Release found; keeping In Development.")
+              raise SystemExit(0)
+
+          rel, exe, assets = selected
+          msi = next((a for a in assets if str(a.get("name", "")).lower().endswith(".msi") and int(a.get("size", 0)) > 0), None)
+          sums = next((a for a in assets if str(a.get("name", "")) == "SHA256SUMS.txt"), None)
+          exe_sha_asset = next((a for a in assets if str(a.get("name", "")) == f"{exe['name']}.sha256"), None)
+
+          sha256 = ""
+          digest = str(exe.get("digest") or "")
+          m = re.match(r"^sha256:([a-fA-F0-9]{64})$", digest)
+          if m:
+              sha256 = m.group(1).lower()
+
+          if not sha256 and (exe_sha_asset or sums):
+              target = exe_sha_asset or sums
+              try:
+                  sreq = urllib.request.Request(target["browser_download_url"], headers={"User-Agent": "scribble-it-pages-ci"})
+                  with urllib.request.urlopen(sreq, timeout=15) as sresp:
+                      text = sresp.read().decode("utf-8", errors="replace")
+                  for line in text.splitlines():
+                      if exe["name"] in line:
+                          hm = re.search(r"\b([a-fA-F0-9]{64})\b", line)
+                          if hm:
+                              sha256 = hm.group(1).lower()
+                              break
+              except Exception as exc:
+                  print(f"Warning: unable to read checksum asset: {exc}")
+
+          if not sha256:
+              print("Found .exe release asset without verified SHA-256 digest; keeping In Development.")
+              raise SystemExit(0)
+
+          tag = str(rel.get("tag_name") or "").lstrip("v") or "1.0.0"
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as envf:
+              envf.write(f"VITE_WINDOWS_RELEASE_VERSION={tag}\n")
+              envf.write(f"VITE_WINDOWS_INSTALLER_URL={exe['browser_download_url']}\n")
+              envf.write(f"VITE_WINDOWS_INSTALLER_SHA256={sha256}\n")
+              envf.write(f"VITE_WINDOWS_INSTALLER_SIZE_BYTES={exe['size']}\n")
+              envf.write(f"VITE_WINDOWS_RELEASE_URL={rel.get('html_url', '')}\n")
+              if msi:
+                  envf.write(f"VITE_WINDOWS_MSI_URL={msi['browser_download_url']}\n")
+                  envf.write(f"VITE_WINDOWS_MSI_SIZE_BYTES={msi['size']}\n")
+              if sums:
+                  envf.write(f"VITE_WINDOWS_SHA256SUMS_URL={sums['browser_download_url']}\n")
+          print(f"Resolved Windows release v{tag}: {exe['name']} ({exe['size']} bytes), sha256={sha256}")
+          PYEOF
+
       - name: Build static bundle for GitHub Pages
         env:
           # Relative base ('./') works for both username.github.io/repo-name and custom domains with HashRouter
