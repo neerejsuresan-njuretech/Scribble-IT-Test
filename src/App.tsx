@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { HashRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, Link, useLocation, useNavigate } from 'react-router-dom';
+import { subscribeDesktopDeepLinks } from './desktop/desktopBridge';
 import { ITSMProvider, useITSM } from './context/ITSMContext';
 import { ServiceNowHeader } from './components/common/ServiceNowHeader';
 import { ServiceNowNavigator } from './components/common/ServiceNowNavigator';
@@ -319,9 +320,27 @@ function MainApp() {
     hasPermission,
   });
   const location = useLocation();
+  const navigate = useNavigate();
   const [isNavigatorOpen, setIsNavigatorOpen] = useState<boolean>(() =>
     typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
   );
+
+  // Listen for validated scribbleit:// deep links; route protection still enforces auth/RBAC.
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    void subscribeDesktopDeepLinks((route) => {
+      if (authSession?.isAuthenticated || route.startsWith('/login')) {
+        navigate(route);
+      } else {
+        navigate('/login/employee');
+      }
+    }).then((fn) => {
+      unlisten = fn;
+    });
+    return () => {
+      unlisten?.();
+    };
+  }, [authSession?.isAuthenticated, navigate]);
 
   // Adapt navigator smoothly when crossing the 1024px desktop/tablet breakpoint
   useEffect(() => {

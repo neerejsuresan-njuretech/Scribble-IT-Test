@@ -367,3 +367,218 @@ test('AI service routes to authenticated FastAPI /api/v1/ai/* and integrationsAp
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 });
+
+test('Task 5.3/5.4 native client metadata headers, authenticated device enrollment, sessions, client config, attachments, and session-expired callback work end-to-end', async () => {
+  const {
+    createScribbleApiClient,
+    MemoryTokenStorageAdapter,
+  } = await import('@scribble-it/api-client');
+
+  const seenRequests: Array<{
+    method: string;
+    url: string;
+    headers: http.IncomingHttpHeaders;
+    body?: Record<string, unknown>;
+  }> = [];
+
+  let expiryTriggered: string | null = null;
+  let forceUnauthorizedEverything = false;
+
+  const server = http.createServer(async (req, res) => {
+    const method = req.method || 'GET';
+    const url = req.url || '/';
+    const body = method !== 'GET' && method !== 'DELETE' ? await readJsonBody(req) : undefined;
+    seenRequests.push({ method, url, headers: req.headers, body });
+
+    const send = (status: number, payload?: unknown) => {
+      if (status === 204) {
+        res.writeHead(204);
+        return res.end();
+      }
+      res.writeHead(status, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(payload));
+    };
+
+    if (method === 'GET' && url === '/api/v1/client/config') {
+      return send(200, {
+        instance_name: 'Scribble-IT Enterprise',
+        deployment_mode: 'self_hosted',
+        api_version: '1.0.0',
+        api_prefix: '/api/v1',
+        public_api_url: null,
+        minimum_client_versions: { desktop: '1.0.0', mobile: '1.0.0' },
+        auth: {
+          access_token_ttl_minutes: 15,
+          refresh_token_ttl_days: 14,
+          refresh_token_rotation: true,
+          reuse_detection_enabled: true,
+          mfa_supported: true,
+          device_trust_supported: true,
+        },
+        push: { android_fcm_enabled: false, ios_apns_enabled: false },
+      });
+    }
+
+    if (forceUnauthorizedEverything) {
+      return send(401, { error: { code: 'SESSION_REVOKED', message: 'Refresh token revoked' } });
+    }
+
+    if (method === 'POST' && url === '/api/v1/auth/login') {
+      assert.equal(req.headers['x-scribble-client-type'], 'desktop');
+      assert.equal(req.headers['x-scribble-client-platform'], 'windows');
+      assert.equal(req.headers['x-scribble-app-version'], '1.0.0');
+      assert.equal(req.headers['x-scribble-app-id'], 'in.njuretech.scribbleit');
+      assert.equal((body?.client_metadata as Record<string, unknown>)?.client_platform, 'windows');
+      assert.equal('organization_slug' in (body || {}), false);
+
+      return send(200, {
+        access_token: 'win-access-1',
+        refresh_token: 'win-refresh-1',
+        token_type: 'bearer',
+        expires_in: 900,
+        session_id: 'sess-win-1',
+        user_id: 'usr-win-1',
+        email: 'win@acme.io',
+        full_name: 'Windows Operator',
+        organization_id: 'org-win-01',
+        organization_slug: 'acme',
+        portal_type: 'employee',
+        clearance_tier: 'it_operations',
+        permissions: ['incidents:read', 'incidents:write'],
+      });
+    }
+
+    if (method === 'POST' && url === '/api/v1/auth/device/enroll') {
+      // Must carry Bearer authorization header (skipAuth must NOT be set)
+      assert.equal(req.headers.authorization, 'Bearer win-access-1');
+      assert.equal(req.headers['x-organization-id'], 'org-win-01');
+      return send(201, {
+        device_id: 'dev-win-1',
+        hostname: body?.hostname,
+        os_platform: 'Windows 11',
+        client_type: 'desktop',
+        device_platform: 'windows',
+        app_version: '1.0.0',
+        trust_level: 'registered',
+        mdm_verified: false,
+        certificate_thumbprint: 'sha256:win-cert-01',
+        status: 'active',
+      });
+    }
+
+    if (method === 'GET' && url === '/api/v1/auth/sessions') {
+      assert.equal(req.headers.authorization, 'Bearer win-access-1');
+      return send(200, {
+        items: [
+          {
+            id: 'sess-win-1',
+            portal_type: 'employee',
+            client_type: 'desktop',
+            client_platform: 'windows',
+            app_version: '1.0.0',
+            app_id: 'in.njuretech.scribbleit',
+            device_name: 'WIN11-LAPTOP-01',
+            ip_address: '127.0.0.1',
+            created_at: '2026-11-26T00:00:00Z',
+            last_used_at: '2026-11-26T00:00:00Z',
+            expires_at: '2026-12-10T00:00:00Z',
+            revoked_at: null,
+            is_current: true,
+          },
+        ],
+      });
+    }
+
+    if (method === 'DELETE' && url === '/api/v1/auth/sessions/sess-other-2') {
+      assert.equal(req.headers.authorization, 'Bearer win-access-1');
+      return send(204);
+    }
+
+    if (method === 'POST' && url === '/api/v1/incidents/inc-uuid-1/attachments') {
+      assert.equal(req.headers.authorization, 'Bearer win-access-1');
+      return send(201, {
+        id: 'att-1',
+        filename: body?.filename,
+        content_type: body?.content_type,
+        size_bytes: body?.size_bytes,
+        storage_key: body?.storage_key,
+        checksum_sha256: body?.checksum_sha256,
+        uploaded_by: 'Windows Operator',
+        created_at: '2026-11-26T00:05:00Z',
+      });
+    }
+
+    return send(404, { error: { code: 'NOT_FOUND', message: `Unhandled ${method} ${url}` } });
+  });
+
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address() as AddressInfo;
+
+  try {
+    const storage = new MemoryTokenStorageAdapter();
+    const client = createScribbleApiClient({
+      tokenStorage: storage,
+      baseUrlProvider: `http://127.0.0.1:${port}`,
+      clientMetadata: {
+        client_type: 'desktop',
+        client_platform: 'windows',
+        app_version: '1.0.0',
+        app_id: 'in.njuretech.scribbleit',
+        device_name: 'WIN11-LAPTOP-01',
+      },
+      onSessionExpired: (reason) => {
+        expiryTriggered = reason;
+      },
+    });
+
+    const cfg = await client.auth.getClientConfig();
+    assert.equal(cfg.deployment_mode, 'self_hosted');
+    assert.equal(cfg.auth.refresh_token_rotation, true);
+
+    await client.auth.login({
+      email: 'win@acme.io',
+      password: 'Password!1234',
+      portal_type: 'employee',
+      organization_slug: 'acme', // should be stripped cleanly for Pydantic extra="forbid"
+    });
+
+    const enrolled = await client.auth.enrollDevice({
+      enrollment_code: 'ENROLL-WIN-01',
+      hostname: 'WIN11-LAPTOP-01',
+      os_platform: 'Windows 11',
+      device_fingerprint: 'fp-1234',
+      client_type: 'desktop',
+      device_platform: 'windows',
+      app_version: '1.0.0',
+      app_id: 'in.njuretech.scribbleit',
+    });
+    assert.equal(enrolled.device_id, 'dev-win-1');
+    assert.equal(enrolled.mdm_verified, false);
+    assert.equal(enrolled.trust_level, 'registered');
+
+    const sessions = await client.auth.listSessions();
+    assert.equal(sessions.items.length, 1);
+    assert.equal(sessions.items[0].client_platform, 'windows');
+
+    await client.auth.revokeSession('sess-other-2');
+
+    const att = await client.itsm.addIncidentAttachment('inc-uuid-1', {
+      filename: 'screenshot.png',
+      content_type: 'image/png',
+      size_bytes: 2048,
+      storage_key: 'windows-local://uuid/screenshot.png',
+      checksum_sha256: 'a'.repeat(64),
+    });
+    assert.equal(att.id, 'att-1');
+    assert.equal(att.filename, 'screenshot.png');
+
+    // Failed refresh clears stored tokens and notifies session-expired handler
+    forceUnauthorizedEverything = true;
+    await assert.rejects(() => client.auth.me());
+    assert.equal(expiryTriggered, 'refresh_failed');
+    assert.equal(await storage.getAccessToken(), null);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+

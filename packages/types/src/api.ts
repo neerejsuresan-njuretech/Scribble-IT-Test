@@ -48,6 +48,50 @@ export interface PaginatedDto<T> {
 // Auth & Organization Governance DTOs (/api/v1/auth/*, /api/v1/organizations/*)
 // ---------------------------------------------------------------------------
 
+export type ClientType = 'web' | 'desktop' | 'mobile';
+export type ClientPlatform = 'web' | 'windows' | 'macos' | 'linux' | 'android' | 'ios';
+
+export interface ClientMetadataDto {
+  client_type: ClientType;
+  client_platform?: ClientPlatform;
+  app_version?: string;
+  app_id?: string;
+  device_name?: string;
+  os_version?: string;
+  device_model?: string;
+}
+
+export interface ClientConfigDto {
+  service: string;
+  instance_name: string;
+  deployment_mode: 'cloud' | 'self_hosted' | string;
+  public_api_url: string | null;
+  api_version: string;
+  api_prefix: string;
+  supported_client_types: string[];
+  supported_client_platforms: string[];
+  minimum_client_versions: {
+    desktop: string;
+    mobile: string;
+    [key: string]: string;
+  };
+  allowed_native_app_ids: string[];
+  auth: {
+    access_token_ttl_minutes: number;
+    refresh_token_ttl_days: number;
+    refresh_token_rotation: boolean;
+    mfa_totp_supported: boolean;
+    device_sso_supported: boolean;
+  };
+  features: {
+    push_notifications_enabled: boolean;
+    fcm_configured: boolean;
+    apns_configured: boolean;
+    device_trust_enabled: boolean;
+    ai_enabled: boolean;
+  };
+}
+
 export interface BackendMeResponse {
   user_id: string;
   email: string;
@@ -80,6 +124,13 @@ export interface BackendLoginResponse {
   clearance_tier: string;
   permissions: IamPermissionScope[];
   session_id: string;
+  client_type?: ClientType;
+  client_platform?: ClientPlatform;
+  is_platform_super_admin?: boolean;
+  mfa_required?: boolean;
+  mfa_enrolled?: boolean;
+  device_managed?: boolean;
+  email_verified?: boolean;
 }
 
 export interface BackendOrganizationDto {
@@ -115,9 +166,92 @@ export interface OrganizationSwitchResponseDto {
 export interface DeviceEnrollResponseDto {
   device_id: string;
   hostname: string;
+  os_platform?: string;
+  client_type?: string;
+  device_platform?: string;
+  app_version?: string | null;
+  os_version?: string | null;
+  device_model?: string | null;
+  mdm_provider?: string;
   trust_level: string;
   mdm_verified: boolean;
   certificate_thumbprint: string;
+  status?: string;
+}
+
+export interface UserSessionDto {
+  id: string;
+  organization_id: string;
+  portal_type: string;
+  auth_method: string;
+  client_type: string;
+  client_platform: string;
+  app_version: string | null;
+  app_id: string | null;
+  device_name: string | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  device_id: string | null;
+  created_at: string;
+  expires_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  revocation_reason: string | null;
+  is_current: boolean;
+}
+
+export interface SessionListResponseDto {
+  items: UserSessionDto[];
+  total: number;
+}
+
+export interface ManagedDeviceDto {
+  id: string;
+  organization_id: string;
+  hostname: string;
+  os_platform: string;
+  client_type: string;
+  device_platform: string;
+  app_version: string | null;
+  os_version: string | null;
+  device_model: string | null;
+  mdm_provider: string;
+  certificate_thumbprint: string;
+  enrolled_by_email: string;
+  trust_level: string;
+  verified_by_iam: boolean;
+  mdm_verified: boolean;
+  mdm_verified_at: string | null;
+  mdm_authority_ref: string | null;
+  status: string;
+  last_seen_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+}
+
+export interface DeviceListResponseDto {
+  items: ManagedDeviceDto[];
+  total: number;
+}
+
+export interface IncidentAttachmentCreateDto {
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  storage_key: string;
+  checksum_sha256?: string;
+}
+
+export interface IncidentAttachmentDto {
+  id: string;
+  incident_id: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  storage_key: string;
+  checksum_sha256: string | null;
+  uploaded_by_email: string;
+  created_at: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -160,6 +294,7 @@ export interface IncidentDto {
   created_at: string;
   updated_at: string;
   activities: IncidentActivityDto[];
+  attachments?: IncidentAttachmentDto[];
 }
 
 export interface ApprovalItemDto {

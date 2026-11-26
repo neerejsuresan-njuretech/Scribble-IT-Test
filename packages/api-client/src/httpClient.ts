@@ -1,4 +1,4 @@
-import type { ApiErrorPayload, PageMetaDto, PaginatedDto } from '@scribble-it/types';
+import type { ApiErrorPayload, ClientMetadataDto, PageMetaDto, PaginatedDto } from '@scribble-it/types';
 import {
   MemoryTokenStorageAdapter,
   normalizeFastApiBaseUrl,
@@ -7,7 +7,7 @@ import {
   TokenUpdateParams,
 } from './storage';
 
-export type { ApiErrorPayload, PageMetaDto, PaginatedDto };
+export type { ApiErrorPayload, ClientMetadataDto, PageMetaDto, PaginatedDto };
 
 export class ApiError extends Error {
   readonly status: number;
@@ -32,11 +32,17 @@ export interface ApiRequestOptions {
   timeoutMs?: number;
 }
 
+export type ClientMetadataProvider =
+  | ClientMetadataDto
+  | (() => ClientMetadataDto | null | undefined);
+
 export interface HttpClientConfig {
   baseUrlProvider?: ResolvableBaseUrlProvider;
   tokenStorage?: TokenStorageAdapter;
   fetchImpl?: typeof fetch;
   defaultTimeoutMs?: number;
+  clientMetadata?: ClientMetadataProvider;
+  onSessionExpired?: (reason: 'refresh_failed' | 'unauthorized') => void;
 }
 
 function readRuntimeEnv(key: string): string | undefined {
@@ -68,12 +74,16 @@ export class ScribbleHttpClient {
   private cachedAccessToken: string | null = null;
   private cachedRefreshToken: string | null = null;
   private cachedOrganizationId: string | null = null;
+  private clientMetadataProvider?: ClientMetadataProvider;
+  private onSessionExpired?: (reason: 'refresh_failed' | 'unauthorized') => void;
 
   constructor(config: HttpClientConfig = {}) {
     this.tokenStorage = config.tokenStorage ?? new MemoryTokenStorageAdapter();
     this.baseUrlProvider = config.baseUrlProvider ?? defaultEnvBaseUrlProvider;
     this.fetchImpl = config.fetchImpl;
     this.defaultTimeoutMs = config.defaultTimeoutMs ?? 15000;
+    this.clientMetadataProvider = config.clientMetadata;
+    this.onSessionExpired = config.onSessionExpired;
   }
 
   configure(config: Partial<HttpClientConfig>): void {
@@ -90,6 +100,12 @@ export class ScribbleHttpClient {
     if (config.defaultTimeoutMs !== undefined) {
       this.defaultTimeoutMs = config.defaultTimeoutMs;
     }
+    if (config.clientMetadata !== undefined) {
+      this.clientMetadataProvider = config.clientMetadata;
+    }
+    if (config.onSessionExpired !== undefined) {
+      this.onSessionExpired = config.onSessionExpired;
+    }
   }
 
   setTokenStorageAdapter(adapter: TokenStorageAdapter): void {
@@ -99,6 +115,23 @@ export class ScribbleHttpClient {
 
   setBaseUrlProvider(provider: ResolvableBaseUrlProvider): void {
     this.baseUrlProvider = provider;
+  }
+
+  setClientMetadataProvider(provider: ClientMetadataProvider | undefined): void {
+    this.clientMetadataProvider = provider;
+  }
+
+  getClientMetadata(): ClientMetadataDto | null {
+    if (!this.clientMetadataProvider) return null;
+    const raw =
+      typeof this.clientMetadataProvider === 'function'
+        ? this.clientMetadataProvider()
+        : this.clientMetadataProvider;
+    return raw ?? null;
+  }
+
+  setOnSessionExpired(handler: ((reason: 'refresh_failed' | 'unauthorized') => void) | undefined): void {
+    this.onSessionExpired = handler;
   }
 
   setApiBaseUrlForTesting(url: string | null): void {
@@ -194,6 +227,22 @@ export class ScribbleHttpClient {
     return globalThis.fetch;
   }
 
+  private buildClientMetaHeaders(): Record<string, string> {
+    const meta = this.getClientMetadata();
+    if (!meta) return {};
+    const headers: Record<string, string> = {};
+    if (meta.client_type) headers['X-Scribble-Client-Type'] = meta.client_type;
+    if (meta.client_platform) headers['X-Scribble-Client-Platform'] = meta.client_platform;
+    if (meta.app_version) headers['X-Scribble-App-Version'] = meta.app_version;
+    if (meta.app_id) headers['X-Scribble-App-Id'] = meta.app_id;
+    if (meta.device_name) headers['X-Scribble-Device-Name'] = meta.device_name;
+    return headers;
+  }
+
+  async refreshSession(): Promise<boolean> {
+    return this.attemptRefresh();
+  }
+
   private async attemptRefresh(): Promise<boolean> {
     const currentRefreshToken = await this.tokenStorage.getRefreshToken();
     if (!currentRefreshToken) return false;
@@ -204,13 +253,22 @@ export class ScribbleHttpClient {
         const baseUrl = await this.resolveBaseUrl();
         if (!baseUrl) return false;
         const doFetch = this.getFetch();
+        const meta = this.getClientMetadata();
         const res = await doFetch(`${baseUrl}/auth/refresh`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refresh_token: currentRefreshToken }),
+          headers: {
+            'Content-Type': 'application/json',
+            ...this.buildClientMetaHeaders(),
+          },
+          body: JSON.stringify(
+            meta
+              ? { refresh_token: currentRefreshToken, client_metadata: meta }
+              : { refresh_token: currentRefreshToken },
+          ),
         });
         if (!res.ok) {
           await this.clearAuthTokens();
+          this.onSessionExpired?.('refresh_failed');
           return false;
         }
         const data = (await res.json()) as {
@@ -269,6 +327,7 @@ export class ScribbleHttpClient {
       try {
         const reqHeaders: Record<string, string> = {
           Accept: 'application/json',
+          ...this.buildClientMetaHeaders(),
           ...headers,
         };
         if (body !== undefined) {
@@ -305,6 +364,9 @@ export class ScribbleHttpClient {
         if (refreshed) {
           response = await exec();
         }
+      } else {
+        await this.clearAuthTokens();
+        this.onSessionExpired?.('unauthorized');
       }
     }
 
@@ -376,6 +438,24 @@ export function getRefreshToken(): string | null {
 
 export function getActiveApiOrganizationId(): string | null {
   return defaultHttpClient.getActiveApiOrganizationId();
+}
+
+export function setClientMetadataProvider(provider: ClientMetadataProvider | undefined): void {
+  defaultHttpClient.setClientMetadataProvider(provider);
+}
+
+export function getClientMetadata(): ClientMetadataDto | null {
+  return defaultHttpClient.getClientMetadata();
+}
+
+export function setOnSessionExpired(
+  handler: ((reason: 'refresh_failed' | 'unauthorized') => void) | undefined,
+): void {
+  defaultHttpClient.setOnSessionExpired(handler);
+}
+
+export async function refreshApiSession(): Promise<boolean> {
+  return defaultHttpClient.refreshSession();
 }
 
 export async function apiRequest<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {

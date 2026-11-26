@@ -12,7 +12,7 @@ import {
   WorkflowDefinition, TicketWorkflowRule,
   IamPolicy, IamPermissionScope, CustomPortalKey, PortalBrandConfig,
   WorkflowRunStepTrace, ToastMessage, ThemeMode,
-  TelephonyProviderConfig, TelephonyProviderType
+  TelephonyProviderConfig, TelephonyProviderType, IncidentAttachment
 } from '../types/itsm';
 import {
   DEFAULT_BLANK_TENANT,
@@ -50,8 +50,12 @@ import {
   mapIncidentDto,
   mapProblemDto,
   mapServiceRequestDto,
+  operationsApi,
+  setOnSessionExpired,
 } from '../services/api';
 import { BackendSyncState, useBackendSyncBridge } from '../hooks/useBackendSyncBridge';
+import { isTauriDesktop } from '../desktop/runtime';
+import { sendWindowsNotification } from '../desktop/desktopBridge';
 
 export type CloudSyncStatus = 'disconnected' | 'connecting' | 'synced' | 'syncing' | 'error';
 
@@ -185,6 +189,16 @@ interface ITSMContextType {
   assignIncident: (id: string, assignee: string) => void;
   logIncidentTime: (id: string, mins: number) => void;
   setIncidentCsat: (id: string, score: number) => void;
+  attachIncidentFile: (
+    incidentId: string,
+    attachment: {
+      filename: string;
+      contentType: string;
+      sizeBytes: number;
+      storageKey: string;
+      checksumSha256?: string;
+    },
+  ) => Promise<{ ok: boolean; error?: string }>;
   simulateEmailToTicket: (fromEmail: string, subject: string, body: string) => Incident;
 
   createServiceRequest: (req: Partial<ServiceRequest>) => ServiceRequest;
@@ -466,6 +480,25 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
       Object.values(toastTimersRef.current).forEach(clearTimeout);
     };
   }, []);
+
+  const notifiedIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    setOnSessionExpired((reason) => {
+      setAuthSession(null);
+      showToast({
+        variant: 'warning',
+        title: 'Session Expired',
+        description:
+          reason === 'refresh_failed'
+            ? 'Your refresh token expired or was revoked. Please sign in again.'
+            : 'Your backend session is no longer active. Please sign in again.',
+      });
+    });
+    return () => {
+      setOnSessionExpired(undefined);
+    };
+  }, [showToast]);
 
   // Multi-Tenant State (Preloaded with 8 Enterprise Companies & Custom Logos)
   const [tenants, setTenants] = useState<Tenant[]>(() => loadState('TENANTS', initialSeed.tenants));
@@ -1789,6 +1822,36 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [activeTenant.id, hydrateFromBackend, applyHydratedBackendSnapshot]
   );
 
+  // Native Windows notification bridge when authenticated with FastAPI backend inside Tauri
+  useEffect(() => {
+    if (!isTauriDesktop() || !authSession?.isAuthenticated || !isBackendApiConfigured() || !getAccessToken()) {
+      return;
+    }
+    let cancelled = false;
+    const pollUnreadNotifications = async () => {
+      try {
+        const items = await operationsApi.listNotifications(true);
+        if (cancelled) return;
+        for (const item of items.slice(0, 5)) {
+          if (!notifiedIdsRef.current.has(item.id)) {
+            notifiedIdsRef.current.add(item.id);
+            await sendWindowsNotification(item.title, item.message);
+          }
+        }
+      } catch {
+        // Ignore transient offline errors during polling
+      }
+    };
+    void pollUnreadNotifications();
+    const timer = setInterval(() => {
+      void pollUnreadNotifications();
+    }, 45000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [authSession?.isAuthenticated, authSession?.backendSessionId]);
+
   const switchTenant = (tenantId: string) => {
     if (authSession?.isAuthenticated && !isSuperAdmin && !isIamPortal) {
       showToast({
@@ -2196,6 +2259,103 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     recordAudit('Incidents', 'CREATE', id, `${newInc.priority} ${newInc.title} -> ${resolvedGroup}`);
     showToast({ variant: 'success', title: `Incident Created: ${id}`, description: `${newInc.priority} · ${resolvedGroup} · ${newInc.title}` });
     return newInc;
+  };
+
+  const attachIncidentFile = async (
+    incidentId: string,
+    attachment: {
+      filename: string;
+      contentType: string;
+      sizeBytes: number;
+      storageKey: string;
+      checksumSha256?: string;
+    },
+  ): Promise<{ ok: boolean; error?: string }> => {
+    const now = new Date().toISOString();
+    if (isBackendApiConfigured() && getAccessToken()) {
+      try {
+        const dto = await itsmApi.addIncidentAttachment(incidentId, {
+          filename: attachment.filename,
+          content_type: attachment.contentType,
+          size_bytes: attachment.sizeBytes,
+          storage_key: attachment.storageKey,
+          checksum_sha256: attachment.checksumSha256,
+        });
+        const mapped: IncidentAttachment = {
+          id: dto.id,
+          filename: dto.filename,
+          contentType: dto.content_type,
+          sizeBytes: dto.size_bytes,
+          storageKey: dto.storage_key,
+          checksumSha256: dto.checksum_sha256,
+          uploadedByEmail: dto.uploaded_by_email,
+          createdAt: dto.created_at,
+        };
+        setAllIncidents(prev =>
+          prev.map(inc =>
+            inc.id === incidentId
+              ? {
+                  ...inc,
+                  updatedAt: now,
+                  attachments: [...(inc.attachments || []), mapped],
+                  activityLog: [
+                    {
+                      id: `act-${Date.now()}`,
+                      timestamp: now,
+                      author: currentUser.name,
+                      type: 'work_note',
+                      action: 'Attachment Added',
+                      note: `Attached ${mapped.filename} (${Math.max(1, Math.round(mapped.sizeBytes / 1024))} KB)`,
+                    },
+                    ...inc.activityLog,
+                  ],
+                }
+              : inc,
+          ),
+        );
+        showToast({ variant: 'success', title: 'Attachment Registered', description: mapped.filename });
+        return { ok: true };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Failed registering attachment on server.';
+        showToast({ variant: 'error', title: 'Attachment Upload Failed', description: msg });
+        return { ok: false, error: msg };
+      }
+    }
+
+    const localAtt: IncidentAttachment = {
+      id: `ATT-${Date.now()}`,
+      filename: attachment.filename,
+      contentType: attachment.contentType,
+      sizeBytes: attachment.sizeBytes,
+      storageKey: attachment.storageKey,
+      checksumSha256: attachment.checksumSha256 || null,
+      uploadedByEmail: currentUser.email,
+      createdAt: now,
+    };
+    setAllIncidents(prev =>
+      prev.map(inc =>
+        inc.id === incidentId
+          ? {
+              ...inc,
+              updatedAt: now,
+              attachments: [...(inc.attachments || []), localAtt],
+              activityLog: [
+                {
+                  id: `act-${Date.now()}`,
+                  timestamp: now,
+                  author: currentUser.name,
+                  type: 'work_note',
+                  action: 'Attachment Added',
+                  note: `Attached ${localAtt.filename} (${Math.max(1, Math.round(localAtt.sizeBytes / 1024))} KB)`,
+                },
+                ...inc.activityLog,
+              ],
+            }
+          : inc,
+      ),
+    );
+    showToast({ variant: 'success', title: 'File Attached', description: localAtt.filename });
+    return { ok: true };
   };
 
   const updateIncidentStatus = (id: string, status: IncidentStatus, note?: string, resolutionNotes?: string, isWorkNote = false) => {
@@ -3905,7 +4065,7 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         softwareLicenses, tasks, projects, kbArticles, contracts, domains, statusComponents,
         morningChecks, calendarEvents, warRooms, lmsCourses, wikiPages, processMaps,
         customForms, cmdbRelations, auditLogs, workflows, ticketWorkflows,
-        createIncident, updateIncidentStatus, assignIncident, logIncidentTime, setIncidentCsat, simulateEmailToTicket,
+        createIncident, updateIncidentStatus, assignIncident, logIncidentTime, setIncidentCsat, attachIncidentFile, simulateEmailToTicket,
         createServiceRequest, canApproveRequestStage, approveRequestStage, reassignRequestApprover, createProblem, updateProblem,
         createChangeRequest, canVoteCab, voteCab, reassignCabVoter, updateChangeStatus, addRecordActivity,
         createAsset, updateAssetStatus, addCmdbRelation, removeCmdbRelation,

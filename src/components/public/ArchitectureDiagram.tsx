@@ -46,14 +46,20 @@ export const ArchitectureDiagram: React.FC = () => {
           <div className="space-y-2 text-xs">
             <div className="p-2.5 border border-neutral-800 bg-neutral-950 rounded">
               <div className="font-semibold text-neutral-100">Web Application</div>
-              <div className="text-[11px] text-neutral-400 mt-0.5">
-                React 19 · TypeScript · Vite · Tailwind CSS · Available
+              <div className="text-[11px] text-emerald-400 mt-0.5">
+                React 19 · TypeScript · Vite · Available
+              </div>
+            </div>
+            <div className="p-2.5 border border-[#0A84FF]/40 bg-[#0B1F3B]/35 rounded">
+              <div className="font-semibold text-[#F5F8FF]">Windows Desktop (Tauri 2)</div>
+              <div className="text-[11px] text-[#22D3EE] mt-0.5">
+                Credential Manager · Native Alerts · In Development
               </div>
             </div>
             <div className="p-2.5 border border-neutral-800/80 bg-neutral-950/60 rounded">
-              <div className="font-semibold text-neutral-300">Desktop &amp; Mobile Clients</div>
+              <div className="font-semibold text-neutral-300">macOS · Linux · Android · iOS</div>
               <div className="text-[11px] text-neutral-500 mt-0.5">
-                Windows · macOS · Linux · Android · iOS · Coming Soon
+                Shared @scribble-it/* Packages · Coming Soon
               </div>
             </div>
           </div>

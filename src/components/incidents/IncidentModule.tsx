@@ -28,8 +28,11 @@ import {
   PanelRightOpen,
   Table2,
   Columns3,
+  Paperclip,
 } from 'lucide-react';
 import { chatService, driveService } from '../../services/workspaceService';
+import { isTauriDesktop } from '../../desktop/runtime';
+import { pickDesktopAttachment } from '../../desktop/desktopBridge';
 
 interface IncidentModuleProps {
   onOpenCreate?: () => void;
@@ -51,6 +54,7 @@ export const IncidentModule: React.FC<IncidentModuleProps> = ({ onOpenCreate }) 
     activeTenant,
     logIncidentTime,
     setIncidentCsat,
+    attachIncidentFile,
     simulateEmailToTicket,
     createWarRoom,
   } = useITSM();
@@ -218,6 +222,50 @@ export const IncidentModule: React.FC<IncidentModuleProps> = ({ onOpenCreate }) 
       setTimeout(() => setActionNotice(null), 4000);
     } catch {
       setActionNotice('Telemetry logged to Google Drive.');
+      setTimeout(() => setActionNotice(null), 4000);
+    }
+  };
+
+  const handleDesktopPickAttachment = async () => {
+    if (!selectedIncident) return;
+    try {
+      const picked = await pickDesktopAttachment();
+      if (!picked) return;
+      const res = await attachIncidentFile(selectedIncident.id, {
+        filename: picked.filename,
+        contentType: picked.content_type,
+        sizeBytes: picked.size_bytes,
+        storageKey: picked.storage_key,
+        checksumSha256: picked.checksum_sha256,
+      });
+      if (res.ok) {
+        setActionNotice(`Attached "${picked.filename}" (${Math.max(1, Math.round(picked.size_bytes / 1024))} KB).`);
+        setTimeout(() => setActionNotice(null), 4000);
+      }
+    } catch (err) {
+      setActionNotice(err instanceof Error ? err.message : 'Unable to attach desktop file.');
+      setTimeout(() => setActionNotice(null), 4000);
+    }
+  };
+
+  const handleBrowserAttachmentChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !selectedIncident) return;
+    if (file.size === 0 || file.size > 10 * 1024 * 1024) {
+      setActionNotice('Attachment must be between 1 byte and 10 MiB.');
+      setTimeout(() => setActionNotice(null), 4000);
+      return;
+    }
+    const cleanName = file.name.replace(/[^a-zA-Z0-9._-]+/g, '_').replace(/^\.+/, '') || 'attachment.bin';
+    const res = await attachIncidentFile(selectedIncident.id, {
+      filename: cleanName,
+      contentType: file.type || 'application/octet-stream',
+      sizeBytes: file.size,
+      storageKey: `web-uploads/${Date.now()}-${cleanName}`,
+    });
+    if (res.ok) {
+      setActionNotice(`Attached "${cleanName}".`);
       setTimeout(() => setActionNotice(null), 4000);
     }
   };
@@ -1179,8 +1227,52 @@ export const IncidentModule: React.FC<IncidentModuleProps> = ({ onOpenCreate }) 
                     <HardDrive className="w-3.5 h-3.5 text-neutral-400" />
                     <span>Sync to Drive</span>
                   </button>
+                  {isTauriDesktop() ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleDesktopPickAttachment()}
+                      className="min-h-[38px] md:min-h-0 px-2.5 py-1.5 border border-sky-700/80 bg-sky-950/30 text-sky-300 hover:bg-sky-900/40 font-bold flex items-center gap-1.5 text-xs whitespace-nowrap"
+                    >
+                      <Paperclip className="w-3.5 h-3.5" />
+                      <span>Attach File (Windows)</span>
+                    </button>
+                  ) : (
+                    <label className="min-h-[38px] md:min-h-0 px-2.5 py-1.5 border border-neutral-700 bg-neutral-900 text-neutral-200 hover:bg-neutral-800 font-bold flex items-center gap-1.5 text-xs whitespace-nowrap cursor-pointer">
+                      <Paperclip className="w-3.5 h-3.5 text-neutral-400" />
+                      <span>Attach File</span>
+                      <input
+                        type="file"
+                        onChange={(e) => void handleBrowserAttachmentChange(e)}
+                        className="sr-only"
+                      />
+                    </label>
+                  )}
                 </div>
               </div>
+
+              {(selectedIncident.attachments?.length ?? 0) > 0 && (
+                <div className="p-3 border border-neutral-800 bg-neutral-950 space-y-2">
+                  <div className="text-[11px] font-bold uppercase text-neutral-400">
+                    Attachments ({selectedIncident.attachments?.length})
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {selectedIncident.attachments!.map((att) => (
+                      <div
+                        key={att.id}
+                        className="p-2 border border-neutral-800 bg-neutral-900/40 flex items-center justify-between gap-2 text-[11px]"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-semibold text-neutral-200 truncate">{att.filename}</div>
+                          <div className="text-[10px] text-neutral-500 truncate">
+                            {att.contentType} · {Math.max(1, Math.round(att.sizeBytes / 1024))} KB
+                            {att.checksumSha256 ? ` · sha256:${att.checksumSha256.slice(0, 10)}` : ''}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="border border-neutral-800 bg-neutral-950 p-10 text-center space-y-3 text-neutral-500">

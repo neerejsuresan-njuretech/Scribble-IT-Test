@@ -1,0 +1,76 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "SCRIBBLE-IT",
+  "version": "1.0.0",
+  "identifier": "in.njuretech.scribbleit",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:3000",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "SCRIBBLE-IT",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 700,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' http://localhost:* http://127.0.0.1:* https:; frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi"],
+    "publisher": "Njure Tech",
+    "copyright": "Copyright (c) Njure Tech (formally Njure Group)",
+    "category": "Business",
+    "shortDescription": "Enterprise IT Management. Open to Everyone.",
+    "longDescription": "SCRIBBLE-IT Windows Desktop Application by Njure Tech for incident management, service requests, CMDB, change advisory board, and identity governance.",
+    "icon": [
+      "../assets/brand/icons/windows/32x32.png",
+      "../assets/brand/icons/windows/128x128.png",
+      "../assets/brand/icons/windows/128x128@2x.png",
+      "../assets/brand/icons/windows/icon.ico",
+      "../assets/brand/icons/windows/icon.png"
+    ],
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": null,
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installerIcon": "../assets/brand/icons/windows/icon.ico",
+        "headerImage": "../assets/brand/icons/windows/installer/nsis-header.bmp",
+        "sidebarImage": "../assets/brand/icons/windows/installer/nsis-sidebar.bmp",
+        "installMode": "currentUser",
+        "languages": ["English"],
+        "displayLanguageSelector": false
+      },
+      "wix": {
+        "language": "en-US",
+        "bannerPath": "../assets/brand/icons/windows/installer/msi-banner.bmp",
+        "dialogImagePath": "../assets/brand/icons/windows/installer/msi-dialog.bmp"
+      }
+    }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["scribbleit"]
+      }
+    }
+  }
+}

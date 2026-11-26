@@ -8,6 +8,8 @@ import type {
   GlobalSearchResponseDto,
   Incident,
   IncidentActivityDto,
+  IncidentAttachmentCreateDto,
+  IncidentAttachmentDto,
   IncidentCategory,
   IncidentDto,
   IncidentPriority,
@@ -28,6 +30,8 @@ export type {
   GlobalSearchHitDto,
   GlobalSearchResponseDto,
   IncidentActivityDto,
+  IncidentAttachmentCreateDto,
+  IncidentAttachmentDto,
   IncidentDto,
   ProblemDto,
   ServiceRequestDto,
@@ -65,6 +69,16 @@ export function mapIncidentDto(dto: IncidentDto): Incident {
       action: a.action,
       note: a.note,
       fieldChanges: a.field_changes,
+    })),
+    attachments: (dto.attachments || []).map((att) => ({
+      id: att.id,
+      filename: att.filename,
+      contentType: att.content_type,
+      sizeBytes: att.size_bytes,
+      storageKey: att.storage_key,
+      checksumSha256: att.checksum_sha256,
+      uploadedByEmail: att.uploaded_by_email,
+      createdAt: att.created_at,
     })),
   };
 }
@@ -229,6 +243,16 @@ export function createItsmApi(http: ScribbleHttpClient) {
       payload: { activity_type: IncidentActivityDto['activity_type']; action: string; note: string },
     ): Promise<IncidentActivityDto> {
       return http.request<IncidentActivityDto>(`/incidents/${id}/activities`, {
+        method: 'POST',
+        body: payload,
+      });
+    },
+
+    async addIncidentAttachment(
+      id: string,
+      payload: IncidentAttachmentCreateDto,
+    ): Promise<IncidentAttachmentDto> {
+      return http.request<IncidentAttachmentDto>(`/incidents/${encodeURIComponent(id)}/attachments`, {
         method: 'POST',
         body: payload,
       });

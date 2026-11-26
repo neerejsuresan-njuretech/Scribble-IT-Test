@@ -91,7 +91,8 @@ Enterprise IT teams frequently face high per-agent licensing fees, closed propri
 flowchart LR
   subgraph Clients["Client Applications"]
     Web["Web App (Available)<br/>React 19 · TypeScript · Vite · Tailwind CSS"]
-    Native["Desktop & Mobile (Coming Soon)<br/>Windows · macOS · Linux · Android · iOS"]
+    Win["Windows Desktop (In Development)<br/>Tauri 2 · React 19 · Credential Manager"]
+    Native["macOS · Linux · Android · iOS<br/>Planned (Next Phases)"]
   end
 
   subgraph Edge["Edge / Proxy"]
@@ -114,6 +115,7 @@ flowchart LR
   end
 
   Web --> Nginx
+  Win -.-> Nginx
   Native -.-> Nginx
   Nginx --> Guard
   Guard --> Auth
@@ -138,10 +140,11 @@ flowchart LR
 | Platform | Target Environments | Current Status |
 | :--- | :--- | :--- |
 | **Web Application** | Modern Desktop & Mobile Browsers | **Available** |
-| **Desktop Applications** | Windows, macOS, Linux | **Coming Soon** (architecture audited; no installers published yet) |
-| **Mobile Applications** | Android, iOS | **Coming Soon** (architecture audited; no store builds published yet) |
+| **Windows Desktop** | Windows 10 (1809+) & Windows 11 (x86_64) via Tauri 2 | **In Development** (source & NSIS/MSI pipeline implemented; signed release pending) |
+| **macOS & Linux Desktop** | macOS, Linux | **Coming Soon** (not yet implemented) |
+| **Mobile Applications** | Android, iOS | **Coming Soon** (not yet implemented) |
 
-See [docs/architecture/repository-audit.md](./docs/architecture/repository-audit.md) for the cross-platform architectural analysis.
+See [docs/architecture/repository-audit.md](./docs/architecture/repository-audit.md) and [docs/desktop/windows-installation-guide.md](./docs/desktop/windows-installation-guide.md).
 
 ---
 
@@ -151,8 +154,9 @@ See [docs/architecture/repository-audit.md](./docs/architecture/repository-audit
 - **Backend (Implemented):** Python 3, FastAPI (`0.115.6`), Uvicorn, Pydantic v2, SQLAlchemy 2.x Async, Alembic, AsyncPG, Psycopg 3
 - **Data & Messaging (Implemented):** PostgreSQL 16 (with Row-Level Security), Redis 7, Async Python Worker Runner
 - **Security & Cryptography (Implemented):** `argon2-cffi`, `PyJWT[crypto]`, `cryptography` (Fernet at-rest secret encryption)
-- **Infrastructure & CI (Implemented):** Docker, Docker Compose, Nginx, GitHub Actions (`.github/workflows/backend-ci.yml`, `.github/workflows/deploy-pages.yml`)
-- **Cross-Platform Shared Packages & Store Pipelines:** Planned
+- **Windows Desktop Client (Task 5.4.1):** Tauri 2 (`src-tauri/`), Rust `keyring` (`windows-native` DPAPI Credential Manager), WebView2, NSIS & WiX MSI bundlers
+- **Infrastructure & CI (Implemented):** Docker, Docker Compose, Nginx, GitHub Actions (`.github/workflows/backend-ci.yml`, `.github/workflows/deploy-pages.yml`, `.github/workflows/windows-desktop-ci.yml`)
+- **Shared Cross-Platform Packages (Implemented):** `@scribble-it/types`, `@scribble-it/api-client`, `@scribble-it/rbac`, `@scribble-it/design-tokens`
 
 ---
 
@@ -172,14 +176,17 @@ See [docs/architecture/repository-audit.md](./docs/architecture/repository-audit
 │   ├── architecture/            # Repository & cross-platform audit
 │   └── deployment/              # Backend foundation, self-hosted, and production cloud deployment guides
 ├── infrastructure/              # Docker web Dockerfile, Nginx configs, and PostgreSQL role bootstrap script
-├── src/                         # React + TypeScript frontend application
+├── packages/                    # Shared cross-platform TS workspaces (types, api-client, rbac, design-tokens)
+├── src/                         # React + TypeScript frontend application (Web + Windows Tauri bridge under src/desktop/)
 │   ├── assets/images/           # Verified local visual assets
 │   ├── components/              # Modular ITSM, IAM, workflow, telephony, and public website components
 │   ├── config/                  # Centralized open-source URLs & project identity (openSourceConfig.ts)
 │   ├── context/                 # Application state and auth/API adapters
+│   ├── desktop/                 # Windows Tauri 2 bridge, Credential Manager token adapter & Desktop Control Panel
 │   ├── pages/                   # Operational portals and public overview page
 │   └── utils/                   # API client, navigation RBAC helpers, and formatters
-├── tests/frontend/              # Frontend Node/tsx unit tests (navigation RBAC & API client)
+├── src-tauri/                   # Tauri 2 Windows Desktop Rust host, Credential Manager vault & NSIS/MSI bundler config
+├── tests/frontend/              # Frontend Node/tsx unit tests (navigation RBAC, API client, shared packages, Windows desktop)
 ├── docker-compose.yml           # Local & self-hosted stack (PostgreSQL, Redis, Migrator, Backend, Worker, Web)
 ├── docker-compose.prod.yml      # Production hardened compose overrides
 ├── server.ts                    # Local Express + Vite dev/runtime entry point (port 3000)
@@ -236,12 +243,17 @@ The application serves on `http://localhost:3000`.
 Available npm scripts defined in `package.json`:
 
 ```bash
-npm install          # Install frontend dependencies
-npm run dev          # Start Express + Vite dev server on port 3000
-npm run build        # Build production Vite bundle into dist/
-npm run build:pages  # Build static bundle with VITE_BASE_PATH=./
-npm run lint         # Type-check codebase via tsc --noEmit
-npm run preview      # Preview production Vite build
+npm install                # Install frontend & workspace dependencies
+npm run dev                # Start Express + Vite dev server on port 3000
+npm run build              # Build production Vite bundle into dist/
+npm run build:pages        # Build static bundle with VITE_BASE_PATH=./
+npm run lint               # Type-check codebase via tsc --noEmit
+npm run typecheck:packages # Type-check shared workspace packages
+npm run test:frontend      # Run Node/tsx tests (RBAC, API client, shared packages, Windows desktop)
+npm run verify:brand       # Validate Task 5.2 SVG/PNG/ICO/BMP assets
+npm run tauri:dev          # Launch Windows desktop app locally (requires Rust + WebView2 on Windows)
+npm run tauri:build:windows # Build Windows NSIS (.exe) & WiX (.msi) installers
+npm run preview            # Preview production Vite build
 ```
 
 To connect the frontend directly to a running SCRIBBLE-IT FastAPI backend, set in `.env`:
@@ -388,7 +400,9 @@ All external connectors operate behind backend adapters with encrypted credentia
 
 ```bash
 npm run lint
-npx tsx --test tests/frontend/navigation_rbac.test.ts tests/frontend/api_client.test.ts
+npm run typecheck:packages
+npm run test:frontend
+npm run verify:brand
 ```
 
 ### Backend Test Suite
@@ -413,6 +427,10 @@ npm run build
 - [Production Cloud Deployment Guide](./docs/deployment/production-cloud-guide.md)
 - [Backend Foundation Guide](./docs/deployment/backend-foundation.md)
 - [Cross-Platform Repository Audit](./docs/architecture/repository-audit.md)
+- [Windows Desktop Installation Guide](./docs/desktop/windows-installation-guide.md)
+- [Windows Desktop Build & Dev Guide](./docs/desktop/windows-build-and-dev-guide.md)
+- [Windows Desktop Security Architecture](./docs/desktop/windows-security.md)
+- [Windows Desktop v1.0.0 Release Notes](./docs/releases/windows-v1.0.0-release-notes.md)
 - [GitHub Pages Static Deployment](./GITHUB_PAGES_DEPLOY.md)
 - [Security Specification](./security_spec.md)
 - [Contributing Guide](./CONTRIBUTING.md)
@@ -430,7 +448,8 @@ npm run build
 | External Integrations & Automation | Completed |
 | Self-Hosted Enterprise Deployment | In Progress |
 | Community Ecosystem & Documentation | In Progress |
-| Desktop Applications (Windows, macOS, Linux) | Coming Soon |
+| Windows Desktop Application (Tauri 2) | In Development |
+| macOS & Linux Desktop Applications | Coming Soon |
 | Mobile Applications (Android, iOS) | Coming Soon |
 | Plugin & Extension Ecosystem | Planned |
 

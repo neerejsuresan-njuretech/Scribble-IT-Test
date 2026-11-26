@@ -1,0 +1,33 @@
+[package]
+name = "scribble-it-desktop"
+version = "1.0.0"
+description = "SCRIBBLE-IT Windows Desktop Client — Enterprise IT Management. Open to Everyone."
+authors = ["NEEREJ S SURESAN <tech@njuregroup.in>", "Njure Tech"]
+license = "AGPL-3.0-only"
+repository = "https://github.com/neerejsuresan-njuretech/Scribble-IT-Test"
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "scribble_it_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-notification = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-deep-link = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-autostart = "2"
+tauri-plugin-single-instance = "2"
+keyring = { version = "3", features = ["windows-native"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+url = "2"
+sha2 = "0.10"
+uuid = { version = "1", features = ["v4"] }
+zeroize = "1"
+hostname = "0.4"

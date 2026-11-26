@@ -6,3 +6,11 @@ coverage/
 *.log
 .env*
 !.env.example
+src-tauri/target/
+release/windows/*.exe
+release/windows/*.msi
+release/windows/*.sha256
+release/windows/SHA256SUMS.txt
+release/windows/BUILD_INFO.txt
+release/windows/installation-verification.txt
+release/windows/logs/

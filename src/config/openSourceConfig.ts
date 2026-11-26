@@ -114,3 +114,43 @@ export const OPEN_SOURCE_CONFIG: SponsorConfig = {
   licenseSpdx: PROJECT_IDENTITY.licenseSpdx,
   licenseUrl: PROJECT_IDENTITY.licenseUrl,
 };
+
+export interface WindowsDesktopReleaseConfig {
+  version: string;
+  availabilityStatus: 'Available' | 'In Development';
+  installerUrl: string;
+  msiInstallerUrl: string;
+  installerSha256: string;
+  architecture: string;
+  minimumOs: string;
+  runtimeRequirement: string;
+  codeSigningStatus: string;
+  installGuideUrl: string;
+  buildGuideUrl: string;
+  securityGuideUrl: string;
+  releaseNotesUrl: string;
+}
+
+const configuredExeUrl = readEnv('VITE_WINDOWS_INSTALLER_URL');
+const configuredMsiUrl = readEnv('VITE_WINDOWS_MSI_URL');
+const configuredSha256 = readEnv('VITE_WINDOWS_INSTALLER_SHA256');
+const hasVerifiedWindowsBinary =
+  isConfiguredUrl(configuredExeUrl) && /^[a-f0-9]{64}$/i.test(configuredSha256);
+
+export const WINDOWS_DESKTOP_CONFIG: WindowsDesktopReleaseConfig = {
+  version: '1.0.0',
+  availabilityStatus: hasVerifiedWindowsBinary ? 'Available' : 'In Development',
+  installerUrl: hasVerifiedWindowsBinary ? configuredExeUrl : '',
+  msiInstallerUrl:
+    hasVerifiedWindowsBinary && isConfiguredUrl(configuredMsiUrl) ? configuredMsiUrl : '',
+  installerSha256: hasVerifiedWindowsBinary ? configuredSha256 : '',
+  architecture: 'Windows x86_64 (64-bit)',
+  minimumOs: 'Windows 10 (Version 1809+) or Windows 11 (64-bit)',
+  runtimeRequirement: 'Microsoft Edge WebView2 Runtime (auto-bootstrapped)',
+  codeSigningStatus: 'Unsigned build (Windows Authenticode signing certificate pending)',
+  installGuideUrl: `${GITHUB_REPOSITORY_URL}/blob/main/docs/desktop/windows-installation-guide.md`,
+  buildGuideUrl: `${GITHUB_REPOSITORY_URL}/blob/main/docs/desktop/windows-build-and-dev-guide.md`,
+  securityGuideUrl: `${GITHUB_REPOSITORY_URL}/blob/main/docs/desktop/windows-security.md`,
+  releaseNotesUrl: `${GITHUB_REPOSITORY_URL}/blob/main/docs/releases/windows-v1.0.0-release-notes.md`,
+};
+

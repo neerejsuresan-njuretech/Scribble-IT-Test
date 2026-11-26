@@ -55,6 +55,7 @@ import {
   COMMUNITY_URL,
   ROADMAP_URL,
   CHANGELOG_URL,
+  WINDOWS_DESKTOP_CONFIG,
   isConfiguredUrl,
 } from '../../config/openSourceConfig';
 import { ArchitectureDiagram } from '../../components/public/ArchitectureDiagram';
@@ -272,22 +273,25 @@ const ECOSYSTEM_PLATFORMS = [
     icon: Globe,
     summary:
       'Full-featured React 19 + TypeScript workspace across Super Admin, IAM, Employee Operations, and End-User portals—ready for cloud or self-hosted deployment.',
+    sectionTarget: undefined,
   },
   {
-    name: 'Desktop Applications',
-    platforms: 'Windows · macOS · Linux',
-    status: 'Coming Soon' as const,
+    name: 'Windows Desktop (Tauri 2)',
+    platforms: 'Windows 10 · Windows 11 (x64)',
+    status: WINDOWS_DESKTOP_CONFIG.availabilityStatus,
     icon: Monitor,
     summary:
-      'Native desktop client architecture audited for Tauri v2 with OS keychain token storage, desktop notifications, and shared TypeScript packages. Installers will be published when built.',
+      'Tauri 2 desktop foundation implemented with Windows Credential Manager token storage, native Windows alerts, file attachments, scribbleit:// deep links, and NSIS/MSI config. Signed installers are pending Windows CI build.',
+    sectionTarget: 'windows-desktop',
   },
   {
-    name: 'Mobile Applications',
-    platforms: 'Android · iOS',
+    name: 'macOS, Linux & Mobile Clients',
+    platforms: 'macOS · Linux · Android · iOS',
     status: 'Coming Soon' as const,
     icon: Smartphone,
     summary:
-      'Cross-platform mobile architecture audited for React Native (Expo CNG) with biometric secure storage and incident approvals. Store builds will be published under our AGPL-3.0 Section 7 exception.',
+      'Shared @scribble-it/* TypeScript foundation prepared for upcoming macOS, Linux, Android, and iOS clients under our AGPL-3.0 Section 7 exception. Builds begin after Windows release.',
+    sectionTarget: undefined,
   },
 ];
 
@@ -343,15 +347,15 @@ const ROADMAP_MILESTONES: RoadmapMilestone[] = [
   },
   {
     phase: '08',
-    title: 'Desktop Applications (Windows, macOS, Linux)',
-    status: 'Coming Soon',
-    summary: 'Native desktop clients sharing core TypeScript API/auth packages with OS-level secure credential storage and signed release pipelines.',
+    title: 'Windows Desktop Application (Tauri 2)',
+    status: 'In Progress',
+    summary: 'Tauri 2 Rust/React desktop implementation with Windows Credential Manager vault, native notifications, and NSIS/MSI bundler configuration; installer CI build & signing pending Windows runner.',
   },
   {
     phase: '09',
-    title: 'Mobile Applications (Android, iOS)',
+    title: 'macOS, Linux & Mobile Applications (Android, iOS)',
     status: 'Coming Soon',
-    summary: 'Dedicated mobile apps for on-call incident response, CAB approvals, self-service tickets, and push alerts distributed with AGPL-3.0 Section 7 clarity.',
+    summary: 'Upcoming native clients sharing core TypeScript API/RBAC/design-token packages across macOS, Linux, Android, and iOS under AGPL-3.0 Section 7.',
   },
   {
     phase: '10',
@@ -433,7 +437,7 @@ const FAQ_ITEMS = [
   {
     question: 'Are desktop and mobile apps available?',
     answer:
-      'Not yet—the Web Application is available today, while native Desktop (Windows, macOS, Linux) and Mobile (Android, iOS) applications are currently in the architectural planning stage and marked Coming Soon. No installers are published yet.',
+      'The Web Application is production-ready today. The SCRIBBLE-IT for Windows Tauri 2 application source code, Credential Manager storage, and NSIS/MSI packaging config are implemented in the repository (In Development—unsigned installer binaries await Windows CI runner compilation). macOS, Linux, Android, and iOS applications remain Coming Soon.',
   },
   {
     question: 'How does AI work in Scribble-IT?',
@@ -548,6 +552,13 @@ export const LandingWebsitePage: React.FC = () => {
       external: true,
     },
     {
+      title: 'Windows Desktop Guide',
+      description: 'Tauri 2 Windows installation, WebView2 prerequisites, NSIS/MSI bundling, and Credential Manager security.',
+      href: `${GITHUB_REPOSITORY_URL}/blob/main/docs/desktop/windows-installation-guide.md`,
+      configured: isConfiguredUrl(GITHUB_REPOSITORY_URL),
+      external: true,
+    },
+    {
       title: 'API Documentation',
       description: 'FastAPI /api/v1 endpoints, authentication flows, and error contracts.',
       href: `${GITHUB_REPOSITORY_URL}/blob/main/docs/api/api-v1-reference.md`,
@@ -626,6 +637,7 @@ export const LandingWebsitePage: React.FC = () => {
             {[
               { id: 'about', label: 'About' },
               { id: 'features', label: 'Capabilities' },
+              { id: 'windows-desktop', label: 'Windows App' },
               { id: 'architecture', label: 'Architecture' },
               { id: 'opensource', label: 'Open Source' },
               { id: 'roadmap', label: 'Roadmap' },
@@ -672,6 +684,7 @@ export const LandingWebsitePage: React.FC = () => {
               { id: 'about', label: 'About Scribble-IT' },
               { id: 'features', label: 'Platform Capabilities' },
               { id: 'ecosystem', label: 'Cross-Platform Ecosystem' },
+              { id: 'windows-desktop', label: 'Scribble-IT for Windows' },
               { id: 'architecture', label: 'Technology & Architecture' },
               { id: 'opensource', label: 'Open-Source Commitment' },
               { id: 'sponsor', label: 'Support & Sponsorship' },
@@ -1101,6 +1114,15 @@ export const LandingWebsitePage: React.FC = () => {
                           <span>Launch Web Application</span>
                           <ArrowRight className="w-3.5 h-3.5" />
                         </button>
+                      ) : item.sectionTarget ? (
+                        <button
+                          type="button"
+                          onClick={() => scrollToSection(item.sectionTarget!)}
+                          className="text-xs font-semibold text-[#22D3EE] hover:text-[#F5F8FF] inline-flex items-center gap-1.5 transition-colors"
+                        >
+                          <span>View Windows Desktop Details</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
                       ) : (
                         <div className="flex items-center gap-2 text-xs text-neutral-500">
                           <Clock className="w-3.5 h-3.5 shrink-0" />
@@ -1111,6 +1133,206 @@ export const LandingWebsitePage: React.FC = () => {
                   </div>
                 );
               })}
+            </div>
+          </div>
+        </section>
+
+        {/* =================================================================== */}
+        {/* D2. SCRIBBLE-IT FOR WINDOWS (DEDICATED DESKTOP SECTION)             */}
+        {/* =================================================================== */}
+        <section
+          id="windows-desktop"
+          className="border-b border-neutral-800 bg-[#0B1F3B]/20"
+        >
+          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 space-y-10">
+            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+              <div className="space-y-3 max-w-3xl">
+                <div className="text-xs font-mono text-[#22D3EE] uppercase tracking-wider">
+                  Windows Desktop Application · Tauri 2 Architecture
+                </div>
+                <h2
+                  className="text-2xl sm:text-3xl font-bold text-[#F5F8FF] tracking-tight"
+                  style={{ fontFamily: 'Manrope, Inter, sans-serif', textWrap: 'balance' }}
+                >
+                  Scribble-IT for Windows
+                </h2>
+                <p className="text-sm sm:text-base text-neutral-300 leading-relaxed">
+                  Enterprise IT service management built natively for Windows 10 and Windows 11. Connect securely to Scribble-IT Cloud or your self-hosted FastAPI backend, manage incidents, service requests, changes, and IT assets right from your desktop.
+                </p>
+              </div>
+
+              <div className="border border-[#0A84FF]/40 bg-[#0B1F3B]/80 rounded-lg px-4 py-3 shrink-0 space-y-1">
+                <div className="text-[11px] font-mono text-neutral-400">Release Status</div>
+                <div className="text-sm font-bold text-[#22D3EE]">
+                  {WINDOWS_DESKTOP_CONFIG.availabilityStatus === 'Available'
+                    ? `Available · v${WINDOWS_DESKTOP_CONFIG.version}`
+                    : `In Development · v${WINDOWS_DESKTOP_CONFIG.version} Source Ready`}
+                </div>
+                <div className="text-[11px] text-neutral-400">
+                  {WINDOWS_DESKTOP_CONFIG.architecture}
+                </div>
+              </div>
+            </div>
+
+            {/* Verified Features + Security Summary */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="lg:col-span-7 border border-[#0A84FF]/30 bg-neutral-950/90 rounded-lg p-6 space-y-5">
+                <div className="flex items-center justify-between gap-2 pb-3 border-b border-neutral-800">
+                  <h3 className="text-base font-bold text-[#F5F8FF]">
+                    Implemented Desktop Capabilities
+                  </h3>
+                  <span className="text-xs font-mono text-[#0A84FF]">Tauri 2 + Rust + React 19</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  {[
+                    {
+                      title: 'Windows Credential Manager Vault',
+                      detail: 'JWT access tokens, rotating refresh tokens, and active organization IDs are stored in OS-protected Windows Credential Manager via Rust keyring—never in browser localStorage.',
+                    },
+                    {
+                      title: 'Cloud & Self-Hosted Endpoints',
+                      detail: 'Configure HTTPS enterprise servers (or localhost for development) inside the Desktop Control Panel and validate live server metadata via /api/v1/client/config.',
+                    },
+                    {
+                      title: 'Session Inventory & Revocation',
+                      detail: 'Inspect active desktop/web token sessions with Windows host metadata and revoke individual sessions or sign out all other devices immediately.',
+                    },
+                    {
+                      title: 'Native Windows Notifications & Files',
+                      detail: 'Bridges unread FastAPI operational notifications to Windows Action Center and provides a bounded 10 MiB native file picker with SHA-256 incident attachment verification.',
+                    },
+                    {
+                      title: 'Safe scribbleit:// Protocol Links',
+                      detail: 'Single-instance deep-link handler opens incidents, requests, or Watchtower views directly while stripping untrusted query tokens and enforcing authentication gates.',
+                    },
+                    {
+                      title: 'Single-Flight Refresh & Cleanup',
+                      detail: 'Automatically coordinates concurrent 401 refresh rotations, detects token reuse revocation, clears Windows vault secrets on logout, and notifies users on expiry.',
+                    },
+                  ].map(feat => (
+                    <div
+                      key={feat.title}
+                      className="p-3.5 border border-neutral-800 bg-[#0B1F3B]/25 rounded-md space-y-1.5"
+                    >
+                      <div className="font-bold text-[#F5F8FF]">{feat.title}</div>
+                      <p className="text-neutral-400 leading-relaxed">{feat.detail}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* System Requirements, Availability & Security Posture */}
+              <div className="lg:col-span-5 flex flex-col gap-5">
+                <div className="border border-neutral-800 bg-neutral-950 rounded-lg p-6 space-y-4">
+                  <div className="flex items-center justify-between gap-2 pb-3 border-b border-neutral-800">
+                    <h3 className="text-sm font-bold text-[#F5F8FF]">
+                      Installer Availability &amp; Verification
+                    </h3>
+                    <span
+                      className={`text-xs font-mono ${
+                        WINDOWS_DESKTOP_CONFIG.availabilityStatus === 'Available'
+                          ? 'text-emerald-400'
+                          : 'text-amber-400'
+                      }`}
+                    >
+                      {WINDOWS_DESKTOP_CONFIG.availabilityStatus}
+                    </span>
+                  </div>
+
+                  {WINDOWS_DESKTOP_CONFIG.installerUrl ? (
+                    <div className="space-y-3">
+                      <a
+                        href={WINDOWS_DESKTOP_CONFIG.installerUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full px-4 py-2.5 min-h-[42px] bg-[#0A84FF] hover:bg-[#0A84FF]/90 text-white text-xs sm:text-sm font-semibold rounded-md transition-colors inline-flex items-center justify-center gap-2"
+                      >
+                        <span>Download Windows Installer (.exe) — v{WINDOWS_DESKTOP_CONFIG.version}</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                      {WINDOWS_DESKTOP_CONFIG.msiInstallerUrl && (
+                        <a
+                          href={WINDOWS_DESKTOP_CONFIG.msiInstallerUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full px-3.5 py-2 border border-neutral-700 hover:border-[#22D3EE]/60 text-neutral-200 text-xs font-semibold rounded-md transition-colors inline-flex items-center justify-center gap-2"
+                        >
+                          <span>Enterprise WiX Installer (.msi)</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                      <div className="text-[11px] font-mono text-neutral-400 break-all">
+                        SHA-256: {WINDOWS_DESKTOP_CONFIG.installerSha256}
+                      </div>
+                      <p className="text-[11px] text-amber-300/90 leading-relaxed">
+                        {WINDOWS_DESKTOP_CONFIG.codeSigningStatus}. If Windows SmartScreen warns on an unsigned build, verify the SHA-256 hash above before running setup.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 text-xs text-neutral-300 leading-relaxed">
+                      <p>
+                        <strong className="text-[#F5F8FF]">Pre-built Windows installers (.exe / .msi) are not yet published.</strong> The complete Tauri 2 project (<code className="text-[#22D3EE]">src-tauri/</code>), NSIS &amp; WiX MSI configurations, and <code className="text-[#22D3EE]">windows-latest</code> CI workflow are committed in GitHub, awaiting execution on a Windows build host.
+                      </p>
+                      <p className="text-neutral-400">
+                        {WINDOWS_DESKTOP_CONFIG.codeSigningStatus}. Build and verify locally on Windows 10/11 via <code className="text-neutral-200">scripts/build-windows-release.ps1</code> or trigger the Windows CI workflow.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="pt-2 border-t border-neutral-800 flex flex-wrap gap-x-4 gap-y-2 text-xs font-semibold">
+                    <a
+                      href={WINDOWS_DESKTOP_CONFIG.installGuideUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#22D3EE] hover:underline inline-flex items-center gap-1"
+                    >
+                      <span>Installation Guide</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                    <a
+                      href={WINDOWS_DESKTOP_CONFIG.buildGuideUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#0A84FF] hover:underline inline-flex items-center gap-1"
+                    >
+                      <span>Windows Build Guide</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                    <a
+                      href={WINDOWS_DESKTOP_CONFIG.securityGuideUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-neutral-200 hover:underline inline-flex items-center gap-1"
+                    >
+                      <span>Security Spec</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                    <a
+                      href={WINDOWS_DESKTOP_CONFIG.releaseNotesUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-neutral-300 hover:underline inline-flex items-center gap-1"
+                    >
+                      <span>v1.0.0 Release Notes</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+
+                <div className="border border-neutral-800 bg-neutral-950 rounded-lg p-6 space-y-3 text-xs">
+                  <h3 className="text-sm font-bold text-[#F5F8FF]">
+                    Windows System Requirements &amp; Known Limitations
+                  </h3>
+                  <ul className="space-y-1.5 text-neutral-400">
+                    <li>· <strong className="text-neutral-200">OS:</strong> {WINDOWS_DESKTOP_CONFIG.minimumOs}</li>
+                    <li>· <strong className="text-neutral-200">Runtime:</strong> {WINDOWS_DESKTOP_CONFIG.runtimeRequirement}</li>
+                    <li>· <strong className="text-neutral-200">Hardware:</strong> 64-bit CPU, 4 GB RAM min (8 GB recommended), 200 MB free disk</li>
+                    <li>· <strong className="text-neutral-200">Trust Boundary:</strong> Local device fingerprint aids session identification and is not treated as independent MDM attestation; IAM enrollment remains admin-controlled.</li>
+                    <li>· <strong className="text-neutral-200">Scope Notice:</strong> macOS, Linux, Android, and iOS builds remain Coming Soon.</li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -1144,7 +1366,7 @@ export const LandingWebsitePage: React.FC = () => {
                     { name: 'Vite 8 Build Pipeline', state: 'Implemented' },
                     { name: 'Tailwind CSS v4 Design System', state: 'Implemented' },
                     { name: 'React Router v7 Multi-Portal Routing', state: 'Implemented' },
-                    { name: 'Shared Desktop/Mobile Core Packages', state: 'Planned' },
+                    { name: 'Tauri 2 Windows Desktop Runtime', state: 'In Development' },
                   ],
                 },
                 {
@@ -1166,7 +1388,7 @@ export const LandingWebsitePage: React.FC = () => {
                     { name: 'Nginx Reverse Proxy + SPA Bundle', state: 'Implemented' },
                     { name: 'Async Background Workers & Retries', state: 'Implemented' },
                     { name: 'GitHub Actions CI/CD Workflows', state: 'Implemented' },
-                    { name: 'Native Store Release Pipelines', state: 'Planned' },
+                    { name: 'Windows NSIS / MSI CI Release Pipeline', state: 'In Development' },
                   ],
                 },
               ].map(column => {

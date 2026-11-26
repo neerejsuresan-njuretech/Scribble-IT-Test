@@ -203,6 +203,17 @@ export interface ActivityEntry {
   fieldChanges?: FieldChange[];
 }
 
+export interface IncidentAttachment {
+  id: string;
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+  storageKey: string;
+  checksumSha256?: string | null;
+  uploadedByEmail?: string;
+  createdAt: string;
+}
+
 export interface Incident {
   id: string;
   tenantId: string;
@@ -227,6 +238,7 @@ export interface Incident {
   updatedAt: string;
   resolutionNotes?: string;
   activityLog: ActivityEntry[];
+  attachments?: IncidentAttachment[];
 }
 
 export type RequestStatus = 'submitted' | 'manager_approved' | 'security_review' | 'fulfillment' | 'completed' | 'rejected';
