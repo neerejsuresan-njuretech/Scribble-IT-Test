@@ -179,6 +179,7 @@ test('Tauri Windows configuration and least-privilege capabilities enforce secur
   const cargoToml = fs.readFileSync(cargoPath, 'utf8');
 
   assert.equal(tauriConf.productName, 'SCRIBBLE-IT');
+  assert.equal(tauriConf.mainBinaryName, 'SCRIBBLE-IT');
   assert.equal(tauriConf.identifier, 'in.njuretech.scribbleit');
   assert.equal(tauriConf.app.withGlobalTauri, false);
   assert.equal(tauriConf.bundle.windows.certificateThumbprint, null);
@@ -186,14 +187,18 @@ test('Tauri Windows configuration and least-privilege capabilities enforce secur
   assert.deepEqual(tauriConf.bundle.targets, ['nsis', 'msi']);
   assert.deepEqual(tauriConf.plugins['deep-link'].desktop.schemes, ['scribbleit']);
 
-  // Verify Windows CI workflow & PowerShell release builder enforce non-empty .exe validation
+  // Verify Windows CI workflow & PowerShell release builder enforce non-empty .exe + .msi validation
   const ciWorkflowPath = path.join(REPO_ROOT, '.github', 'workflows', 'windows-desktop-ci.yml');
   const buildPsPath = path.join(REPO_ROOT, 'scripts', 'build-windows-release.ps1');
   assert.equal(fs.existsSync(ciWorkflowPath), true);
   assert.equal(fs.existsSync(buildPsPath), true);
   const ciYaml = fs.readFileSync(ciWorkflowPath, 'utf8');
+  const buildPs = fs.readFileSync(buildPsPath, 'utf8');
   assert.match(ciYaml, /runs-on:\s*windows-latest/);
   assert.match(ciYaml, /build-windows-release\.ps1/);
+  assert.match(ciYaml, /\.msi/);
+  assert.match(buildPs, /Get-ScribbleUninstallEntries/);
+  assert.match(buildPs, /msiexec\.exe/);
 
   // Verify zero version numbers in visual branding productName / window titles
   assert.doesNotMatch(tauriConf.productName, /\b(2\.0|V2|v2)\b/);

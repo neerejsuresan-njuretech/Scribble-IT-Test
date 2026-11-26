@@ -10,8 +10,8 @@ This directory receives the staged production Windows deliverables built by `scr
 - `BUILD_INFO.txt` — Release version (`1.0.0`), UTC build date, Rust/Node toolchain versions, and signing status
 - `windows-v1.0.0-release-notes.md` — Copied release notes
 - `windows-installation-guide.md` — Copied installation guide
-- `installation-verification.txt` — Results from automated silent install, launch, registry/Start Menu checks, and uninstall verification
-- `logs/` — Preserved TypeScript, frontend test, brand verification, Cargo test, and Tauri build logs
+- `installation-verification.txt` — Results from automated silent NSIS (`.exe`) and WiX (`.msi`) install, launch, registry/Start Menu checks, and uninstall verification
+- `logs/` — Preserved TypeScript, frontend test, brand verification, Cargo test, Tauri build, and MSI install/uninstall logs
 
 ## SmartScreen & Code Signing Notice
 

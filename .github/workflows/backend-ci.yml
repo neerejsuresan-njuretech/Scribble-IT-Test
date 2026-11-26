@@ -2,7 +2,7 @@ name: Scribble-IT 2.0 CI (Backend Foundation & Preserved Frontend)
 
 on:
   push:
-    branches: ["main", "develop"]
+    branches: ["main", "develop", "master"]
   pull_request:
 
 jobs:

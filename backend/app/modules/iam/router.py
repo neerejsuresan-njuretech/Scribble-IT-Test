@@ -111,6 +111,7 @@ async def restore_member(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.patch("/members/{user_id}/roles", status_code=status.HTTP_204_NO_CONTENT)
 @router.put("/members/{user_id}/roles", status_code=status.HTTP_204_NO_CONTENT)
 async def update_member_roles(
     user_id: uuid.UUID,

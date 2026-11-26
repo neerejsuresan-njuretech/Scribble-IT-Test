@@ -9,8 +9,10 @@ import httpx
 import pytest
 
 import psycopg
+import redis
 
 from app.core.config import Settings
+from app.core.rate_limit import rate_limiter
 from app.core.security import reset_local_rate_limits
 from app.main import create_app
 
@@ -34,6 +36,19 @@ def _truncate_live_test_tables(migration_url: str) -> None:
             if tables:
                 quoted = ", ".join(f'public."{tbl}"' for tbl in tables)
                 cur.execute(f"TRUNCATE TABLE {quoted} RESTART IDENTITY CASCADE")
+
+
+def _reset_live_redis_rate_limits(redis_url: str, *, app_env: str) -> None:
+    """Clear rate-limit keys (rl:*) between integration tests only when running in test mode."""
+    if app_env != "test":
+        return
+    client = redis.Redis.from_url(redis_url, decode_responses=True)
+    try:
+        keys = list(client.scan_iter(match="rl:*", count=500))
+        if keys:
+            client.delete(*keys)
+    finally:
+        client.close()
 
 
 @pytest.fixture
@@ -60,11 +75,21 @@ def test_settings() -> Settings:
 def _isolate_live_integration_database(
     request: pytest.FixtureRequest,
     test_settings: Settings,
-) -> None:
-    """Ensure every live PostgreSQL integration test runs against a clean migrated schema."""
-    if LIVE_INTEGRATION and request.node.get_closest_marker("integration") is not None:
+) -> Any:
+    """Ensure every live PostgreSQL + Redis integration test starts and ends with clean state."""
+    is_live_integration = (
+        LIVE_INTEGRATION and request.node.get_closest_marker("integration") is not None
+    )
+    if is_live_integration:
         reset_local_rate_limits()
+        rate_limiter.reset_local()
+        _reset_live_redis_rate_limits(test_settings.redis_url, app_env=test_settings.app_env)
         _truncate_live_test_tables(test_settings.migration_database_url)
+    yield
+    if is_live_integration:
+        reset_local_rate_limits()
+        rate_limiter.reset_local()
+        _reset_live_redis_rate_limits(test_settings.redis_url, app_env=test_settings.app_env)
 
 
 @pytest.fixture
@@ -79,6 +104,9 @@ async def async_client(test_settings: Settings) -> AsyncIterator[httpx.AsyncClie
 async def client(test_settings: Settings) -> AsyncIterator[httpx.AsyncClient]:
     """Lifespan-managed ASGI client backed by live PostgreSQL & Redis for integration workflows."""
     reset_local_rate_limits()
+    rate_limiter.reset_local()
+    if LIVE_INTEGRATION:
+        _reset_live_redis_rate_limits(test_settings.redis_url, app_env=test_settings.app_env)
     integration_settings = test_settings.model_copy(
         update={"max_request_body_bytes": 10 * 1024 * 1024}
     )

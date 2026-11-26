@@ -60,9 +60,30 @@ def test_production_requires_separate_runtime_and_migration_roles() -> None:
 
 
 def test_production_rejects_wildcard_cors() -> None:
-    with pytest.raises(ValidationError, match="Wildcard '\\*' is forbidden"):
+    expected_msg = r"Wildcard '\*' and 'null' are forbidden in CORS_ALLOWED_ORIGINS for staging/production\."
+    with pytest.raises(ValidationError, match=expected_msg):
         Settings(
             app_env="production",
+            debug=False,
+            database_url="postgresql+asyncpg://scribble_app:strong_pw@db.internal:5432/scribble_it",
+            migration_database_url="postgresql+psycopg://scribble_migrator:strong_pw@db.internal:5432/scribble_it",
+            cors_allowed_origins=["*"],
+            jwt_secret_key=SecretStr("A9x!kP2mQ7vR4zL8wN1cF6tB3yH5jD0sE9uG2qK4"),
+        )
+
+    with pytest.raises(ValidationError, match=expected_msg):
+        Settings(
+            app_env="production",
+            debug=False,
+            database_url="postgresql+asyncpg://scribble_app:strong_pw@db.internal:5432/scribble_it",
+            migration_database_url="postgresql+psycopg://scribble_migrator:strong_pw@db.internal:5432/scribble_it",
+            cors_allowed_origins=["null"],
+            jwt_secret_key=SecretStr("A9x!kP2mQ7vR4zL8wN1cF6tB3yH5jD0sE9uG2qK4"),
+        )
+
+    with pytest.raises(ValidationError, match=expected_msg):
+        Settings(
+            app_env="staging",
             debug=False,
             database_url="postgresql+asyncpg://scribble_app:strong_pw@db.internal:5432/scribble_it",
             migration_database_url="postgresql+psycopg://scribble_migrator:strong_pw@db.internal:5432/scribble_it",

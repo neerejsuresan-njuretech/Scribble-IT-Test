@@ -627,7 +627,21 @@ async def test_live_desktop_mobile_auth_mfa_sso_policy_and_web_compat(
     )
     assert mob_with_mfa.status_code == 200, mob_with_mfa.text
 
-    # 4. Enforce org sso_only policy and verify password login is blocked on native desktop client
+    # 4. Non-IAM employee cannot modify roles via PATCH or PUT (403)
+    unauth_patch = await client.patch(
+        f"/api/v1/iam/members/{emp_user_id}/roles",
+        headers={"Authorization": f"Bearer {mob_with_mfa.json()['access_token']}"},
+        json={"role_slugs": ["pol-iam-admin"]},
+    )
+    assert unauth_patch.status_code == 403
+    unauth_put = await client.put(
+        f"/api/v1/iam/members/{emp_user_id}/roles",
+        headers={"Authorization": f"Bearer {mob_with_mfa.json()['access_token']}"},
+        json={"role_slugs": ["pol-iam-admin"]},
+    )
+    assert unauth_put.status_code == 403
+
+    # Enforce org sso_only policy via PATCH and verify password login is blocked on native desktop client
     policy_upd = await client.patch(
         f"/api/v1/iam/members/{emp_user_id}/roles",
         headers=admin_headers,
@@ -646,6 +660,14 @@ async def test_live_desktop_mobile_auth_mfa_sso_policy_and_web_compat(
         },
     )
     assert blocked_desk.status_code == 401
+
+    # Verify PUT backwards compatibility for role & policy update
+    policy_restore = await client.put(
+        f"/api/v1/iam/members/{emp_user_id}/roles",
+        headers=admin_headers,
+        json={"role_slugs": ["pol-employee-ops"], "sso_only": False},
+    )
+    assert policy_restore.status_code == 204, policy_restore.text
 
 
 @pytest.mark.integration

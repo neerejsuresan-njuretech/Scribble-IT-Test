@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - master
+      - develop
     paths:
       - 'src/**'
       - 'src-tauri/**'
@@ -19,6 +20,7 @@ on:
     branches:
       - main
       - master
+      - develop
     paths:
       - 'src/**'
       - 'src-tauri/**'
@@ -61,7 +63,7 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
-      - name: Build, verify, stage, and smoke-test Windows installer
+      - name: Build, verify, stage, and smoke-test Windows NSIS & MSI installers
         shell: pwsh
         env:
           VITE_BASE_PATH: "./"
@@ -69,14 +71,25 @@ jobs:
           VITE_USE_BACKEND_API: ${{ vars.VITE_USE_BACKEND_API }}
         run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows-release.ps1 -VerifyInstall -IncludeMsi
 
-      - name: Verify non-empty Windows .exe artifact in release/windows
+      - name: Verify non-empty Windows .exe and .msi artifacts and checksums in release/windows
         shell: pwsh
         run: |
           $exeFiles = @(Get-ChildItem -Path "release/windows" -Filter "*.exe" -File)
           if ($exeFiles.Count -eq 0 -or $exeFiles[0].Length -le 0) {
             throw "Expected non-empty Windows .exe installer in release/windows/."
           }
-          Write-Host "Verified artifact: $($exeFiles[0].Name) ($($exeFiles[0].Length) bytes)"
+          $msiFiles = @(Get-ChildItem -Path "release/windows" -Filter "*.msi" -File)
+          if ($msiFiles.Count -eq 0 -or $msiFiles[0].Length -le 0) {
+            throw "Expected non-empty Windows .msi installer in release/windows/."
+          }
+          if (-not (Test-Path "release/windows/SHA256SUMS.txt")) {
+            throw "Expected SHA256SUMS.txt in release/windows/."
+          }
+          if (-not (Test-Path "release/windows/installation-verification.txt")) {
+            throw "Expected installation-verification.txt in release/windows/."
+          }
+          Write-Host "Verified NSIS artifact: $($exeFiles[0].Name) ($($exeFiles[0].Length) bytes)"
+          Write-Host "Verified MSI artifact: $($msiFiles[0].Name) ($($msiFiles[0].Length) bytes)"
           Get-Content "release/windows/SHA256SUMS.txt"
           Get-Content "release/windows/installation-verification.txt"
 
