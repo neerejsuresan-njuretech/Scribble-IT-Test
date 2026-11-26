@@ -2,8 +2,23 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+from app.modules.iam.schemas import ManagedDeviceOut
+
+
+class ClientMetadataIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    client_type: Literal["web", "desktop", "mobile"] = "web"
+    client_platform: Literal["web", "windows", "macos", "linux", "android", "ios"] | None = None
+    app_version: str | None = Field(default=None, max_length=48)
+    app_id: str | None = Field(default=None, max_length=160)
+    device_name: str | None = Field(default=None, max_length=160)
+    os_version: str | None = Field(default=None, max_length=64)
+    device_model: str | None = Field(default=None, max_length=128)
 
 
 class RegisterRequest(BaseModel):
@@ -29,12 +44,20 @@ class LoginRequest(BaseModel):
     organization_id: uuid.UUID | None = None
     totp_code: str | None = Field(default=None, max_length=16)
     backup_code: str | None = Field(default=None, max_length=16)
+    client_metadata: ClientMetadataIn | None = None
 
 
 class RefreshTokenRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     refresh_token: str = Field(min_length=16, max_length=256)
+    client_metadata: ClientMetadataIn | None = None
+
+
+class LogoutRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    revoke_push_tokens: bool = True
 
 
 class TokenResponse(BaseModel):
@@ -42,6 +65,9 @@ class TokenResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     expires_in: int
+    session_id: uuid.UUID | None = None
+    client_type: str = "web"
+    client_platform: str = "web"
     user_id: uuid.UUID
     email: str
     full_name: str
@@ -100,16 +126,33 @@ class DeviceEnrollRequest(BaseModel):
     hostname: str = Field(min_length=2, max_length=128)
     os_platform: str = Field(default="Enterprise OS", max_length=64)
     device_fingerprint: str = Field(min_length=16, max_length=128)
+    client_type: Literal["web", "desktop", "mobile"] | None = None
+    device_platform: Literal["web", "windows", "macos", "linux", "android", "ios"] | None = None
+    app_version: str | None = Field(default=None, max_length=48)
+    app_id: str | None = Field(default=None, max_length=160)
+    os_version: str | None = Field(default=None, max_length=64)
+    device_model: str | None = Field(default=None, max_length=128)
 
 
 class DeviceEnrollResponse(BaseModel):
     device_id: uuid.UUID
     hostname: str
+    os_platform: str
+    client_type: str = "web"
+    device_platform: str = "web"
+    app_version: str | None = None
+    os_version: str | None = None
+    device_model: str | None = None
     mdm_provider: str
     certificate_thumbprint: str
     trust_level: str
     mdm_verified: bool
     status: str
+
+
+class DeviceListResponse(BaseModel):
+    items: list[ManagedDeviceOut]
+    total: int
 
 
 class DeviceSsoLoginRequest(BaseModel):
@@ -119,6 +162,7 @@ class DeviceSsoLoginRequest(BaseModel):
     certificate_thumbprint: str = Field(min_length=16, max_length=128)
     organization_id: uuid.UUID
     email: EmailStr
+    client_metadata: ClientMetadataIn | None = None
 
 
 class UserSessionOut(BaseModel):
@@ -128,6 +172,11 @@ class UserSessionOut(BaseModel):
     organization_id: uuid.UUID
     portal_type: str
     auth_method: str
+    client_type: str = "web"
+    client_platform: str = "web"
+    app_version: str | None = None
+    app_id: str | None = None
+    device_name: str | None = None
     ip_address: str | None
     user_agent: str | None
     device_id: uuid.UUID | None

@@ -66,11 +66,27 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
     # Strict CORS allowlist (never wildcard with credentials)
     application.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_allowed_origins,
+        allow_origins=settings.effective_cors_allowed_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "X-Request-ID", "X-Organization-ID"],
-        expose_headers=["X-Request-ID"],
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "X-Request-ID",
+            "X-Organization-ID",
+            "X-Scribble-Client-Type",
+            "X-Scribble-Client-Platform",
+            "X-Scribble-App-Version",
+            "X-Scribble-App-Id",
+            "X-Scribble-Device-Name",
+        ],
+        expose_headers=[
+            "X-Request-ID",
+            "X-RateLimit-Limit",
+            "X-RateLimit-Remaining",
+            "X-RateLimit-Reset",
+            "X-Scribble-API-Version",
+        ],
     )
 
     application.add_middleware(RequestContextAndSecurityMiddleware, settings=settings)

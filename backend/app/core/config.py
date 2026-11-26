@@ -62,7 +62,19 @@ class Settings(BaseSettings):
     cors_allowed_origins: list[str] = Field(
         default_factory=lambda: ["http://localhost:3000", "http://localhost:5173"]
     )
+    allow_tauri_webview_origins: bool = Field(
+        default=False,
+        description="Explicit opt-in allowing Tauri desktop webview origins without loosening web CORS.",
+    )
     max_request_body_bytes: int = Field(default=2 * 1024 * 1024, ge=1024, le=50 * 1024 * 1024)
+
+    # Phase 5.3: Native client & deployment configuration
+    deployment_mode: Literal["cloud", "self_hosted"] = Field(default="cloud")
+    instance_name: str = Field(default="Scribble-IT Enterprise")
+    public_api_url: str | None = Field(default=None)
+    allowed_native_app_ids: list[str] = Field(default_factory=list)
+    min_desktop_app_version: str = Field(default="1.0.0")
+    min_mobile_app_version: str = Field(default="1.0.0")
 
     # Authentication cryptography foundations
     jwt_secret_key: SecretStr = Field(
@@ -91,9 +103,19 @@ class Settings(BaseSettings):
     telephony_webhook_secret: SecretStr = Field(default=SecretStr(""))
     webhook_replay_window_seconds: int = Field(default=300, ge=30, le=3600)
 
-    @field_validator("cors_allowed_origins", mode="before")
+    # Phase 5.3: Push Notification Providers (strictly backend-only — NEVER expose to clients)
+    fcm_project_id: str = Field(default="")
+    fcm_client_email: str = Field(default="")
+    fcm_private_key: SecretStr = Field(default=SecretStr(""))
+    apns_team_id: str = Field(default="")
+    apns_key_id: str = Field(default="")
+    apns_bundle_id: str = Field(default="")
+    apns_private_key: SecretStr = Field(default=SecretStr(""))
+    apns_use_sandbox: bool = Field(default=False)
+
+    @field_validator("cors_allowed_origins", "allowed_native_app_ids", mode="before")
     @classmethod
-    def parse_cors_origins(cls, value: object) -> list[str]:
+    def parse_string_list_setting(cls, value: object) -> list[str]:
         if isinstance(value, str):
             raw = value.strip()
             if not raw:
@@ -103,12 +125,25 @@ class Settings(BaseSettings):
 
                 parsed = json.loads(raw)
                 if not isinstance(parsed, list):
-                    raise ValueError("CORS_ALLOWED_ORIGINS JSON value must be a list.")
+                    raise ValueError("List setting JSON value must be a list.")
                 return [str(item).strip() for item in parsed if str(item).strip()]
             return [origin.strip() for origin in raw.split(",") if origin.strip()]
         if isinstance(value, list):
             return [str(origin).strip() for origin in value if str(origin).strip()]
-        raise ValueError("CORS_ALLOWED_ORIGINS must be a comma-separated string or list.")
+        raise ValueError("Setting must be a comma-separated string or list.")
+
+    @field_validator("public_api_url")
+    @classmethod
+    def validate_public_api_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip().rstrip("/")
+        if not cleaned:
+            return None
+        parsed = urlparse(cleaned)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("PUBLIC_API_URL must be a valid http:// or https:// URL.")
+        return cleaned
 
     @field_validator("database_url")
     @classmethod
@@ -161,8 +196,13 @@ class Settings(BaseSettings):
                     f"{self.app_env} to enforce least privilege between runtime DML and schema DDL."
                 )
 
-            if any(origin == "*" for origin in self.cors_allowed_origins):
-                raise ValueError("Wildcard '*' is forbidden in CORS_ALLOWED_ORIGINS for staging/production.")
+            if any(origin == "*" or origin.lower() == "null" for origin in self.cors_allowed_origins):
+                raise ValueError(
+                    "Wildcard '*' and 'null' are forbidden in CORS_ALLOWED_ORIGINS for staging/production."
+                )
+
+            if self.public_api_url and not self.public_api_url.startswith("https://"):
+                raise ValueError("PUBLIC_API_URL must use HTTPS in staging and production.")
 
             secret = self.jwt_secret_key.get_secret_value()
             if len(secret) < 32 or "change-before" in secret.lower() or "dev-only" in secret.lower():
@@ -179,6 +219,15 @@ class Settings(BaseSettings):
                 )
 
         return self
+
+    @property
+    def effective_cors_allowed_origins(self) -> list[str]:
+        origins = list(self.cors_allowed_origins)
+        if self.allow_tauri_webview_origins:
+            for tauri_origin in ("tauri://localhost", "http://tauri.localhost", "https://tauri.localhost"):
+                if tauri_origin not in origins:
+                    origins.append(tauri_origin)
+        return origins
 
     @property
     def runtime_db_username(self) -> str:

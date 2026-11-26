@@ -80,6 +80,15 @@ class ManagedDevice(UUIDPrimaryKeyMixin, TenantOwnedMixin, TimestampMixin, Base)
     device_fingerprint_hash: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     hostname: Mapped[str] = mapped_column(String(128), nullable=False)
     os_platform: Mapped[str] = mapped_column(String(64), nullable=False, default="Enterprise OS")
+    client_type: Mapped[str] = mapped_column(
+        String(24), nullable=False, default="web", server_default="web"
+    )
+    device_platform: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="web", server_default="web"
+    )
+    app_version: Mapped[str | None] = mapped_column(String(48), nullable=True)
+    os_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    device_model: Mapped[str | None] = mapped_column(String(128), nullable=True)
     mdm_provider: Mapped[str] = mapped_column(String(96), nullable=False, default="Microsoft Intune")
     certificate_thumbprint: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
     bound_user_id: Mapped[uuid.UUID | None] = mapped_column(

@@ -60,6 +60,7 @@ from app.db.models.operations import (
 )
 from app.db.models.organizations import Department, Organization
 from app.db.models.platform import PlatformSetting
+from app.db.models.push_notifications import DevicePushToken, PushDeliveryLog
 
 __all__ = [
     "AiInteractionLog",
@@ -75,6 +76,7 @@ __all__ = [
     "CmdbRelation",
     "Department",
     "DeviceEnrollmentCode",
+    "DevicePushToken",
     "DeviceTrustEvent",
     "DomainRecord",
     "Incident",
@@ -97,6 +99,7 @@ __all__ = [
     "Problem",
     "ProblemIncidentLink",
     "ProjectItem",
+    "PushDeliveryLog",
     "Role",
     "RolePermission",
     "ServiceCatalogItem",

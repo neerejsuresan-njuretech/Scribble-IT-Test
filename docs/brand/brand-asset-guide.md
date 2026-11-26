@@ -8,9 +8,9 @@
 | **Logo Wordmark** | `Scribble IT` |
 | **Product Attribution** | `A Njure Tech product.` |
 | **Tagline** | `Enterprise IT Management. Open to Everyone.` |
-| **Organization** | `Njure Tech (formerly Njure Group)` |
+| **Organization** | `Njure Tech (formally Njure Group)` |
 | **Developer** | `NEEREJ S SURESAN` |
-| **Designation** | `Founder & CEO — Njure Tech (formerly Njure Group).` |
+| **Designation** | `Founder & CEO — Njure Tech (formally Njure Group).` |
 | **Official Product Website** | `https://scribbleit.njuregroup.in` |
 | **Organization Website** | `https://tech.njuregroup.in` |
 | **Former Group Website** | `https://njuregroup.in` |
@@ -50,7 +50,7 @@ The SCRIBBLE-IT mark combines three unified visual elements:
 | `accentCyan` | Accent Cyan | `#22D3EE` | Secondary luminous highlight, pencil & gradient accent, "IT" accent on dark backgrounds |
 | `surface` | Surface | `#F5F8FF` | Primary light background canvas and dark-mode contrast foreground |
 
-All colors are exported programmatically in `@scribble-it/design-tokens` (`BRAND_PALETTE`, `DARK_THEME`, `LIGHT_THEME`, and `packages/design-tokens/css/tokens.css`).
+All colors are exported programmatically in `@scribble-it/design-tokens` (`BRAND_COLORS`, `DARK_THEME`, `LIGHT_THEME`, and `packages/design-tokens/css/tokens.css`).
 
 ---
 

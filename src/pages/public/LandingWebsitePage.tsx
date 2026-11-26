@@ -428,7 +428,7 @@ const FAQ_ITEMS = [
   {
     question: 'How does Scribble-IT sustain development?',
     answer:
-      'Development is led by Njure Tech (formerly Njure Group) and supported by voluntary community sponsorships, individual donations, and open-source engineering contributions. Support is strictly voluntary and never gates platform capabilities.',
+      'Development is led by Njure Tech (formally Njure Group) and supported by voluntary community sponsorships, individual donations, and open-source engineering contributions. Support is strictly voluntary and never gates platform capabilities.',
   },
   {
     question: 'Are desktop and mobile apps available?',

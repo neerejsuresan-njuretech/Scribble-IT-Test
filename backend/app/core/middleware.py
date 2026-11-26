@@ -7,8 +7,9 @@ import uuid
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
+from app.core.client_meta import resolve_client_metadata
 from app.core.config import Settings
-from app.core.exceptions import build_error_response
+from app.core.exceptions import AppError, build_error_response
 from app.core.logging import request_id_ctx, tenant_id_ctx
 from app.core.rate_limit import rate_limiter
 from app.core.redis import redis_manager
@@ -75,12 +76,34 @@ class RequestContextAndSecurityMiddleware(BaseHTTPMiddleware):
                 and not request.headers.get("authorization")
             ):
                 origin = request.headers.get("origin", "").strip()
-                allowed = set(self._settings.cors_allowed_origins)
+                allowed = set(self._settings.effective_cors_allowed_origins)
                 if not origin or origin not in allowed:
                     response = build_error_response(
                         status_code=403,
                         error_code="CSRF_ORIGIN_MISMATCH",
                         message="Cross-site state-changing request rejected by origin policy.",
+                    )
+                    self._apply_security_headers(response, request.url.path, req_id)
+                    return response
+
+            # 2b. Validate declared native client application metadata headers when present
+            if request.url.path.startswith("/api/") and any(
+                request.headers.get(h, "").strip()
+                for h in (
+                    "X-Scribble-Client-Type",
+                    "X-Scribble-Client-Platform",
+                    "X-Scribble-App-Version",
+                    "X-Scribble-App-Id",
+                )
+            ):
+                try:
+                    resolve_client_metadata(request=request, settings=self._settings)
+                except AppError as exc:
+                    response = build_error_response(
+                        status_code=exc.status_code,
+                        error_code=exc.error_code,
+                        message=exc.message,
+                        details=exc.details,
                     )
                     self._apply_security_headers(response, request.url.path, req_id)
                     return response
@@ -150,6 +173,7 @@ class RequestContextAndSecurityMiddleware(BaseHTTPMiddleware):
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
         response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
         if path.startswith("/api/"):
+            response.headers["X-Scribble-API-Version"] = "v1"
             response.headers.setdefault("Cache-Control", "no-store")
             response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
         if self._settings.app_env == "production":

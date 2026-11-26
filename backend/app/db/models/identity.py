@@ -256,6 +256,15 @@ class UserSession(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     ip_address: Mapped[str | None] = mapped_column(String(64), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    client_type: Mapped[str] = mapped_column(
+        String(24), nullable=False, default="web", server_default="web"
+    )
+    client_platform: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="web", server_default="web"
+    )
+    app_version: Mapped[str | None] = mapped_column(String(48), nullable=True)
+    app_id: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    device_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

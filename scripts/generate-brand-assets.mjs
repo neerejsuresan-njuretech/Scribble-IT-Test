@@ -156,7 +156,7 @@ function buildSymbolInnerSvg(variant = 'color-dark', idPrefix = 'sym') {
       <stop offset="100%" stop-color="${COLORS.njureBlue}" />
     </linearGradient>
     <linearGradient id="${idPrefix}-doc-fill" x1="216" y1="132" x2="808" y2="892" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="${isLightSurface ? COLORS.white : '#14335E'}" stop-opacity="${isLightSurface ? '0.96' : '0.68'}" />
+      <stop offset="0%" stop-color="${isLightSurface ? COLORS.surface : '#14335E'}" stop-opacity="${isLightSurface ? '0.96' : '0.68'}" />
       <stop offset="100%" stop-color="${isLightSurface ? '#E6F0FF' : '#0B1F3B'}" stop-opacity="${isLightSurface ? '0.92' : '0.88'}" />
     </linearGradient>`;
 
@@ -430,39 +430,39 @@ function createLogoLockupSvg({
       : '';
 
   if (layout === 'compact') {
-    const symScale = 0.24;
+    const symScale = 0.21;
     return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="SCRIBBLE-IT Compact Logo">
   <title>SCRIBBLE-IT Compact Logo</title>
   <defs>${sym.defs}
   </defs>
   ${bgRect}
-  <g id="layer-symbol" transform="translate(36 32) scale(${symScale})">
+  <g id="layer-symbol" transform="translate(40 22) scale(${symScale})">
     ${sym.body}
   </g>
   <g id="layer-wordmark">
-    <text x="304" y="182" font-family="Manrope, Inter, sans-serif" font-size="82" font-weight="800" letter-spacing="-2" fill="${wordPrimaryColor}">Scribble <tspan fill="${wordAccentColor}">IT</tspan></text>
+    <text x="292" y="158" font-family="Manrope, Inter, sans-serif" font-size="86" font-weight="800" letter-spacing="-2.2" fill="${wordPrimaryColor}">Scribble <tspan fill="${wordAccentColor}">IT</tspan></text>
   </g>
 </svg>
 `;
   }
 
   if (layout === 'horizontal') {
-    const symScale = 0.27;
+    const symScale = 0.34;
     return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="SCRIBBLE-IT Horizontal Wordmark">
   <title>SCRIBBLE-IT Horizontal Wordmark</title>
   <defs>${sym.defs}
   </defs>
   ${bgRect}
-  <g id="layer-symbol" transform="translate(48 44) scale(${symScale})">
+  <g id="layer-symbol" transform="translate(64 46) scale(${symScale})">
     ${sym.body}
   </g>
   <g id="layer-wordmark">
-    <text x="364" y="196" font-family="Manrope, Inter, sans-serif" font-size="112" font-weight="800" letter-spacing="-3" fill="${wordPrimaryColor}">Scribble <tspan fill="${wordAccentColor}">IT</tspan></text>
+    <text x="454" y="236" font-family="Manrope, Inter, sans-serif" font-size="132" font-weight="800" letter-spacing="-3.4" fill="${wordPrimaryColor}">Scribble <tspan fill="${wordAccentColor}">IT</tspan></text>
   </g>
   <g id="layer-attribution">
-    <text x="368" y="256" font-family="Inter, Manrope, sans-serif" font-size="34" font-weight="500" letter-spacing="0.4" fill="${subColor}" opacity="${isMonoDark || isMonoLight ? '0.82' : '1'}">A Njure Tech product.</text>
+    <text x="460" y="306" font-family="Inter, Manrope, sans-serif" font-size="38" font-weight="500" letter-spacing="0.4" fill="${subColor}" opacity="${isMonoDark || isMonoLight ? '0.82' : '1'}">A Njure Tech product.</text>
   </g>
 </svg>
 `;
@@ -680,7 +680,7 @@ function createBrandIdentityBoardSvg() {
   <text x="86" y="848" font-family="Manrope, Inter, sans-serif" font-size="16" font-weight="700" letter-spacing="1" fill="${COLORS.deepNavy}">TYPOGRAPHY &amp; OFFICIAL ATTRIBUTION</text>
   <text x="86" y="904" font-family="Manrope, Inter, sans-serif" font-size="38" font-weight="800" fill="${COLORS.deepNavy}">Manrope &amp; Inter — Enterprise IT Management. Open to Everyone.</text>
   <text x="86" y="948" font-family="Inter, sans-serif" font-size="20" font-weight="500" fill="${COLORS.mutedLight}">Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww Xx Yy Zz  ·  0123456789</text>
-  <text x="86" y="996" font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="${COLORS.deepNavy}">SCRIBBLE-IT  ·  A Njure Tech product.  ·  Developed by NEEREJ S SURESAN — Founder &amp; CEO — Njure Tech (formerly Njure Group).</text>
+  <text x="86" y="996" font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="${COLORS.deepNavy}">SCRIBBLE-IT  ·  A Njure Tech product.  ·  Developed by NEEREJ S SURESAN — Founder &amp; CEO — Njure Tech (formally Njure Group).</text>
 </svg>`;
 }
 
@@ -757,22 +757,22 @@ function main() {
   const logoSpecs = [
     // Dark background variants
     { file: 'logos/dark/scribble-it-logo-dark.svg', layout: 'primary', theme: 'dark', w: 1200, h: 740 },
-    { file: 'logos/dark/scribble-it-horizontal-dark.svg', layout: 'horizontal', theme: 'dark', w: 1400, h: 360 },
-    { file: 'logos/dark/scribble-it-compact-dark.svg', layout: 'compact', theme: 'dark', w: 860, h: 310 },
+    { file: 'logos/dark/scribble-it-horizontal-dark.svg', layout: 'horizontal', theme: 'dark', w: 1600, h: 440 },
+    { file: 'logos/dark/scribble-it-compact-dark.svg', layout: 'compact', theme: 'dark', w: 880, h: 260 },
     // Light background variants
     { file: 'logos/light/scribble-it-logo-light.svg', layout: 'primary', theme: 'light', w: 1200, h: 740 },
-    { file: 'logos/light/scribble-it-horizontal-light.svg', layout: 'horizontal', theme: 'light', w: 1400, h: 360 },
-    { file: 'logos/light/scribble-it-compact-light.svg', layout: 'compact', theme: 'light', w: 860, h: 310 },
+    { file: 'logos/light/scribble-it-horizontal-light.svg', layout: 'horizontal', theme: 'light', w: 1600, h: 440 },
+    { file: 'logos/light/scribble-it-compact-light.svg', layout: 'compact', theme: 'light', w: 880, h: 260 },
     // Transparent background variants
     { file: 'logos/transparent/scribble-it-logo-transparent-dark-text.svg', layout: 'primary', theme: 'transparent-dark-text', w: 1200, h: 740 },
     { file: 'logos/transparent/scribble-it-logo-transparent-light-text.svg', layout: 'primary', theme: 'transparent-light-text', w: 1200, h: 740 },
-    { file: 'logos/transparent/scribble-it-horizontal-transparent-dark-text.svg', layout: 'horizontal', theme: 'transparent-dark-text', w: 1400, h: 360 },
-    { file: 'logos/transparent/scribble-it-horizontal-transparent-light-text.svg', layout: 'horizontal', theme: 'transparent-light-text', w: 1400, h: 360 },
+    { file: 'logos/transparent/scribble-it-horizontal-transparent-dark-text.svg', layout: 'horizontal', theme: 'transparent-dark-text', w: 1600, h: 440 },
+    { file: 'logos/transparent/scribble-it-horizontal-transparent-light-text.svg', layout: 'horizontal', theme: 'transparent-light-text', w: 1600, h: 440 },
     // Monochrome variants
     { file: 'logos/monochrome/scribble-it-logo-mono-dark.svg', layout: 'primary', theme: 'mono-dark', w: 1200, h: 740 },
     { file: 'logos/monochrome/scribble-it-logo-mono-light.svg', layout: 'primary', theme: 'mono-light', w: 1200, h: 740 },
-    { file: 'logos/monochrome/scribble-it-horizontal-mono-dark.svg', layout: 'horizontal', theme: 'mono-dark', w: 1400, h: 360 },
-    { file: 'logos/monochrome/scribble-it-horizontal-mono-light.svg', layout: 'horizontal', theme: 'mono-light', w: 1400, h: 360 },
+    { file: 'logos/monochrome/scribble-it-horizontal-mono-dark.svg', layout: 'horizontal', theme: 'mono-dark', w: 1600, h: 440 },
+    { file: 'logos/monochrome/scribble-it-horizontal-mono-light.svg', layout: 'horizontal', theme: 'mono-light', w: 1600, h: 440 },
   ];
 
   for (const spec of logoSpecs) {
@@ -782,13 +782,13 @@ function main() {
     renderSvgToPng(svgPath, pngPath, spec.w, spec.h);
   }
 
-  // Monochrome standalone symbols
+  // Monochrome standalone symbols (1024x1024)
   const monoSymDarkSvg = path.join(BRAND_ROOT, 'logos', 'monochrome', 'scribble-it-symbol-mono-dark.svg');
   const monoSymLightSvg = path.join(BRAND_ROOT, 'logos', 'monochrome', 'scribble-it-symbol-mono-light.svg');
   writeFile(monoSymDarkSvg, createStandaloneSymbolSvg('mono-dark'));
   writeFile(monoSymLightSvg, createStandaloneSymbolSvg('mono-light'));
-  renderSvgToPng(monoSymDarkSvg, monoSymDarkSvg.replace(/\.svg$/, '.png'), 512, 512);
-  renderSvgToPng(monoSymLightSvg, monoSymLightSvg.replace(/\.svg$/, '.png'), 512, 512);
+  renderSvgToPng(monoSymDarkSvg, monoSymDarkSvg.replace(/\.svg$/, '.png'), 1024, 1024);
+  renderSvgToPng(monoSymLightSvg, monoSymLightSvg.replace(/\.svg$/, '.png'), 1024, 1024);
 
   // -------------------------------------------------------------------------
   // 3. Web Icons & Favicons (Part B)
@@ -983,7 +983,7 @@ Keywords=ITSM;ServiceDesk;CMDB;IAM;Incidents;Changes;
     <name>Njure Tech</name>
   </developer>
   <description>
-    <p>SCRIBBLE-IT is an open-source Enterprise IT Service Management (ITSM) platform by Njure Tech (formerly Njure Group), uniting incidents, service requests, problem investigation, CAB change governance, CMDB, asset management, and centralized IAM.</p>
+    <p>SCRIBBLE-IT is an open-source Enterprise IT Service Management (ITSM) platform by Njure Tech (formally Njure Group), uniting incidents, service requests, problem investigation, CAB change governance, CMDB, asset management, and centralized IAM.</p>
   </description>
   <launchable type="desktop-id">scribble-it.desktop</launchable>
   <url type="homepage">https://scribbleit.njuregroup.in</url>
@@ -1033,8 +1033,10 @@ Keywords=ITSM;ServiceDesk;CMDB;IAM;Incidents;Changes;
     renderSvgToPng(androidMonoSvg, path.join(dir, 'ic_launcher_monochrome.png'), d.adaptive, d.adaptive);
   }
 
-  // Google Play Store 512x512 icon
-  renderSvgToPng(appIconMasterSvg, path.join(androidDir, 'play-store-icon-512.png'), 512, 512);
+  // Google Play Store 512x512 icon (strictly opaque 24-bit RGB without alpha channel)
+  renderSvgToPng(appIconOpaqueSvg, path.join(androidDir, 'play-store-icon-512.png'), 512, 512, {
+    opaqueBg: COLORS.deepNavy,
+  });
 
   // Adaptive icon XML manifests (API 26+ with Android 13+ monochrome support)
   const adaptiveXml = `<?xml version="1.0" encoding="utf-8"?>

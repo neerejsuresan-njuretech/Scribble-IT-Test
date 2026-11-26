@@ -1,6 +1,6 @@
 /**
  * Centralized Open-Source Project Identity & Configurable External URLs
- * for SCRIBBLE-IT (Njure Tech, formerly Njure Group).
+ * for SCRIBBLE-IT (Njure Tech, formally Njure Group).
  *
  * Unconfigured third-party URLs intentionally default to empty strings ('')
  * so unverified destinations are never fabricated or rendered as broken links.
@@ -37,11 +37,11 @@ export const PROJECT_IDENTITY = {
   tagline: 'Enterprise IT Management. Open to Everyone.',
   organization: 'Njure Tech',
   formerOrganization: 'Njure Group',
-  organizationFull: 'Njure Tech (formerly Njure Group)',
+  organizationFull: 'Njure Tech (formally Njure Group)',
   founderName: 'NEEREJ S SURESAN',
   founderRole: 'Founder & CEO',
   founderAttribution: 'Developed by NEEREJ S SURESAN',
-  founderAttributionSubline: 'Founder & CEO — Njure Tech (formerly Njure Group).',
+  founderAttributionSubline: 'Founder & CEO — Njure Tech (formally Njure Group).',
   officialWebsiteUrl: 'https://scribbleit.njuregroup.in',
   njureTechWebsiteUrl: 'https://tech.njuregroup.in',
   njureGroupWebsiteUrl: 'https://njuregroup.in',

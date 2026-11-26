@@ -9,6 +9,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.client_meta import ValidatedClientMetadata, resolve_client_metadata
 from app.core.config import Settings
 from app.core.exceptions import (
     AuthenticationError,
@@ -52,12 +53,43 @@ from app.db.models.identity import (
     UserSession,
 )
 from app.db.models.organizations import Organization
+from app.db.models.push_notifications import DevicePushToken
 from app.db.session import (
     enable_transaction_platform_lookup,
     set_transaction_tenant_context,
 )
 from app.modules.audit.service import AuditService, extract_client_ip, extract_user_agent
 from app.modules.organizations.service import seed_organization_default_roles
+
+
+def _extract_client_meta(
+    payload: Any | None,
+    settings: Settings | None,
+    request: Request | None,
+) -> ValidatedClientMetadata:
+    cm = getattr(payload, "client_metadata", None) if payload is not None else None
+    return resolve_client_metadata(
+        request=request,
+        settings=settings,
+        body_client_type=getattr(cm, "client_type", None) if cm is not None else None,
+        body_client_platform=getattr(cm, "client_platform", None) if cm is not None else None,
+        body_app_version=getattr(cm, "app_version", None) if cm is not None else None,
+        body_app_id=getattr(cm, "app_id", None) if cm is not None else None,
+        body_device_name=getattr(cm, "device_name", None) if cm is not None else None,
+        body_os_version=getattr(cm, "os_version", None) if cm is not None else None,
+        body_device_model=getattr(cm, "device_model", None) if cm is not None else None,
+    )
+
+
+def _client_meta_explicitly_declared(payload: Any | None, request: Request | None) -> bool:
+    if payload is not None and getattr(payload, "client_metadata", None) is not None:
+        return True
+    if request is not None and any(
+        request.headers.get(h, "").strip()
+        for h in ("X-Scribble-Client-Type", "X-Scribble-Client-Platform")
+    ):
+        return True
+    return False
 
 
 class AuthService:
@@ -232,6 +264,7 @@ class AuthService:
         settings: Settings,
         request: Request | None = None,
     ) -> tuple[str, str, int, UserSession, Organization, OrganizationMembership, User, bool]:
+        meta = _extract_client_meta(payload, settings, request)
         email_norm = str(payload.email).lower().strip()
         portal_requested = str(payload.portal_type or PORTAL_EMPLOYEE).strip().lower()
         if portal_requested not in VALID_PORTALS:
@@ -482,6 +515,11 @@ class AuthService:
             last_used_at=now,
             ip_address=extract_client_ip(request),
             user_agent=extract_user_agent(request),
+            client_type=meta.client_type,
+            client_platform=meta.client_platform,
+            app_version=meta.app_version,
+            app_id=meta.app_id,
+            device_name=meta.device_name,
         )
         db.add(session_row)
         await db.flush()
@@ -508,7 +546,13 @@ class AuthService:
             target_id=str(session_row.id),
             outcome="success",
             detail=f"Authenticated '{user.email}' into '{membership.portal_type}' portal.",
-            metadata={"auth_method": session_row.auth_method},
+            metadata={
+                "auth_method": session_row.auth_method,
+                "client_type": meta.client_type,
+                "client_platform": meta.client_platform,
+                "app_version": meta.app_version,
+                "app_id": meta.app_id,
+            },
             request=request,
         )
         return access_token, raw_refresh, access_ttl, session_row, org, membership, user, mfa_enrolled
@@ -519,8 +563,10 @@ class AuthService:
         *,
         raw_refresh_token: str,
         settings: Settings,
+        payload: Any | None = None,
         request: Request | None = None,
     ) -> tuple[str, str, int, UserSession, Organization, OrganizationMembership, User, bool]:
+        meta = _extract_client_meta(payload, settings, request)
         client_id = extract_client_ip(request) or "anonymous"
         await enforce_rate_limit(
             bucket="refresh", identifier=client_id, max_requests=30, window_seconds=60
@@ -530,12 +576,16 @@ class AuthService:
         presented_hash = hash_token(raw_refresh_token)
         now = datetime.now(timezone.utc)
 
+        # Row-level lock serializes concurrent refresh attempts so strictly one succeeds
+        # and any concurrent duplicate triggers refresh-token reuse detection.
         session_row = (
             await db.execute(
-                select(UserSession).where(
+                select(UserSession)
+                .where(
                     (UserSession.refresh_token_hash == presented_hash)
                     | (UserSession.previous_refresh_token_hash == presented_hash)
                 )
+                .with_for_update()
             )
         ).scalar_one_or_none()
 
@@ -551,6 +601,17 @@ class AuthService:
         ):
             session_row.revoked_at = now
             session_row.revocation_reason = "refresh_token_reuse_detected"
+            family_session_ids = list(
+                (
+                    await db.execute(
+                        select(UserSession.id).where(
+                            UserSession.token_family_id == session_row.token_family_id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
             await db.execute(
                 update(UserSession)
                 .where(
@@ -559,6 +620,19 @@ class AuthService:
                 )
                 .values(revoked_at=now, revocation_reason="token_family_compromised")
             )
+            if family_session_ids:
+                await db.execute(
+                    update(DevicePushToken)
+                    .where(
+                        DevicePushToken.session_id.in_(family_session_ids),
+                        DevicePushToken.status == "active",
+                    )
+                    .values(
+                        status="revoked",
+                        revoked_at=now,
+                        revocation_reason="token_family_compromised",
+                    )
+                )
             await db.flush()
             await AuditService.record(
                 db,
@@ -572,6 +646,10 @@ class AuthService:
                 target_id=str(session_row.token_family_id),
                 outcome="denied",
                 detail="Replayed or rotated refresh token detected. Revoked entire session token family.",
+                metadata={
+                    "client_type": meta.client_type,
+                    "client_platform": meta.client_platform,
+                },
                 request=request,
             )
             raise AuthenticationError(
@@ -580,6 +658,32 @@ class AuthService:
 
         if session_row.revoked_at is not None or session_row.expires_at <= now:
             raise AuthenticationError("Refresh session has expired or been revoked.")
+
+        if _client_meta_explicitly_declared(payload, request) and (
+            meta.client_type != session_row.client_type
+            or meta.client_platform != session_row.client_platform
+        ):
+            await AuditService.record(
+                db,
+                action="REFRESH_CLIENT_MISMATCH",
+                module="security",
+                actor_email="system",
+                actor_user_id=session_row.user_id,
+                organization_id=session_row.organization_id,
+                portal_type=session_row.portal_type,
+                target_type="session",
+                target_id=str(session_row.id),
+                outcome="denied",
+                detail="Blocked token refresh because declared client type/platform did not match session.",
+                metadata={
+                    "expected_client_type": session_row.client_type,
+                    "expected_client_platform": session_row.client_platform,
+                    "presented_client_type": meta.client_type,
+                    "presented_client_platform": meta.client_platform,
+                },
+                request=request,
+            )
+            raise AuthenticationError("Client platform mismatch during token refresh.")
 
         user = (
             await db.execute(
@@ -624,6 +728,10 @@ class AuthService:
         session_row.refresh_token_hash = new_refresh_hash
         session_row.last_used_at = now
         session_row.expires_at = now + timedelta(days=settings.refresh_token_ttl_days)
+        if meta.app_version:
+            session_row.app_version = meta.app_version
+        if meta.app_id:
+            session_row.app_id = meta.app_id
         await db.flush()
 
         access_token, access_ttl = create_access_token(
@@ -666,6 +774,7 @@ class AuthService:
         db: AsyncSession,
         *,
         principal: AuthenticatedPrincipal,
+        revoke_push_tokens: bool = True,
         request: Request | None = None,
     ) -> None:
         await enable_transaction_platform_lookup(db)
@@ -675,6 +784,18 @@ class AuthService:
             .where(UserSession.id == principal.session_id)
             .values(revoked_at=now, revocation_reason="user_logout")
         )
+        revoked_push_count = 0
+        if revoke_push_tokens:
+            push_res = await db.execute(
+                update(DevicePushToken)
+                .where(
+                    DevicePushToken.session_id == principal.session_id,
+                    DevicePushToken.user_id == principal.user_id,
+                    DevicePushToken.status == "active",
+                )
+                .values(status="revoked", revoked_at=now, revocation_reason="user_logout")
+            )
+            revoked_push_count = int(push_res.rowcount or 0)
         await set_transaction_tenant_context(db, principal.organization_id)
         await AuditService.record(
             db,
@@ -688,6 +809,7 @@ class AuthService:
             target_id=str(principal.session_id),
             outcome="success",
             detail=f"Revoked session on user logout for '{principal.email}'.",
+            metadata={"revoked_push_tokens": revoked_push_count},
             request=request,
         )
 
@@ -728,8 +850,18 @@ class AuthService:
         if session_row is None:
             raise NotFoundError("Session not found.")
 
-        session_row.revoked_at = datetime.now(timezone.utc)
+        now = datetime.now(timezone.utc)
+        session_row.revoked_at = now
         session_row.revocation_reason = "user_revoked_session"
+        await db.execute(
+            update(DevicePushToken)
+            .where(
+                DevicePushToken.session_id == session_id,
+                DevicePushToken.user_id == principal.user_id,
+                DevicePushToken.status == "active",
+            )
+            .values(status="revoked", revoked_at=now, revocation_reason="session_revoked")
+        )
         await db.flush()
 
         await set_transaction_tenant_context(db, principal.organization_id)
@@ -745,6 +877,10 @@ class AuthService:
             target_id=str(session_id),
             outcome="success",
             detail=f"Revoked session {session_id}.",
+            metadata={
+                "client_type": session_row.client_type,
+                "client_platform": session_row.client_platform,
+            },
             request=request,
         )
 
@@ -762,10 +898,21 @@ class AuthService:
             UserSession.user_id == principal.user_id,
             UserSession.revoked_at.is_(None),
         )
+        push_stmt = update(DevicePushToken).where(
+            DevicePushToken.user_id == principal.user_id,
+            DevicePushToken.status == "active",
+        )
         if keep_current:
             stmt = stmt.where(UserSession.id != principal.session_id)
+            push_stmt = push_stmt.where(
+                (DevicePushToken.session_id != principal.session_id)
+                | (DevicePushToken.session_id.is_(None))
+            )
         result = await db.execute(
             stmt.values(revoked_at=now, revocation_reason="user_revoked_all_sessions")
+        )
+        await db.execute(
+            push_stmt.values(status="revoked", revoked_at=now, revocation_reason="all_sessions_revoked")
         )
         revoked_count = int(result.rowcount or 0)
         await set_transaction_tenant_context(db, principal.organization_id)
@@ -881,11 +1028,16 @@ class AuthService:
         user.locked_until = None
         reset_row.used_at = now
 
-        # Immediately invalidate ALL existing user sessions after password reset
+        # Immediately invalidate ALL existing user sessions & push tokens after password reset
         await db.execute(
             update(UserSession)
             .where(UserSession.user_id == user.id, UserSession.revoked_at.is_(None))
             .values(revoked_at=now, revocation_reason="password_reset")
+        )
+        await db.execute(
+            update(DevicePushToken)
+            .where(DevicePushToken.user_id == user.id, DevicePushToken.status == "active")
+            .values(status="revoked", revoked_at=now, revocation_reason="password_reset")
         )
         await db.flush()
 
@@ -1064,6 +1216,7 @@ class AuthService:
         *,
         principal: AuthenticatedPrincipal,
         payload: Any,
+        settings: Settings | None = None,
         request: Request | None = None,
     ) -> ManagedDevice:
         """
@@ -1073,9 +1226,20 @@ class AuthService:
         Security invariant:
           - Unmanaged employee devices CANNOT self-enroll without a valid active IAM code.
           - Atomic row-locked consumption guarantees single-use even under concurrent requests.
-          - Browser-generated device fingerprints are recorded as `trust_level='registered_iam_code'`
+          - Device fingerprints (browser, desktop, or mobile) are recorded as `trust_level='registered_iam_code'`
             with `mdm_verified=False`, distinct from independently MDM-attested devices.
         """
+        meta = resolve_client_metadata(
+            request=request,
+            settings=settings,
+            body_client_type=getattr(payload, "client_type", None),
+            body_client_platform=getattr(payload, "device_platform", None),
+            body_app_version=getattr(payload, "app_version", None),
+            body_app_id=getattr(payload, "app_id", None),
+            body_device_name=getattr(payload, "hostname", None),
+            body_os_version=getattr(payload, "os_version", None),
+            body_device_model=getattr(payload, "device_model", None),
+        )
         await set_transaction_tenant_context(db, principal.organization_id)
         normalized_code = payload.enrollment_code.strip().upper()
         code_hash = hash_token(normalized_code)
@@ -1211,6 +1375,11 @@ class AuthService:
             existing_device.revoked_by_user_id = None
             existing_device.hostname = payload.hostname.strip()
             existing_device.os_platform = payload.os_platform.strip()
+            existing_device.client_type = meta.client_type
+            existing_device.device_platform = meta.client_platform
+            existing_device.app_version = meta.app_version
+            existing_device.os_version = meta.os_version
+            existing_device.device_model = meta.device_model
             existing_device.mdm_provider = enroll_code.mdm_provider
             existing_device.certificate_thumbprint = thumbprint
             existing_device.bound_user_id = principal.user_id
@@ -1225,6 +1394,11 @@ class AuthService:
                 device_fingerprint_hash=fp_hash,
                 hostname=payload.hostname.strip(),
                 os_platform=payload.os_platform.strip(),
+                client_type=meta.client_type,
+                device_platform=meta.client_platform,
+                app_version=meta.app_version,
+                os_version=meta.os_version,
+                device_model=meta.device_model,
                 mdm_provider=enroll_code.mdm_provider,
                 certificate_thumbprint=thumbprint,
                 bound_user_id=principal.user_id,
@@ -1250,11 +1424,15 @@ class AuthService:
                 actor_user_id=principal.user_id,
                 actor_email=principal.email,
                 detail=(
-                    f"Registered device '{device.hostname}' via IAM code prefix '{enroll_code.code_prefix}'. "
+                    f"Registered device '{device.hostname}' ({device.client_type}/{device.device_platform}) "
+                    f"via IAM code prefix '{enroll_code.code_prefix}'. "
                     "Trust level set to registered_iam_code (pending independent MDM attestation)."
                 ),
                 metadata_json={
                     "hostname": device.hostname,
+                    "client_type": device.client_type,
+                    "device_platform": device.device_platform,
+                    "app_version": device.app_version,
                     "mdm_provider": device.mdm_provider,
                     "trust_level": device.trust_level,
                     "mdm_verified": False,
@@ -1277,12 +1455,35 @@ class AuthService:
             detail=f"Onboarded device '{device.hostname}' via IAM code prefix '{enroll_code.code_prefix}'.",
             metadata={
                 "hostname": device.hostname,
+                "client_type": device.client_type,
+                "device_platform": device.device_platform,
+                "app_version": device.app_version,
                 "mdm_provider": device.mdm_provider,
                 "trust_level": device.trust_level,
             },
             request=request,
         )
         return device
+
+    @staticmethod
+    async def list_user_devices(
+        db: AsyncSession,
+        *,
+        principal: AuthenticatedPrincipal,
+    ) -> list[ManagedDevice]:
+        await set_transaction_tenant_context(db, principal.organization_id)
+        rows = (
+            await db.execute(
+                select(ManagedDevice)
+                .where(
+                    ManagedDevice.organization_id == principal.organization_id,
+                    (ManagedDevice.bound_user_id == principal.user_id)
+                    | (ManagedDevice.enrolled_by_email == principal.email),
+                )
+                .order_by(ManagedDevice.created_at.desc())
+            )
+        ).scalars().all()
+        return list(rows)
 
     @staticmethod
     async def device_sso_login(
@@ -1296,6 +1497,7 @@ class AuthService:
         Company Device SSO login verifying an active IAM-registered device fingerprint,
         certificate thumbprint, organization binding, and user binding.
         """
+        meta = _extract_client_meta(payload, settings, request)
         email_norm = str(payload.email).lower().strip()
         await enforce_rate_limit(
             bucket="device_sso", identifier=email_norm, max_requests=10, window_seconds=60
@@ -1383,6 +1585,10 @@ class AuthService:
             raise AuthorizationError("Organization workspace is currently suspended.")
 
         device.last_seen_at = now
+        if meta.app_version:
+            device.app_version = meta.app_version
+        if meta.os_version:
+            device.os_version = meta.os_version
         if device.bound_user_id is None:
             device.bound_user_id = user.id
         user.last_login_at = now
@@ -1405,6 +1611,11 @@ class AuthService:
             device_id=device.id,
             ip_address=extract_client_ip(request),
             user_agent=extract_user_agent(request),
+            client_type=meta.client_type,
+            client_platform=meta.client_platform,
+            app_version=meta.app_version,
+            app_id=meta.app_id,
+            device_name=meta.device_name or device.hostname,
         )
         db.add(session_row)
         await db.flush()
@@ -1436,7 +1647,12 @@ class AuthService:
                 actor_user_id=user.id,
                 actor_email=user.email,
                 detail=f"Authenticated '{user.email}' via Company Device SSO ({device.trust_level}).",
-                metadata_json={"session_id": str(session_row.id), "trust_level": device.trust_level},
+                metadata_json={
+                    "session_id": str(session_row.id),
+                    "trust_level": device.trust_level,
+                    "client_type": meta.client_type,
+                    "client_platform": meta.client_platform,
+                },
             )
         )
         await AuditService.record(
@@ -1451,7 +1667,12 @@ class AuthService:
             target_id=str(device.id),
             outcome="success",
             detail=f"User '{user.email}' authenticated via Company Device SSO.",
-            metadata={"trust_level": device.trust_level, "mdm_verified": device.mdm_verified},
+            metadata={
+                "trust_level": device.trust_level,
+                "mdm_verified": device.mdm_verified,
+                "client_type": meta.client_type,
+                "client_platform": meta.client_platform,
+            },
             request=request,
         )
         return access_token, raw_refresh, access_ttl, session_row, org, membership, user, mfa_enrolled

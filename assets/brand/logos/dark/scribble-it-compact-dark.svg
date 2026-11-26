@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 310" width="860" height="310" role="img" aria-label="SCRIBBLE-IT Compact Logo">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 260" width="880" height="260" role="img" aria-label="SCRIBBLE-IT Compact Logo">
   <title>SCRIBBLE-IT Compact Logo</title>
   <defs>
     <linearGradient id="logo-compact-dark-doc-stroke" x1="210" y1="128" x2="814" y2="896" gradientUnits="userSpaceOnUse">
@@ -21,8 +21,8 @@
       <stop offset="100%" stop-color="#0B1F3B" stop-opacity="0.88" />
     </linearGradient>
   </defs>
-  <g id="layer-background"><rect x="0" y="0" width="860" height="310" rx="28" fill="#0B1F3B" /></g>
-  <g id="layer-symbol" transform="translate(36 32) scale(0.24)">
+  <g id="layer-background"><rect x="0" y="0" width="880" height="260" rx="28" fill="#0B1F3B" /></g>
+  <g id="layer-symbol" transform="translate(40 22) scale(0.21)">
     
     <g id="logo-compact-dark-layer-document">
       <!-- Enterprise Document / Page Outline with Folded Top-Right Corner -->
@@ -99,6 +99,6 @@
     </g>
   </g>
   <g id="layer-wordmark">
-    <text x="304" y="182" font-family="Manrope, Inter, sans-serif" font-size="82" font-weight="800" letter-spacing="-2" fill="#F5F8FF">Scribble <tspan fill="#22D3EE">IT</tspan></text>
+    <text x="292" y="158" font-family="Manrope, Inter, sans-serif" font-size="86" font-weight="800" letter-spacing="-2.2" fill="#F5F8FF">Scribble <tspan fill="#22D3EE">IT</tspan></text>
   </g>
 </svg>

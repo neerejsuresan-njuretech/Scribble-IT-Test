@@ -9,7 +9,7 @@
     <name>Njure Tech</name>
   </developer>
   <description>
-    <p>SCRIBBLE-IT is an open-source Enterprise IT Service Management (ITSM) platform by Njure Tech (formerly Njure Group), uniting incidents, service requests, problem investigation, CAB change governance, CMDB, asset management, and centralized IAM.</p>
+    <p>SCRIBBLE-IT is an open-source Enterprise IT Service Management (ITSM) platform by Njure Tech (formally Njure Group), uniting incidents, service requests, problem investigation, CAB change governance, CMDB, asset management, and centralized IAM.</p>
   </description>
   <launchable type="desktop-id">scribble-it.desktop</launchable>
   <url type="homepage">https://scribbleit.njuregroup.in</url>

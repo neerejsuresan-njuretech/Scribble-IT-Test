@@ -5,24 +5,33 @@ import http from 'node:http';
 import path from 'node:path';
 import { AddressInfo } from 'node:net';
 
-import type { Incident, AuthTokenResponseDto, IncidentDto } from '@scribble-it/types';
+import type {
+  AuthSession,
+  BackendLoginResponse,
+  Incident,
+  IncidentDto,
+  PaginatedDto,
+} from '@scribble-it/types';
 import {
-  BRAND_PALETTE,
+  BRAND_COLORS,
+  BORDER_RADII,
   DARK_THEME,
-  LIGHT_THEME,
-  INCIDENT_PRIORITY_TOKENS,
-  SLA_STATUS_TOKENS,
   ENTERPRISE_STATUS_TOKENS,
+  FONT_FAMILIES,
+  INCIDENT_PRIORITY_TOKENS,
+  LIGHT_THEME,
   SCRIBBLE_IT_BRAND,
-  TYPOGRAPHY,
+  SLA_STATUS_TOKENS,
   SPACING,
-  RADII,
+  TYPOGRAPHY_SCALE,
+  type ThemeTokens,
 } from '@scribble-it/design-tokens';
 import {
-  canAccessPage,
+  canAccessNavId,
+  canAccessRoutePath,
   evaluateEffectivePermissions,
   formatClearanceLabel,
-  getVisibleSidebarItems,
+  getAccessibleNavSections,
   hasAllPermissions,
   hasAnyPermission,
   resolveEffectiveHasPermission,
@@ -30,37 +39,61 @@ import {
 import {
   ApiError,
   createScribbleApiClient,
+  mapIncidentDto,
   normalizeFastApiBaseUrl,
   type TokenStorageAdapter,
+  type TokenUpdateParams,
 } from '@scribble-it/api-client';
 
 const REPO_ROOT = path.resolve(process.cwd());
 
-function createAsyncSecureStorageMock(): TokenStorageAdapter & { reads: number; writes: number } {
-  const store = new Map<string, string>();
+function createAsyncSecureStorageMock(): TokenStorageAdapter & {
+  reads: number;
+  writes: number;
+} {
+  let accessToken: string | null = null;
+  let refreshToken: string | null = null;
+  let organizationId: string | null = null;
+
   return {
     reads: 0,
     writes: 0,
-    async getItem(key: string) {
+    async getAccessToken() {
       this.reads += 1;
-      return store.get(key) ?? null;
+      return accessToken;
     },
-    async setItem(key: string, value: string) {
-      this.writes += 1;
-      store.set(key, value);
+    async getRefreshToken() {
+      this.reads += 1;
+      return refreshToken;
     },
-    async removeItem(key: string) {
+    async getOrganizationId() {
+      this.reads += 1;
+      return organizationId;
+    },
+    async setTokens(params: TokenUpdateParams) {
       this.writes += 1;
-      store.delete(key);
+      accessToken = params.accessToken;
+      if (params.refreshToken !== undefined) {
+        refreshToken = params.refreshToken;
+      }
+      if (params.organizationId !== undefined) {
+        organizationId = params.organizationId;
+      }
+    },
+    async clearTokens() {
+      this.writes += 1;
+      accessToken = null;
+      refreshToken = null;
+      organizationId = null;
     },
   };
 }
 
 test('@scribble-it/design-tokens enforces official palette, themes, typography, ITSM statuses, and zero version numbers', () => {
-  assert.equal(BRAND_PALETTE.deepNavy, '#0B1F3B');
-  assert.equal(BRAND_PALETTE.njureBlue, '#0A84FF');
-  assert.equal(BRAND_PALETTE.accentCyan, '#22D3EE');
-  assert.equal(BRAND_PALETTE.surface, '#F5F8FF');
+  assert.equal(BRAND_COLORS.deepNavy, '#0B1F3B');
+  assert.equal(BRAND_COLORS.njureBlue, '#0A84FF');
+  assert.equal(BRAND_COLORS.accentCyan, '#22D3EE');
+  assert.equal(BRAND_COLORS.surface, '#F5F8FF');
 
   assert.equal(SCRIBBLE_IT_BRAND.productName, 'SCRIBBLE-IT');
   assert.equal(SCRIBBLE_IT_BRAND.wordmark, 'Scribble IT');
@@ -69,17 +102,26 @@ test('@scribble-it/design-tokens enforces official palette, themes, typography, 
 
   // Strict zero-version branding guard
   for (const val of Object.values(SCRIBBLE_IT_BRAND)) {
-    assert.doesNotMatch(String(val), /\b(2\.0|V2|v2)\b/, `Forbidden version string in brand metadata: ${val}`);
+    assert.doesNotMatch(
+      String(val),
+      /\b(2\.0|V2|v2)\b/,
+      `Forbidden version string in brand metadata: ${val}`,
+    );
   }
 
-  assert.equal(DARK_THEME.mode, 'dark');
-  assert.equal(LIGHT_THEME.mode, 'light');
-  assert.equal(DARK_THEME.brand.primary, '#0A84FF');
-  assert.equal(LIGHT_THEME.surface.canvas, '#F5F8FF');
+  const dark: ThemeTokens = DARK_THEME;
+  const light: ThemeTokens = LIGHT_THEME;
+  assert.equal(dark.mode, 'dark');
+  assert.equal(light.mode, 'light');
+  assert.equal(dark.brand.primary, '#0A84FF');
+  assert.equal(light.background.canvas, '#F5F8FF');
+  assert.equal(dark.background.surface, '#0B1F3B');
 
-  assert.ok(TYPOGRAPHY.fontFamily.display.includes('Manrope'));
-  assert.ok(TYPOGRAPHY.fontFamily.sans.includes('Inter'));
-  assert.ok(SPACING[4] === 16 && RADII.md === 8);
+  assert.ok(FONT_FAMILIES.css.display.includes('Manrope'));
+  assert.ok(FONT_FAMILIES.css.sans.includes('Inter'));
+  assert.equal(FONT_FAMILIES.native.displayExtraBold, 'Manrope-ExtraBold');
+  assert.ok(TYPOGRAPHY_SCALE.display.fontSize === 40);
+  assert.ok(SPACING[4] === 16 && BORDER_RADII.md === 8);
 
   assert.ok(INCIDENT_PRIORITY_TOKENS.P1 && INCIDENT_PRIORITY_TOKENS.P4);
   assert.ok(SLA_STATUS_TOKENS.on_track && SLA_STATUS_TOKENS.breached);
@@ -87,60 +129,93 @@ test('@scribble-it/design-tokens enforces official palette, themes, typography, 
 });
 
 test('@scribble-it/rbac evaluates permissions and navigation clearance purely without React/DOM', () => {
+  const superAdminSession: AuthSession = {
+    isAuthenticated: true,
+    portalType: 'super_admin',
+    role: 'admin',
+    name: 'Global Super Admin',
+    email: 'superadmin@njuregroup.in',
+    department: 'Platform Governance',
+    authMethod: 'admin_credentials',
+    deviceManaged: true,
+    permissionSource: 'backend',
+    clearanceTier: 'super_admin',
+    effectivePermissions: ['audit:read', 'iam:manage', 'tenants:admin', 'incidents:read'],
+    authenticatedAt: new Date().toISOString(),
+  };
+
   const superAdmin = evaluateEffectivePermissions({
-    role: 'Super Admin',
-    backendPermissions: [],
-    permissionSource: 'local',
-    portalClearance: 'L5_SUPER_ADMIN',
+    role: 'admin',
+    authSession: superAdminSession,
+    isSuperAdmin: true,
+    isIamPortal: false,
+    isModuleEnabled: () => true,
+    hasPermission: () => false,
   });
-  assert.equal(superAdmin.isSuperAdmin, true);
-  assert.equal(superAdmin.hasPermission('governance.audit.read'), true);
-  assert.equal(superAdmin.hasPermission('iam.users.manage'), true);
-  assert.equal(formatClearanceLabel(superAdmin.clearance), 'L5 — Super Admin');
+  assert.equal(superAdmin.permissionSource, 'backend');
+  assert.equal(superAdmin.rbacContext.hasPermission('audit:read'), true);
+  assert.equal(superAdmin.rbacContext.hasPermission('iam:manage'), true);
+  assert.equal(superAdmin.clearanceLabel, 'Super Admin');
+  assert.equal(canAccessNavId('audit', superAdmin.rbacContext) || canAccessNavId('tenants', superAdmin.rbacContext), true);
+
+  const techSession: AuthSession = {
+    isAuthenticated: true,
+    portalType: 'employee',
+    role: 'technician',
+    name: 'Jordan Rivera',
+    email: 'tech@njuregroup.in',
+    department: 'IT Service Desk',
+    authMethod: 'employee_password',
+    deviceManaged: true,
+    permissionSource: 'backend',
+    clearanceTier: 'it_operations',
+    effectivePermissions: ['incidents:read', 'incidents:write', 'assets:read'],
+    authenticatedAt: new Date().toISOString(),
+  };
 
   const tech = evaluateEffectivePermissions({
-    role: 'Technician',
-    backendPermissions: ['itsm.incidents.read', 'itsm.incidents.write', 'cmdb.read'],
-    permissionSource: 'backend',
-    portalClearance: 'L2_EMPLOYEE',
-  });
-  assert.equal(tech.isSuperAdmin, false);
-  assert.equal(tech.hasPermission('itsm.incidents.write'), true);
-  assert.equal(tech.hasPermission('iam.roles.manage'), false);
-  assert.equal(hasAnyPermission(tech.hasPermission, ['iam.roles.manage', 'cmdb.read']), true);
-  assert.equal(hasAllPermissions(tech.hasPermission, ['itsm.incidents.read', 'cmdb.read']), true);
-  assert.equal(hasAllPermissions(tech.hasPermission, ['itsm.incidents.read', 'iam.roles.manage']), false);
-
-  assert.equal(
-    resolveEffectiveHasPermission('End User', ['itsm.incidents.read'], 'backend', 'itsm.incidents.read'),
-    true
-  );
-  assert.equal(
-    resolveEffectiveHasPermission('End User', ['itsm.incidents.read'], 'backend', 'iam.users.manage'),
-    false
-  );
-
-  // Navigation policy check
-  assert.equal(
-    canAccessPage('Super Admin', 'audit', {
-      hasPermission: superAdmin.hasPermission,
-      portalClearance: 'L5_SUPER_ADMIN',
-    }),
-    true
-  );
-  assert.equal(
-    canAccessPage('End User', 'audit', {
-      hasPermission: () => false,
-      portalClearance: 'L1_END_USER',
-    }),
-    false
-  );
-  const endUserNav = getVisibleSidebarItems('End User', {
+    role: 'technician',
+    authSession: techSession,
+    isSuperAdmin: false,
+    isIamPortal: false,
+    isModuleEnabled: () => true,
     hasPermission: () => false,
-    portalClearance: 'L1_END_USER',
   });
-  assert.ok(endUserNav.length > 0);
-  assert.ok(!endUserNav.some((item) => item.id === 'iam'));
+  assert.equal(tech.rbacContext.hasPermission('incidents:write'), true);
+  assert.equal(tech.rbacContext.hasPermission('iam:manage'), false);
+  assert.equal(hasAnyPermission(tech.rbacContext.hasPermission, ['iam:manage', 'assets:read']), true);
+  assert.equal(hasAllPermissions(tech.rbacContext.hasPermission, ['incidents:read', 'assets:read']), true);
+  assert.equal(hasAllPermissions(tech.rbacContext.hasPermission, ['incidents:read', 'iam:manage']), false);
+
+  const resolved = resolveEffectiveHasPermission(techSession, () => false);
+  assert.equal(resolved('incidents:read'), true);
+  assert.equal(resolved('iam:manage'), false);
+
+  assert.equal(
+    formatClearanceLabel({
+      isSuperAdmin: false,
+      isIamPortal: true,
+      hasPermission: () => false,
+    }),
+    'IAM Officer',
+  );
+
+  // Navigation policy check: end_user/customer accounts receive zero corporate staff sidebar sections
+  assert.equal(canAccessRoutePath('/incidents', tech.rbacContext), true);
+  assert.equal(canAccessRoutePath('/tenants', tech.rbacContext), false);
+  const endUserSections = getAccessibleNavSections({
+    role: 'customer',
+    portalType: 'end_user',
+    isSuperAdmin: false,
+    isIamPortal: false,
+    isModuleEnabled: () => true,
+    hasPermission: () => false,
+  });
+  assert.equal(endUserSections.length, 0);
+  const techSections = getAccessibleNavSections(tech.rbacContext);
+  assert.ok(techSections.length > 0);
+  assert.ok(!techSections.some((sec) => sec.items.some((item) => item.id === 'iam')));
+  assert.ok(!techSections.some((sec) => sec.items.some((item) => item.id === 'tenants')));
 });
 
 test('@scribble-it/api-client supports async TokenStorageAdapter, async BaseUrlProvider, 401 refresh rotation, and FastAPI-only AI routes', async () => {
@@ -169,7 +244,7 @@ test('@scribble-it/api-client supports async TokenStorageAdapter, async BaseUrlP
       };
 
       if (method === 'POST' && url === '/api/v1/auth/login') {
-        const loginPayload: AuthTokenResponseDto = {
+        const loginPayload: BackendLoginResponse = {
           access_token: 'native-access-1',
           refresh_token: 'native-refresh-1',
           token_type: 'bearer',
@@ -178,9 +253,11 @@ test('@scribble-it/api-client supports async TokenStorageAdapter, async BaseUrlP
           user_id: 'usr-native-1',
           email: 'ops@njuregroup.in',
           full_name: 'Ops Lead',
-          portal_clearance: 'L2_EMPLOYEE',
+          portal_type: 'employee',
+          clearance_tier: 'it_operations',
           organization_id: 'org-njure',
-          permissions: ['itsm.incidents.read', 'ai.triage.use'],
+          organization_slug: 'njure-tech',
+          permissions: ['incidents:read'],
         };
         return send(200, loginPayload);
       }
@@ -190,22 +267,45 @@ test('@scribble-it/api-client supports async TokenStorageAdapter, async BaseUrlP
           failOnceWith401 = false;
           return send(401, { detail: 'Access token expired' });
         }
+        const now = new Date().toISOString();
         const dto: IncidentDto = {
           id: 'inc-100',
+          organization_id: 'org-njure',
           number: 'INC0000100',
-          short_description: 'VPN tunnel timeout',
+          title: 'VPN tunnel timeout',
           description: 'Branch office tunnel dropped',
-          category: 'Network',
+          category: 'network',
           priority: 'P2',
-          impact: 'Medium',
-          urgency: 'High',
-          status: 'Open',
-          caller_name: 'Ops Lead',
-          caller_email: 'ops@njuregroup.in',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          impact: 'medium',
+          urgency: 'high',
+          status: 'assigned',
+          requester_name: 'Ops Lead',
+          requester_email: 'ops@njuregroup.in',
+          assignee_name: 'NetOps Team',
+          assignment_group: 'Network Engineering',
+          affected_ci_label: 'vpn-gw-01',
+          sla_deadline: now,
+          sla_breached: false,
+          time_logged_mins: 15,
+          csat_score: null,
+          source_channel: 'portal',
+          resolution_notes: null,
+          created_at: now,
+          updated_at: now,
+          activities: [],
         };
-        return send(200, [dto]);
+        const page: PaginatedDto<IncidentDto> = {
+          items: [dto],
+          meta: {
+            page: 1,
+            page_size: 25,
+            total: 1,
+            total_pages: 1,
+            has_next: false,
+            has_prev: false,
+          },
+        };
+        return send(200, page);
       }
 
       if (method === 'POST' && url === '/api/v1/auth/refresh') {
@@ -219,14 +319,15 @@ test('@scribble-it/api-client supports async TokenStorageAdapter, async BaseUrlP
 
       if (method === 'POST' && url === '/api/v1/ai/triage-incident') {
         return send(200, {
-          priority: 'P2',
-          category: 'Network',
-          assigned_group: 'Network Engineering',
-          suggested_actions: ['Inspect IPsec phase 2 lifetime'],
-          summary: 'High-priority VPN interruption.',
-          confidence: 0.91,
-          matched_kb_ids: [],
-          audit_id: 'ai-audit-1',
+          recommendedPriority: 'P2',
+          recommendedCategory: 'network',
+          suggestedQueue: 'Network Engineering',
+          rootCauseHypothesis: 'IPsec phase 2 key lifetime mismatch',
+          diagnosticSteps: ['Inspect IPsec phase 2 lifetime'],
+          draftResolutionNote: 'Synchronize gateway lifetime parameters.',
+          draftCustomerReply: 'Network engineering is investigating the VPN tunnel interruption.',
+          generatedAt: new Date().toISOString(),
+          requiresHumanApproval: true,
         });
       }
 
@@ -244,33 +345,39 @@ test('@scribble-it/api-client supports async TokenStorageAdapter, async BaseUrlP
   try {
     const secureStorage = createAsyncSecureStorageMock();
     const client = createScribbleApiClient({
-      storage: secureStorage,
+      tokenStorage: secureStorage,
       baseUrlProvider: async () => `http://127.0.0.1:${port}`,
     });
 
-    await client.auth.login({ email: 'ops@njuregroup.in', password: 'SecretPassword!123' });
-    assert.equal(await client.http.getAccessToken(), 'native-access-1');
-    assert.equal(await client.http.getActiveOrganizationId(), 'org-njure');
-    assert.ok(secureStorage.writes >= 3);
+    await client.auth.login({
+      email: 'ops@njuregroup.in',
+      password: 'SecretPassword!123',
+      portal_type: 'employee',
+    });
+    assert.equal(await secureStorage.getAccessToken(), 'native-access-1');
+    assert.equal(await secureStorage.getOrganizationId(), 'org-njure');
+    assert.ok(secureStorage.writes >= 1);
 
     // Triggers 401 -> single-flight refresh -> retry with rotated token
-    const incidents: Incident[] = (await client.itsm.listIncidents()).map(client.mappers.mapIncidentDto);
+    const page = await client.itsm.listIncidents();
+    const incidents: Incident[] = page.items.map(mapIncidentDto);
     assert.equal(incidents.length, 1);
-    assert.equal(incidents[0].number, 'INC0000100');
-    assert.equal(await client.http.getAccessToken(), 'native-access-2');
+    assert.equal(incidents[0].id, 'inc-100');
+    assert.equal(incidents[0].title, 'VPN tunnel timeout');
+    assert.equal(await secureStorage.getAccessToken(), 'native-access-2');
 
     // FastAPI-only AI endpoint check
     const triage = await client.ai.triageIncident({
-      short_description: 'VPN tunnel timeout',
+      title: 'VPN tunnel timeout',
       description: 'Branch office tunnel dropped',
     });
-    assert.equal(triage.priority, 'P2');
+    assert.equal(triage.recommendedPriority, 'P2');
     assert.ok(observed.some((r) => r.url === '/api/v1/ai/triage-incident' && r.org === 'org-njure'));
 
     // Structured ApiError propagation
     await assert.rejects(
       () => client.http.request('/incidents/missing'),
-      (err: unknown) => err instanceof ApiError && err.status === 404 && err.message === 'Incident not found'
+      (err: unknown) => err instanceof ApiError && err.status === 404 && err.message === 'Incident not found',
     );
   } finally {
     server.close();
@@ -294,7 +401,7 @@ test('Shared packages maintain acyclic DAG, zero React/DOM dependencies, and zer
       assert.equal(
         allDeps[forbidden],
         undefined,
-        `Shared package ${pkgJson.name} must not depend on ${forbidden}`
+        `Shared package ${pkgJson.name} must not depend on ${forbidden}`,
       );
     }
 
@@ -309,18 +416,18 @@ test('Shared packages maintain acyclic DAG, zero React/DOM dependencies, and zer
       assert.doesNotMatch(
         content,
         /from\s+['"]react(-dom)?['"]/,
-        `${pkgJson.name}/src/${file} must not import React`
+        `${pkgJson.name}/src/${file} must not import React`,
       );
       assert.doesNotMatch(
         content,
         /\bdocument\.(getElementById|querySelector|createElement)\b/,
-        `${pkgJson.name}/src/${file} must not rely on DOM APIs`
+        `${pkgJson.name}/src/${file} must not rely on DOM APIs`,
       );
       if (dir === 'api-client') {
         assert.doesNotMatch(
           content,
           /['"]\/api\/ai\//,
-          `@scribble-it/api-client/${file} must use FastAPI /api/v1/ai/* exclusively, never Express /api/ai/*`
+          `@scribble-it/api-client/${file} must use FastAPI /api/v1/ai/* exclusively, never Express /api/ai/*`,
         );
       }
     }

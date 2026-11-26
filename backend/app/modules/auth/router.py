@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from types import SimpleNamespace
 
-from fastapi import APIRouter, Depends, Query, Request, Response, status
+from fastapi import APIRouter, Body, Depends, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
@@ -13,10 +13,12 @@ from app.db.session import get_db_session
 from app.modules.auth.schemas import (
     DeviceEnrollRequest,
     DeviceEnrollResponse,
+    DeviceListResponse,
     DeviceSsoLoginRequest,
     ForgotPasswordRequest,
     ForgotPasswordResponse,
     LoginRequest,
+    LogoutRequest,
     MfaEnrollResponse,
     MfaVerifyRequest,
     RefreshTokenRequest,
@@ -28,6 +30,7 @@ from app.modules.auth.schemas import (
     VerifyEmailRequest,
 )
 from app.modules.auth.service import AuthService
+from app.modules.iam.schemas import ManagedDeviceOut
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -63,6 +66,9 @@ def _build_token_response(
         access_token=access_token,
         refresh_token=refresh_token,
         expires_in=expires_in,
+        session_id=session_row.id,
+        client_type=getattr(session_row, "client_type", "web"),
+        client_platform=getattr(session_row, "client_platform", "web"),
         user_id=user.id,
         email=user.email,
         full_name=user.full_name,
@@ -143,7 +149,11 @@ async def refresh(
 ) -> TokenResponse:
     access_token, refresh_token, ttl, session_row, org, membership, user, mfa_enrolled = (
         await AuthService.refresh_tokens(
-            db, raw_refresh_token=payload.refresh_token, settings=settings, request=request
+            db,
+            raw_refresh_token=payload.refresh_token,
+            settings=settings,
+            payload=payload,
+            request=request,
         )
     )
     return _build_token_response(
@@ -161,10 +171,16 @@ async def refresh(
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
     request: Request,
+    payload: LogoutRequest | None = Body(default=None),
     principal: AuthenticatedPrincipal = Depends(get_current_principal),
     db: AsyncSession = Depends(get_db_session),
 ) -> Response:
-    await AuthService.logout(db, principal=principal, request=request)
+    await AuthService.logout(
+        db,
+        principal=principal,
+        revoke_push_tokens=payload.revoke_push_tokens if payload is not None else True,
+        request=request,
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -218,6 +234,11 @@ async def list_sessions(
             organization_id=s.organization_id,
             portal_type=s.portal_type,
             auth_method=s.auth_method,
+            client_type=getattr(s, "client_type", "web"),
+            client_platform=getattr(s, "client_platform", "web"),
+            app_version=getattr(s, "app_version", None),
+            app_id=getattr(s, "app_id", None),
+            device_name=getattr(s, "device_name", None),
             ip_address=s.ip_address,
             user_agent=s.user_agent,
             device_id=s.device_id,
@@ -292,19 +313,36 @@ async def enroll_device(
     request: Request,
     principal: AuthenticatedPrincipal = Depends(get_current_principal),
     db: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
 ) -> DeviceEnrollResponse:
     device = await AuthService.enroll_device(
-        db, principal=principal, payload=payload, request=request
+        db, principal=principal, payload=payload, settings=settings, request=request
     )
     return DeviceEnrollResponse(
         device_id=device.id,
         hostname=device.hostname,
+        os_platform=device.os_platform,
+        client_type=device.client_type,
+        device_platform=device.device_platform,
+        app_version=device.app_version,
+        os_version=device.os_version,
+        device_model=device.device_model,
         mdm_provider=device.mdm_provider,
         certificate_thumbprint=device.certificate_thumbprint,
         trust_level=device.trust_level,
         mdm_verified=device.mdm_verified,
         status=device.status,
     )
+
+
+@router.get("/devices", response_model=DeviceListResponse)
+async def list_my_devices(
+    principal: AuthenticatedPrincipal = Depends(get_current_principal),
+    db: AsyncSession = Depends(get_db_session),
+) -> DeviceListResponse:
+    devices = await AuthService.list_user_devices(db, principal=principal)
+    items = [ManagedDeviceOut.model_validate(d) for d in devices]
+    return DeviceListResponse(items=items, total=len(items))
 
 
 @router.post("/device/sso-login", response_model=TokenResponse)

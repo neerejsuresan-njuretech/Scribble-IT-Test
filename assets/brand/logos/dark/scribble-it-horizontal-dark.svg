@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 360" width="1400" height="360" role="img" aria-label="SCRIBBLE-IT Horizontal Wordmark">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 440" width="1600" height="440" role="img" aria-label="SCRIBBLE-IT Horizontal Wordmark">
   <title>SCRIBBLE-IT Horizontal Wordmark</title>
   <defs>
     <linearGradient id="logo-horizontal-dark-doc-stroke" x1="210" y1="128" x2="814" y2="896" gradientUnits="userSpaceOnUse">
@@ -21,8 +21,8 @@
       <stop offset="100%" stop-color="#0B1F3B" stop-opacity="0.88" />
     </linearGradient>
   </defs>
-  <g id="layer-background"><rect x="0" y="0" width="1400" height="360" rx="28" fill="#0B1F3B" /></g>
-  <g id="layer-symbol" transform="translate(48 44) scale(0.27)">
+  <g id="layer-background"><rect x="0" y="0" width="1600" height="440" rx="28" fill="#0B1F3B" /></g>
+  <g id="layer-symbol" transform="translate(64 46) scale(0.34)">
     
     <g id="logo-horizontal-dark-layer-document">
       <!-- Enterprise Document / Page Outline with Folded Top-Right Corner -->
@@ -99,9 +99,9 @@
     </g>
   </g>
   <g id="layer-wordmark">
-    <text x="364" y="196" font-family="Manrope, Inter, sans-serif" font-size="112" font-weight="800" letter-spacing="-3" fill="#F5F8FF">Scribble <tspan fill="#22D3EE">IT</tspan></text>
+    <text x="454" y="236" font-family="Manrope, Inter, sans-serif" font-size="132" font-weight="800" letter-spacing="-3.4" fill="#F5F8FF">Scribble <tspan fill="#22D3EE">IT</tspan></text>
   </g>
   <g id="layer-attribution">
-    <text x="368" y="256" font-family="Inter, Manrope, sans-serif" font-size="34" font-weight="500" letter-spacing="0.4" fill="#94B2D8" opacity="1">A Njure Tech product.</text>
+    <text x="460" y="306" font-family="Inter, Manrope, sans-serif" font-size="38" font-weight="500" letter-spacing="0.4" fill="#94B2D8" opacity="1">A Njure Tech product.</text>
   </g>
 </svg>

@@ -29,6 +29,7 @@ from app.db.models.identity import (
     Role,
     UserSession,
 )
+from app.db.models.push_notifications import DevicePushToken
 from app.db.session import set_transaction_tenant_context
 from app.modules.audit.service import AuditService
 from app.modules.iam.schemas import IamMemberOut
@@ -273,6 +274,15 @@ class IAMService:
             )
             .values(revoked_at=now, revocation_reason="user_suspended")
         )
+        await db.execute(
+            update(DevicePushToken)
+            .where(
+                DevicePushToken.organization_id == principal.organization_id,
+                DevicePushToken.user_id == user_id,
+                DevicePushToken.status == "active",
+            )
+            .values(status="revoked", revoked_at=now, revocation_reason="user_suspended")
+        )
         await db.flush()
 
         await AuditService.record(
@@ -430,6 +440,15 @@ class IAMService:
                     UserSession.revoked_at.is_(None),
                 )
                 .values(revoked_at=now, revocation_reason="permissions_or_policy_updated")
+            )
+            await db.execute(
+                update(DevicePushToken)
+                .where(
+                    DevicePushToken.organization_id == principal.organization_id,
+                    DevicePushToken.user_id == user_id,
+                    DevicePushToken.status == "active",
+                )
+                .values(status="revoked", revoked_at=now, revocation_reason="permissions_or_policy_updated")
             )
 
         await db.flush()
@@ -719,7 +738,7 @@ class IAMService:
         device.revoked_at = now
         device.revoked_by_user_id = principal.user_id
 
-        # Immediately revoke all active sessions tied to this device
+        # Immediately revoke all active sessions & push tokens tied to this device
         await db.execute(
             update(UserSession)
             .where(
@@ -727,6 +746,14 @@ class IAMService:
                 UserSession.revoked_at.is_(None),
             )
             .values(revoked_at=now, revocation_reason="device_revoked")
+        )
+        await db.execute(
+            update(DevicePushToken)
+            .where(
+                DevicePushToken.device_id == device.id,
+                DevicePushToken.status == "active",
+            )
+            .values(status="revoked", revoked_at=now, revocation_reason="device_revoked")
         )
 
         db.add(

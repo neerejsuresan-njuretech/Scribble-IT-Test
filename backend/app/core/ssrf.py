@@ -34,6 +34,20 @@ TWILIO_ALLOWED_HOSTS = frozenset(
     }
 )
 
+FCM_ALLOWED_HOSTS = frozenset(
+    {
+        "fcm.googleapis.com",
+        "oauth2.googleapis.com",
+    }
+)
+
+APNS_ALLOWED_HOSTS = frozenset(
+    {
+        "api.push.apple.com",
+        "api.sandbox.push.apple.com",
+    }
+)
+
 
 class SsrfBlockedError(ValueError):
     """Raised when an outbound URL violates SSRF or host-allowlist security rules."""

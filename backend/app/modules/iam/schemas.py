@@ -89,6 +89,11 @@ class ManagedDeviceOut(BaseModel):
     organization_id: uuid.UUID
     hostname: str
     os_platform: str
+    client_type: str = "web"
+    device_platform: str = "web"
+    app_version: str | None = None
+    os_version: str | None = None
+    device_model: str | None = None
     mdm_provider: str
     certificate_thumbprint: str
     bound_user_id: uuid.UUID | None

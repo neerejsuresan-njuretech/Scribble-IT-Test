@@ -81,7 +81,7 @@ class IntegrationConnection(UUIDPrimaryKeyMixin, TenantScopedMixin, TimestampMix
             "provider IN ("
             "'google_workspace','google_drive','google_sheets','google_forms','google_chat',"
             "'twilio','telephony_sip','webhook_outbound','webhook_inbound',"
-            "'email_smtp','slack','pagerduty')",
+            "'email_smtp','slack','pagerduty','fcm','apns')",
             name="ck_integrations_provider",
         ),
         CheckConstraint("status IN ('active','paused','error','revoked')", name="ck_integrations_status"),
@@ -150,7 +150,7 @@ class BackgroundJob(UUIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin, Base
     __tablename__ = "background_jobs"
     __table_args__ = (
         CheckConstraint(
-            "status IN ('queued','running','completed','failed','dead_letter')",
+            "status IN ('queued','running','retrying','succeeded','completed','failed','dead_letter')",
             name="ck_bg_jobs_status",
         ),
         CheckConstraint("attempts >= 0 AND max_attempts BETWEEN 1 AND 15", name="ck_bg_jobs_attempts"),

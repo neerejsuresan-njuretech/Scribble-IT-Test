@@ -37,7 +37,7 @@
       <stop offset="100%" stop-color="#0A84FF" />
     </linearGradient>
     <linearGradient id="board-light-doc-fill" x1="216" y1="132" x2="808" y2="892" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.96" />
+      <stop offset="0%" stop-color="#F5F8FF" stop-opacity="0.96" />
       <stop offset="100%" stop-color="#E6F0FF" stop-opacity="0.92" />
     </linearGradient>
     <linearGradient id="board-hero-bg" x1="0" y1="0" x2="1600" y2="380" gradientUnits="userSpaceOnUse">
@@ -560,5 +560,5 @@
   <text x="86" y="848" font-family="Manrope, Inter, sans-serif" font-size="16" font-weight="700" letter-spacing="1" fill="#0B1F3B">TYPOGRAPHY &amp; OFFICIAL ATTRIBUTION</text>
   <text x="86" y="904" font-family="Manrope, Inter, sans-serif" font-size="38" font-weight="800" fill="#0B1F3B">Manrope &amp; Inter — Enterprise IT Management. Open to Everyone.</text>
   <text x="86" y="948" font-family="Inter, sans-serif" font-size="20" font-weight="500" fill="#476285">Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww Xx Yy Zz  ·  0123456789</text>
-  <text x="86" y="996" font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="#0B1F3B">SCRIBBLE-IT  ·  A Njure Tech product.  ·  Developed by NEEREJ S SURESAN — Founder &amp; CEO — Njure Tech (formerly Njure Group).</text>
+  <text x="86" y="996" font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="#0B1F3B">SCRIBBLE-IT  ·  A Njure Tech product.  ·  Developed by NEEREJ S SURESAN — Founder &amp; CEO — Njure Tech (formally Njure Group).</text>
 </svg>

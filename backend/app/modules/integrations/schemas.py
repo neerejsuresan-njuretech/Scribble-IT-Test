@@ -19,6 +19,8 @@ IntegrationProvider = Literal[
     "email_smtp",
     "slack",
     "pagerduty",
+    "fcm",
+    "apns",
 ]
 
 

@@ -31,21 +31,21 @@ Canonical TypeScript domain models and FastAPI `/api/v1` Data Transfer Objects (
 
 - **Source files**: `src/itsm.ts`, `src/api.ts`, `src/index.ts`
 - **Key exports**:
-  - Core ITSM domain models: `Incident`, `ServiceRequest`, `Problem`, `ChangeRequest`, `Asset`, `ConfigurationItem`, `KnowledgeArticle`, `User`, `Role`, `Tenant`, `SLAPolicy`, `WorkflowRule`, `AuditLog`, `PortalClearanceTier`, `PageId`, `IncidentPriority`, `IncidentStatus`, `ChangeRisk`, etc.
-  - FastAPI v1 DTO interfaces: `AuthTokenResponseDto`, `AuthMeDto`, `IncidentDto`, `ServiceRequestDto`, `ProblemDto`, `ChangeRequestDto`, `AssetDto`, `CmdbCiDto`, `KnowledgeArticleDto`, `NotificationDto`, `AuditEventDto`, `ReportSummaryDto`, `GlobalSearchResultDto`, `IntegrationConfigDto`, `AiTriageRequestDto`, `AiTriageResponseDto`, `AiChangeAssessmentRequestDto`, `AiChangeAssessmentResponseDto`, `AiKbDraftRequestDto`, `AiKbDraftResponseDto`, `AiCopilotRequestDto`, `AiCopilotResponseDto`.
+  - Core ITSM domain models: `Incident`, `ServiceRequest`, `Problem`, `ChangeRequest`, `Asset`, `CmdbRelation`, `InventoryItem`, `SoftwareLicense`, `KnowledgeArticle`, `AuthAccount`, `AuthSession`, `Role`, `Tenant`, `AuditLogEntry`, `WorkflowDefinition`, `IamPolicy`, `IamPermissionScope`, `AuthPortalType`, `IncidentPriority`, `IncidentStatus`, `ChangeStatus`, `RiskLevel`, etc.
+  - FastAPI v1 DTO interfaces: `BackendLoginResponse`, `BackendMeResponse`, `BackendOrganizationDto`, `OrganizationSwitchResponseDto`, `IncidentDto`, `ServiceRequestDto`, `ProblemDto`, `ChangeRequestDto`, `AssetDto`, `CmdbRelationDto`, `InventoryItemDto`, `SoftwareLicenseDto`, `KnowledgeArticleDto`, `NotificationDto`, `AuditLogDto`, `OperationsReportSummaryDto`, `GlobalSearchResponseDto`, `IntegrationConnectionDto`, `IncidentTriageResponse`, `ChangeAssessResponse`, `DraftKbResponse`, `WikiAssistResponse`, `CopilotResponse`, `TriageAssistantResponse`, `PaginatedDto<T>`, `ApiErrorPayload`.
 
 ### 2.2 `@scribble-it/api-client` (`packages/api-client`)
 Platform-agnostic FastAPI `/api/v1` HTTP client with injectable token storage and base URL resolution.
 
 - **Source files**: `src/storage.ts`, `src/httpClient.ts`, `src/authApi.ts`, `src/itsmApi.ts`, `src/cmdbApi.ts`, `src/operationsApi.ts`, `src/integrationsApi.ts`, `src/aiApi.ts`, `src/index.ts`
 - **Core abstractions**:
-  - `TokenStorageAdapter`: Sync or async (`string | null | Promise<string | null>`) storage interface so Web can use `localStorage`/`sessionStorage`, Tauri desktop can use OS keychains (Windows Credential Manager / macOS Keychain / Linux Secret Service), and React Native can use iOS Keychain / Android Keystore.
-  - `BaseUrlProvider`: Sync or async base URL provider normalized automatically to `/api/v1` via `normalizeFastApiBaseUrl`.
-  - `ScribbleHttpClient` & `createScribbleApiClient(options)`: Factory returning isolated `{ http, auth, itsm, cmdb, operations, integrations, ai, mappers }` instances.
+  - `TokenStorageAdapter`: Sync or async (`getAccessToken`, `getRefreshToken`, `getOrganizationId`, `setTokens`, `clearTokens`) storage interface so Web uses `MemoryTokenStorageAdapter` / `localStorage`, Tauri desktop can use OS keychains (Windows Credential Manager / macOS Keychain / Linux Secret Service), and React Native can use iOS Keychain / Android Keystore.
+  - `BaseUrlProvider` / `ResolvableBaseUrlProvider`: Sync or async base URL provider normalized automatically to `/api/v1` via `normalizeFastApiBaseUrl`.
+  - `ScribbleHttpClient` & `createScribbleApiClient(config)`: Factory returning isolated `{ http, auth, itsm, cmdb, operations, integrations, ai }` instances, alongside top-level DTO mappers (`mapIncidentDto`, `mapServiceRequestDto`, `mapProblemDto`, `mapChangeDto`, `mapAssetDto`, `mapCmdbRelationDto`, `mapInventoryItemDto`, `mapSoftwareLicenseDto`, `mapKnowledgeDto`, `mapAuditLogDto`).
 - **Security guarantees preserved**:
   - Automatic `Authorization: Bearer <token>` and `X-Organization-ID` tenant scoping headers.
   - Single-flight 401 refresh-token rotation (`refreshPromise` mutex) so concurrent requests never race or trigger refresh-token reuse revocation.
-  - Structured `ApiError(message, status, detail)` propagation.
+  - Structured `ApiError(status, message, code, details)` propagation.
   - Shared `aiApi` exclusively calls FastAPI `/api/v1/ai/*` endpoints (zero Express `/api/ai/*` dependencies; Gemini API keys remain backend-only).
 
 ### 2.3 `@scribble-it/rbac` (`packages/rbac`)
@@ -53,7 +53,7 @@ Pure enterprise RBAC, portal clearance, and navigation visibility engine.
 
 - **Source files**: `src/navigationAccess.ts`, `src/permissions.ts`, `src/index.ts`
 - **Key exports**:
-  - Navigation policies: `SIDEBAR_NAV_POLICY`, `PAGE_ACCESS_POLICY`, `canAccessPage`, `getVisibleSidebarItems`, `getDefaultLandingPageForRole`.
+  - Navigation policies: `NAV_SECTION_METADATA`, `NAV_MODULES`, `NAV_MODULES_BY_ID`, `NAV_MODULES_BY_PATH`, `NAV_MODULES_BY_NEW_PATH`, `canAccessNavModule`, `canAccessNavId`, `canAccessRoutePath`, `canUseQuickCreate`, `getGlobalSearchPermissions`, `getOrderedSectionIds`, `getAccessibleNavSections`.
   - Permission evaluators: `evaluateEffectivePermissions`, `resolveEffectiveHasPermission`, `hasAnyPermission`, `hasAllPermissions`, `isPortalSuperAdmin`, `isPortalIamOfficer`, `formatClearanceLabel`, `CANONICAL_PERMISSION_SCOPES`, `CLEARANCE_TIER_LABELS`.
 - **Security model**: Frontend RBAC mirrors server-computed effective permissions from `/api/v1/auth/me` strictly for UX visibility; backend FastAPI middleware and PostgreSQL RLS remain the authoritative enforcement boundary.
 
@@ -63,9 +63,9 @@ Single source of truth for SCRIBBLE-IT brand identity, light/dark themes, typogr
 - **Source files**: `src/colors.ts`, `src/themes.ts`, `src/typography.ts`, `src/layout.ts`, `src/status.ts`, `src/index.ts`, `css/tokens.css`
 - **Key exports**:
   - `SCRIBBLE_IT_BRAND` (official version-free product metadata & attribution).
-  - `BRAND_PALETTE` (`#0B1F3B`, `#0A84FF`, `#22D3EE`, `#F5F8FF`) & `NEUTRAL_SCALE`.
-  - `DARK_THEME` & `LIGHT_THEME` semantic token maps.
-  - `TYPOGRAPHY`, `SPACING`, `RADII`, `BORDER_WIDTH`, `ELEVATION`.
+  - `BRAND_COLORS` (`#0B1F3B`, `#0A84FF`, `#22D3EE`, `#F5F8FF`), `NEUTRAL_SCALE`, `BLUE_SCALE`, `CYAN_SCALE`, `SEMANTIC_PALETTE`.
+  - `DARK_THEME`, `LIGHT_THEME`, `THEMES`, `getThemeTokens`, `ThemeTokens`.
+  - `FONT_FAMILIES`, `FONT_WEIGHTS`, `TYPOGRAPHY_SCALE`, `SPACING`, `BORDER_RADII`, `BORDER_WIDTHS`, `ELEVATION`.
   - `INCIDENT_PRIORITY_TOKENS` (`P1`–`P4`), `SLA_STATUS_TOKENS`, `ENTERPRISE_STATUS_TOKENS`.
   - `css/tokens.css` for CSS Custom Properties / Tailwind CSS v4 integration.
 

@@ -43,6 +43,37 @@ class VersionResponse(BaseModel):
     environment: str
 
 
+class ClientAuthCapabilitiesOut(BaseModel):
+    access_token_ttl_minutes: int
+    refresh_token_ttl_days: int
+    refresh_token_rotation: bool = True
+    mfa_totp_supported: bool = True
+    device_sso_supported: bool = True
+
+
+class ClientFeatureFlagsOut(BaseModel):
+    push_notifications_enabled: bool
+    fcm_configured: bool
+    apns_configured: bool
+    device_trust_enabled: bool = True
+    ai_enabled: bool
+
+
+class ClientConfigResponse(BaseModel):
+    service: str
+    instance_name: str
+    deployment_mode: str
+    public_api_url: str | None
+    api_version: str
+    api_prefix: str
+    supported_client_types: list[str]
+    supported_client_platforms: list[str]
+    minimum_client_versions: dict[str, str]
+    allowed_native_app_ids: list[str]
+    auth: ClientAuthCapabilitiesOut
+    features: ClientFeatureFlagsOut
+
+
 @router.get(
     "/health",
     response_model=HealthResponse,
@@ -95,6 +126,55 @@ async def version(settings: Settings = Depends(get_settings)) -> VersionResponse
         version=settings.app_version,
         api_version="v1",
         environment=settings.app_env,
+    )
+
+
+@router.get(
+    "/client/config",
+    response_model=ClientConfigResponse,
+    summary="Native & web client bootstrap configuration",
+    description=(
+        "Non-sensitive server discovery endpoint for desktop, mobile, and self-hosted clients "
+        "advertising API versioning, deployment mode, minimum versions, and capabilities."
+    ),
+)
+async def client_config(settings: Settings = Depends(get_settings)) -> ClientConfigResponse:
+    fcm_ready = bool(
+        settings.fcm_project_id.strip()
+        and settings.fcm_client_email.strip()
+        and settings.fcm_private_key.get_secret_value().strip()
+    )
+    apns_ready = bool(
+        settings.apns_team_id.strip()
+        and settings.apns_key_id.strip()
+        and settings.apns_bundle_id.strip()
+        and settings.apns_private_key.get_secret_value().strip()
+    )
+    return ClientConfigResponse(
+        service=settings.app_name,
+        instance_name=settings.instance_name,
+        deployment_mode=settings.deployment_mode,
+        public_api_url=settings.public_api_url,
+        api_version="v1",
+        api_prefix=settings.api_v1_prefix,
+        supported_client_types=["web", "desktop", "mobile"],
+        supported_client_platforms=["web", "windows", "macos", "linux", "android", "ios"],
+        minimum_client_versions={
+            "desktop": settings.min_desktop_app_version,
+            "mobile": settings.min_mobile_app_version,
+        },
+        allowed_native_app_ids=list(settings.allowed_native_app_ids),
+        auth=ClientAuthCapabilitiesOut(
+            access_token_ttl_minutes=settings.access_token_ttl_minutes,
+            refresh_token_ttl_days=settings.refresh_token_ttl_days,
+        ),
+        features=ClientFeatureFlagsOut(
+            push_notifications_enabled=True,
+            fcm_configured=fcm_ready,
+            apns_configured=apns_ready,
+            device_trust_enabled=True,
+            ai_enabled=bool(settings.gemini_api_key.get_secret_value().strip()),
+        ),
     )
 
 

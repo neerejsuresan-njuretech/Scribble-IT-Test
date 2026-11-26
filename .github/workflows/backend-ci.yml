@@ -81,22 +81,28 @@ jobs:
         run: pytest -v
 
   frontend-preservation-check:
-    name: Preserved React Frontend Tests, Typecheck & Build
+    name: Preserved React Frontend Tests, Shared Packages, Brand & Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js 22
+      - name: Set up Node.js 24 (>=24.12.0)
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: ">=24.12.0 <25"
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Run Frontend API & RBAC unit tests
-        run: npx tsx --test tests/frontend/navigation_rbac.test.ts tests/frontend/api_client.test.ts
+      - name: Run Frontend API, RBAC & Shared Package unit tests
+        run: npm run test:frontend
+
+      - name: Typecheck shared workspace packages
+        run: npm run typecheck:packages
+
+      - name: Verify SCRIBBLE-IT brand & five-platform assets
+        run: npm run verify:brand
 
       - name: TypeScript check
         run: npm run lint

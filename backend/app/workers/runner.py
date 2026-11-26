@@ -22,8 +22,10 @@ from app.db.models.integrations import (
     IntegrationConnection,
     WebhookEndpoint,
 )
+from app.db.models.push_notifications import PushDeliveryLog
 from app.db.session import db_manager, enable_transaction_platform_lookup, set_transaction_tenant_context
 from app.modules.integrations.adapters import WebhookDeliveryAdapter
+from app.modules.notifications.service import PushNotificationService
 
 logger = logging.getLogger("scribble_it.worker")
 
@@ -122,7 +124,51 @@ async def _execute_external_notification(
     conn.last_error = None
 
 
-async def process_single_job(session: AsyncSession, job: BackgroundJob, settings: Settings) -> str:
+async def _execute_push_notification_delivery(
+    session: AsyncSession,
+    *,
+    job: BackgroundJob,
+    settings: Settings,
+    transport: Any | None = None,
+) -> None:
+    payload = job.payload_json or {}
+    delivery_log_id = uuid.UUID(str(payload["delivery_log_id"]))
+    priority = str(payload.get("priority", "normal"))
+
+    result = await PushNotificationService.execute_delivery_job(
+        session,
+        organization_id=job.organization_id,
+        delivery_log_id=delivery_log_id,
+        priority=priority,
+        settings=settings,
+        transport=transport,
+    )
+    job.result_json = {
+        "delivered": result.delivered,
+        "http_status": result.http_status,
+        "provider_message_id": result.provider_message_id,
+        "error_code": result.error_code,
+        "permanent_token_invalid": result.permanent_token_invalid,
+    }
+    if result.delivered or result.permanent_token_invalid or result.error_code in {"TOKEN_MISSING", "TOKEN_INACTIVE"}:
+        # Terminal outcomes (delivered, permanently invalid token auto-revoked, or already inactive)
+        return
+    if not result.retryable:
+        # Non-retryable provider error (e.g., bad credentials/payload): mark terminal without retrying
+        job.attempts = job.max_attempts
+    raise RuntimeError(
+        f"Push delivery failed (HTTP {result.http_status}, code={result.error_code}): "
+        f"{(result.error_message or '')[:200]}"
+    )
+
+
+async def process_single_job(
+    session: AsyncSession,
+    job: BackgroundJob,
+    settings: Settings,
+    *,
+    push_transport: Any | None = None,
+) -> str:
     """Executes one claimed background job and updates retry/dead-letter state."""
     job.attempts += 1
     job.status = "running"
@@ -133,6 +179,10 @@ async def process_single_job(session: AsyncSession, job: BackgroundJob, settings
             await _execute_webhook_delivery(session, job=job, settings=settings)
         elif job.job_type == "external_notification":
             await _execute_external_notification(session, job=job, settings=settings)
+        elif job.job_type == "push_notification_delivery":
+            await _execute_push_notification_delivery(
+                session, job=job, settings=settings, transport=push_transport
+            )
         else:
             raise RuntimeError(f"Unsupported background job_type '{job.job_type}'.")
 
@@ -143,16 +193,48 @@ async def process_single_job(session: AsyncSession, job: BackgroundJob, settings
     except Exception as exc:
         err_text = f"{type(exc).__name__}: {str(exc)[:450]}"
         job.last_error = err_text
+        now = datetime.now(timezone.utc)
         if job.attempts >= job.max_attempts:
             job.status = "dead_letter"
+            if job.job_type == "push_notification_delivery" and job.payload_json.get("delivery_log_id"):
+                await set_transaction_tenant_context(session, organization_id=job.organization_id)
+                delivery = (
+                    await session.execute(
+                        select(PushDeliveryLog).where(
+                            PushDeliveryLog.id == uuid.UUID(str(job.payload_json["delivery_log_id"])),
+                            PushDeliveryLog.organization_id == job.organization_id,
+                        )
+                    )
+                ).scalar_one_or_none()
+                if delivery is not None and delivery.status not in {"delivered", "revoked_token", "skipped"}:
+                    delivery.status = "failed"
+                    delivery.next_retry_at = None
+                    if not delivery.error_message:
+                        delivery.error_message = err_text[:512]
             logger.error(
                 "Background job moved to dead_letter",
                 extra={"extra_fields": {"job_id": str(job.id), "job_type": job.job_type, "error": err_text}},
             )
             return "dead_letter"
         backoff = compute_backoff_seconds(job.attempts)
+        next_run = now + timedelta(seconds=backoff)
         job.status = "retrying"
-        job.next_run_at = datetime.now(timezone.utc) + timedelta(seconds=backoff)
+        job.next_run_at = next_run
+        if job.job_type == "push_notification_delivery" and job.payload_json.get("delivery_log_id"):
+            await set_transaction_tenant_context(session, organization_id=job.organization_id)
+            delivery = (
+                await session.execute(
+                    select(PushDeliveryLog).where(
+                        PushDeliveryLog.id == uuid.UUID(str(job.payload_json["delivery_log_id"])),
+                        PushDeliveryLog.organization_id == job.organization_id,
+                    )
+                )
+            ).scalar_one_or_none()
+            if delivery is not None and delivery.status not in {"delivered", "revoked_token", "skipped"}:
+                delivery.status = "retrying"
+                delivery.next_retry_at = next_run
+                if not delivery.error_message:
+                    delivery.error_message = err_text[:512]
         logger.warning(
             "Background job scheduled for retry",
             extra={

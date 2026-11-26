@@ -1,16 +1,16 @@
-# SCRIBBLE-IT 2.0
+# SCRIBBLE-IT
 
 **Enterprise IT Management. Open to Everyone.**
 
 **Developed by NEEREJ S SURESAN**  
-Founder & CEO — Njure Tech (formerly Njure Group).
+Founder & CEO — Njure Tech (formally Njure Group).
 
 Official Website: [https://scribbleit.njuregroup.in](https://scribbleit.njuregroup.in)  
 Njure Tech: [https://tech.njuregroup.in](https://tech.njuregroup.in) · Njure Group (Former): [https://njuregroup.in](https://njuregroup.in)  
 Repository: [https://github.com/neerejsuresan-njuretech/Scribble-IT-Test](https://github.com/neerejsuresan-njuretech/Scribble-IT-Test)  
 License: `AGPL-3.0-only WITH Appstore-exception` ([LICENSE](./LICENSE) · [LICENSE-EXCEPTION.md](./LICENSE-EXCEPTION.md))
 
-![SCRIBBLE-IT 2.0 Operational Workspace](src/assets/images/hero_scribbleit_ops_1795074484892.jpg)
+![SCRIBBLE-IT Operational Workspace](src/assets/images/hero_scribbleit_ops_1795074484892.jpg)
 
 ---
 
@@ -49,7 +49,7 @@ License: `AGPL-3.0-only WITH Appstore-exception` ([LICENSE](./LICENSE) · [LICEN
 
 ## 1. Project Overview
 
-**SCRIBBLE-IT 2.0** is an open-source, community-driven Enterprise IT Service Management (ITSM) platform built by **Njure Tech (formerly Njure Group)**. It unifies incident management, service requests, problem investigation, Change Advisory Board (CAB) governance, Configuration Management Database (CMDB), asset and license tracking, centralized Identity and Access Management (IAM), workflow automation, and human-supervised AI assistance in one self-hostable platform.
+**SCRIBBLE-IT** is an open-source, community-driven Enterprise IT Service Management (ITSM) platform built by **Njure Tech (formally Njure Group)**. It unifies incident management, service requests, problem investigation, Change Advisory Board (CAB) governance, Configuration Management Database (CMDB), asset and license tracking, centralized Identity and Access Management (IAM), workflow automation, and human-supervised AI assistance in one self-hostable platform.
 
 The platform operates across four role-separated portals:
 
@@ -62,7 +62,7 @@ The platform operates across four role-separated portals:
 
 ## 2. Why Scribble-IT
 
-Enterprise IT teams frequently face high per-agent licensing fees, closed proprietary ecosystems, and disconnected operational tools. SCRIBBLE-IT 2.0 addresses these gaps with:
+Enterprise IT teams frequently face high per-agent licensing fees, closed proprietary ecosystems, and disconnected operational tools. SCRIBBLE-IT addresses these gaps with:
 
 - **100% Free & Open Source** under GNU AGPL v3.0 with an explicit Section 7 App Store Distribution Exception.
 - **Full Data Sovereignty** via Docker Compose self-hosting and PostgreSQL 16 Row-Level Security (RLS).
@@ -207,7 +207,7 @@ See [docs/architecture/repository-audit.md](./docs/architecture/repository-audit
 
 ### Prerequisites
 
-- **Node.js 20+** and `npm` (for frontend development & builds)
+- **Node.js 24.12.0+** (required by Firebase SDK 13.x & verified in CI) and `npm`
 - **Python 3.11+** (for local FastAPI backend development)
 - **Docker & Docker Compose** (recommended for running PostgreSQL 16, Redis 7, migrations, API, and workers together)
 
@@ -222,6 +222,12 @@ npm run dev
 ```
 
 The application serves on `http://localhost:3000`.
+
+### Shared Workspaces & Brand Verification
+
+- `packages/types` (`@scribble-it/types`), `packages/api-client` (`@scribble-it/api-client`), `packages/rbac` (`@scribble-it/rbac`), and `packages/design-tokens` (`@scribble-it/design-tokens`) form the shared cross-platform TypeScript core. See [docs/architecture/shared-packages.md](docs/architecture/shared-packages.md).
+- Official SCRIBBLE-IT brand assets, locally bundled SIL OFL 1.1 Inter/Manrope fonts, and Windows/macOS/Linux/Android/iOS icon packages live under `assets/brand/`. See [docs/brand/brand-asset-guide.md](docs/brand/brand-asset-guide.md) and [docs/brand/platform-icon-specifications.md](docs/brand/platform-icon-specifications.md).
+- Validate workspaces & brand assets locally via `npm run typecheck:packages`, `npm run test:frontend`, and `npm run verify:brand`.
 
 ---
 
@@ -238,7 +244,7 @@ npm run lint         # Type-check codebase via tsc --noEmit
 npm run preview      # Preview production Vite build
 ```
 
-To connect the frontend directly to a running SCRIBBLE-IT 2.0 FastAPI backend, set in `.env`:
+To connect the frontend directly to a running SCRIBBLE-IT FastAPI backend, set in `.env`:
 
 ```env
 VITE_API_BASE_URL="http://localhost:8000"
@@ -275,7 +281,7 @@ Health endpoints:
 
 ## 12. Database & Migrations
 
-SCRIBBLE-IT 2.0 enforces strict PostgreSQL role separation:
+SCRIBBLE-IT enforces strict PostgreSQL role separation:
 
 - **`scribble_migrator`** — Used exclusively by Alembic (`MIGRATION_DATABASE_URL`) for DDL migrations.
 - **`scribble_app`** — Restricted `NOSUPERUSER` / `NOBYPASSRLS` runtime role (`DATABASE_URL`) ensuring Row-Level Security policies are always enforced.
@@ -351,7 +357,7 @@ All configuration keys are documented in [`.env.example`](./.env.example). Core 
 
 ## 16. AI Integration & Governance Boundaries
 
-SCRIBBLE-IT 2.0 integrates optional Gemini AI assistance exclusively behind authenticated FastAPI endpoints (`/api/v1/ai/*`) for:
+SCRIBBLE-IT integrates optional Gemini AI assistance exclusively behind authenticated FastAPI endpoints (`/api/v1/ai/*`) for:
 
 - Incident triage recommendations
 - Change risk review checklists
@@ -456,7 +462,7 @@ Contributions are welcome across code, bug reports, feature proposals, documenta
 
 Security architecture, tenant isolation guarantees, cryptographic controls, and operational hardening guidelines are documented in [`security_spec.md`](./security_spec.md).
 
-If you discover a security vulnerability, please avoid posting exploit details publicly in open issues and report it responsibly to **Njure Tech (formerly Njure Group)** via the project's security reporting channel on GitHub.
+If you discover a security vulnerability, please avoid posting exploit details publicly in open issues and report it responsibly to **Njure Tech (formally Njure Group)** via the project's security reporting channel on GitHub.
 
 ---
 
@@ -464,7 +470,7 @@ If you discover a security vulnerability, please avoid posting exploit details p
 
 **HELP US BUILD THE FUTURE OF OPEN-SOURCE ITSM.**
 
-SCRIBBLE-IT 2.0 is free to use, self-host, and modify. Voluntary sponsorships help fund engineering time, testing infrastructure, documentation, and upcoming native desktop and mobile clients. Support is strictly voluntary and never gates software capabilities.
+SCRIBBLE-IT is free to use, self-host, and modify. Voluntary sponsorships help fund engineering time, testing infrastructure, documentation, and upcoming native desktop and mobile clients. Support is strictly voluntary and never gates software capabilities.
 
 - **Direct Voluntary Support (Verified):** [https://rzp.io/rzp/Njuretech](https://rzp.io/rzp/Njuretech)
 - **GitHub Sponsors:** *Placeholder — configure `GITHUB_SPONSORS_URL` in [`src/config/openSourceConfig.ts`](./src/config/openSourceConfig.ts) once activated.*
@@ -474,7 +480,7 @@ SCRIBBLE-IT 2.0 is free to use, self-host, and modify. Voluntary sponsorships he
 
 ## 25. Licensing
 
-SCRIBBLE-IT 2.0 is dual-documented under:
+SCRIBBLE-IT is dual-documented under:
 
 1. **GNU Affero General Public License v3.0 (`AGPL-3.0-only`)** — Full license text in [`LICENSE`](./LICENSE).
 2. **App Store Distribution Exception (GNU AGPL v3.0 Section 7)** — Full additional permission text in [`LICENSE-EXCEPTION.md`](./LICENSE-EXCEPTION.md).
@@ -482,7 +488,7 @@ SCRIBBLE-IT 2.0 is dual-documented under:
 SPDX Identifier: `AGPL-3.0-only WITH Appstore-exception`
 
 Key summary:
-- You may use, study, modify, self-host, and distribute SCRIBBLE-IT 2.0 free of charge under AGPL-3.0-only.
+- You may use, study, modify, self-host, and distribute SCRIBBLE-IT free of charge under AGPL-3.0-only.
 - If you run a modified version for network users, AGPL-3.0 requires making the Corresponding Source available to those users.
 - The Section 7 exception permits conveying the Program via digital app stores (Apple App Store, Mac App Store, Google Play Store, Microsoft Store) provided Corresponding Source remains freely available under unmodified AGPL-3.0 through an unrestricted public channel.
 - Trademark rights to **Njure Tech**, **Njure Group**, and **Scribble-IT** are not granted by the source code license.
@@ -496,9 +502,9 @@ Key summary:
 </a>
 
 **Developed by NEEREJ S SURESAN**  
-**Founder & CEO — Njure Tech (formerly Njure Group).**
+**Founder & CEO — Njure Tech (formally Njure Group).**
 
-- **Organization:** Njure Tech (formerly Njure Group)
+- **Organization:** Njure Tech (formally Njure Group)
 - **Njure Tech:** [https://tech.njuregroup.in](https://tech.njuregroup.in)
 - **Njure Group:** [https://njuregroup.in](https://njuregroup.in)
 - **Official Product Website:** [https://scribbleit.njuregroup.in](https://scribbleit.njuregroup.in)
@@ -507,14 +513,14 @@ Key summary:
 
 ## 27. Acknowledgements & Philosophy
 
-SCRIBBLE-IT 2.0 is made possible by the broader open-source ecosystem—including React, TypeScript, Vite, Tailwind CSS, Python, FastAPI, PostgreSQL, SQLAlchemy, Alembic, Redis, Docker, and every contributor who helps refine enterprise IT management for everyone.
+SCRIBBLE-IT is made possible by the broader open-source ecosystem—including React, TypeScript, Vite, Tailwind CSS, Python, FastAPI, PostgreSQL, SQLAlchemy, Alembic, Redis, Docker, and every contributor who helps refine enterprise IT management for everyone.
 
 ---
 
 ## 28. Project Identity Summary
 
-> **SCRIBBLE-IT 2.0**  
+> **SCRIBBLE-IT**  
 > **Enterprise IT Management. Open to Everyone.**  
 > **Developed by NEEREJ S SURESAN**  
-> **Founder & CEO — Njure Tech (formerly Njure Group).**  
+> **Founder & CEO — Njure Tech (formally Njure Group).**  
 > *A community-driven enterprise ITSM platform. Built for everyone. Improved together.*

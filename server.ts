@@ -18,7 +18,22 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const PORT = Number(process.env.PORT || 3000);
+function resolveServerPort(): number {
+  const idx = process.argv.indexOf('--port');
+  if (idx !== -1 && process.argv[idx + 1]) {
+    const cliPort = Number(process.argv[idx + 1]);
+    if (Number.isFinite(cliPort) && cliPort > 0) return cliPort;
+  }
+  const envPort = process.env.PORT ? Number(process.env.PORT) : undefined;
+  const nginxPort = process.env.NGINX_PORT ? Number(process.env.NGINX_PORT) : undefined;
+  const defaultAppPort = process.env.DEFAULT_APP_PORT ? Number(process.env.DEFAULT_APP_PORT) : 3000;
+  if (envPort && nginxPort && envPort === nginxPort) {
+    return defaultAppPort;
+  }
+  return envPort || defaultAppPort;
+}
+
+const PORT = resolveServerPort();
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
 function sendGeminiError(res: Response, err: unknown, fallbackMessage: string) {

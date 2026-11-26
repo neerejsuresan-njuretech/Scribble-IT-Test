@@ -23,6 +23,10 @@ _REDACTED_KEYS = frozenset(
         "backup_codes",
         "enrollment_code",
         "token",
+        "push_token",
+        "private_key",
+        "fcm_private_key",
+        "apns_private_key",
     }
 )
 
@@ -104,6 +108,44 @@ class AuditService:
         if outcome in {"denied", "failure", "blocked"}:
             await db.commit()
         return entry
+
+    @staticmethod
+    async def log_event(
+        db: AsyncSession,
+        *,
+        organization_id: uuid.UUID | None = None,
+        actor_user_id: uuid.UUID | None = None,
+        actor_email: str = "anonymous",
+        actor_portal: str | None = None,
+        portal_type: str | None = None,
+        module: str = "system",
+        action: str,
+        entity_type: str | None = None,
+        target_type: str | None = None,
+        entity_id: str | None = None,
+        target_id: str | None = None,
+        outcome: str = "success",
+        summary: str = "",
+        detail: str = "",
+        details: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+        request: Request | None = None,
+    ) -> AuditLog:
+        return await AuditService.record(
+            db,
+            action=action,
+            module=module,
+            actor_email=actor_email,
+            actor_user_id=actor_user_id,
+            organization_id=organization_id,
+            portal_type=portal_type or actor_portal,
+            target_type=target_type or entity_type,
+            target_id=target_id if target_id is not None else entity_id,
+            outcome=outcome,
+            detail=detail or summary,
+            metadata=metadata if metadata is not None else details,
+            request=request,
+        )
 
     @staticmethod
     async def list_logs(
