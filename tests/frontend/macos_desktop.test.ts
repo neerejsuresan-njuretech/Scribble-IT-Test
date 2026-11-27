@@ -242,16 +242,26 @@ test('Tauri macOS configuration, Hardened Runtime entitlements, Cargo Keychain d
   );
   assert.match(macCiYaml, /CI:\s*"true"/);
   assert.match(buildSh, /unset APPLE_SIGNING_IDENTITY/);
-  assert.match(buildSh, /hdiutil verify/);
+  assert.match(buildSh, /file -b "\$dmg"/);
+  assert.match(buildSh, /hdiutil imageinfo "\$dmg"/);
+  assert.match(buildSh, /hdiutil verify "\$dmg"/);
   assert.match(buildSh, /xattr -d com\.apple\.quarantine/);
   assert.match(buildSh, /mktemp -d "\$\{REAL_TMP_WORK\}\/mnt_\$\{label\}\.XXXXXX"/);
   assert.match(buildSh, /hdiutil attach "\$dmg"/);
   assert.match(buildSh, /-nobrowse/);
   assert.match(buildSh, /-noautoopen/);
+  assert.match(buildSh, /ATTACH_STDOUT=/);
+  assert.match(buildSh, /ATTACH_STDERR=/);
   assert.match(buildSh, /trap cleanup_verify EXIT/);
   assert.match(buildSh, /plutil -lint/);
   assert.match(buildSh, /Security\.framework/);
   assert.match(buildSh, /SHA256SUMS-macos\.txt/);
+  assert.equal(tauriConf.bundle.license, 'AGPL-3.0-only');
+  assert.equal(
+    tauriConf.bundle.licenseFile,
+    undefined,
+    'bundle.licenseFile causes Tauri macOS bundler to embed an interactive DMG EULA/SLA that cancels non-interactive hdiutil attach'
+  );
 
   // Website LandingWebsitePage gates both Hero and #macos-desktop DMG download CTAs strictly on Available state
   const landingTsx = fs.readFileSync(

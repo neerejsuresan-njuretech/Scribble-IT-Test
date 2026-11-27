@@ -254,7 +254,7 @@ if [[ "$VERIFY_INSTALL" -eq 1 ]]; then
     dev_candidates="$(printf '%s\n' "$info_out" | awk -v dmg="$dmg_path" -v mnt="$mount_path" -v vpref="$vol_prefix" '
       /^image-path[[:space:]]*:/ { match_img = (index($0, dmg) > 0) }
       /^\/dev\/disk/ {
-        if (match_img || index($0, mnt) > 0 || index($0, vpref) > 0) {
+        if (match_img || index($0, mnt) > 0 || $0 ~ (vpref "([[:space:]]|$)")) {
           print $1
         }
       }
@@ -313,53 +313,120 @@ if [[ "$VERIFY_INSTALL" -eq 1 ]]; then
     # Strip any macOS quarantine attribute inherited on CI runner to prevent headless dialog cancellation
     xattr -d com.apple.quarantine "$dmg" >/dev/null 2>&1 || true
 
-    # Verify UDIF image metadata and internal block checksums BEFORE mounting
-    if ! hdiutil imageinfo "$dmg" > "$LOGS_DIR/hdiutil-imageinfo-${label}.log" 2>&1; then
-      echo "[ERROR] hdiutil imageinfo failed for $name" >&2
-      cat "$LOGS_DIR/hdiutil-imageinfo-${label}.log" >&2
+    # Step A: Diagnose DMG file type, UDIF container metadata, partition map, and block checksums BEFORE mounting
+    FILE_OUT_LOG="$LOGS_DIR/dmg-file-${label}.stdout.log"
+    FILE_ERR_LOG="$LOGS_DIR/dmg-file-${label}.stderr.log"
+    set +e
+    file -b "$dmg" > "$FILE_OUT_LOG" 2> "$FILE_ERR_LOG"
+    FILE_EC=$?
+    set -e
+    echo "  -> file ($name, exit=$FILE_EC): $(cat "$FILE_OUT_LOG")"
+    if [[ "$FILE_EC" -ne 0 ]]; then
+      echo "[ERROR] file inspection failed for $name (exit=$FILE_EC)" >&2
+      cat "$FILE_ERR_LOG" >&2 || true
       exit 1
     fi
-    if ! hdiutil verify "$dmg" > "$LOGS_DIR/hdiutil-verify-${label}.log" 2>&1; then
-      echo "[ERROR] hdiutil verify integrity check failed for $name" >&2
-      cat "$LOGS_DIR/hdiutil-verify-${label}.log" >&2
+
+    INFO_OUT_LOG="$LOGS_DIR/hdiutil-imageinfo-${label}.stdout.log"
+    INFO_ERR_LOG="$LOGS_DIR/hdiutil-imageinfo-${label}.stderr.log"
+    set +e
+    hdiutil imageinfo "$dmg" > "$INFO_OUT_LOG" 2> "$INFO_ERR_LOG"
+    INFO_EC=$?
+    set -e
+    if [[ "$INFO_EC" -ne 0 ]]; then
+      echo "[ERROR] hdiutil imageinfo failed for $name (exit=$INFO_EC) — invalid DMG container." >&2
+      cat "$INFO_OUT_LOG" >&2 || true
+      cat "$INFO_ERR_LOG" >&2 || true
       exit 1
     fi
-    echo "[PASS] DMG UDIF structure and checksum verified via hdiutil verify ($name)." >> "$VERIFY_REPORT"
+    if ! grep -qiE "Format:|Partition" "$INFO_OUT_LOG"; then
+      echo "[ERROR] hdiutil imageinfo missing expected partition/format metadata for $name." >&2
+      cat "$INFO_OUT_LOG" >&2
+      exit 1
+    fi
+
+    VERIFY_OUT_LOG="$LOGS_DIR/hdiutil-verify-${label}.stdout.log"
+    VERIFY_ERR_LOG="$LOGS_DIR/hdiutil-verify-${label}.stderr.log"
+    set +e
+    hdiutil verify "$dmg" > "$VERIFY_OUT_LOG" 2> "$VERIFY_ERR_LOG"
+    VERIFY_EC=$?
+    set -e
+    if [[ "$VERIFY_EC" -ne 0 ]]; then
+      echo "[ERROR] hdiutil verify integrity check failed for $name (exit=$VERIFY_EC) — corrupt DMG." >&2
+      cat "$VERIFY_OUT_LOG" >&2 || true
+      cat "$VERIFY_ERR_LOG" >&2 || true
+      exit 1
+    fi
+
+    HAS_SLA=0
+    if grep -qiE "Software License Agreement:[[:space:]]*true" "$INFO_OUT_LOG"; then
+      HAS_SLA=1
+    fi
+    echo "[PASS] DMG integrity verified (file=exit0, hdiutil imageinfo=exit0, hdiutil verify=exit0, SLA=${HAS_SLA}) for $name." >> "$VERIFY_REPORT"
 
     MOUNT_DIR="$(mktemp -d "${REAL_TMP_WORK}/mnt_${label}.XXXXXX")"
     REAL_MOUNT_DIR="$(cd "$MOUNT_DIR" && pwd -P)"
     APP_DEST_DIR="$(mktemp -d "${REAL_TMP_WORK}/apps_${label}.XXXXXX")"
     chmod 0755 "$REAL_MOUNT_DIR" "$APP_DEST_DIR"
+    if [[ ! -d "$REAL_MOUNT_DIR" || ! -w "$REAL_MOUNT_DIR" ]]; then
+      echo "[ERROR] Temporary mount point $REAL_MOUNT_DIR is missing or not writable." >&2
+      exit 1
+    fi
 
     cleanup_existing_dmg_mounts "$dmg" "$REAL_MOUNT_DIR"
 
-    ATTACH_LOG="$LOGS_DIR/hdiutil-attach-${label}.log"
+    ATTACH_STDOUT="$LOGS_DIR/hdiutil-attach-${label}.stdout.log"
+    ATTACH_STDERR="$LOGS_DIR/hdiutil-attach-${label}.stderr.log"
     ATTACHED_OK=0
     CURRENT_MOUNT="$REAL_MOUNT_DIR"
     CURRENT_DEV=""
 
     for attempt in 1 2 3; do
-      : > "$ATTACH_LOG"
-      if hdiutil attach "$dmg" \
-        -nobrowse \
-        -noautoopen \
-        -readonly \
-        -noverify \
-        -mountpoint "$REAL_MOUNT_DIR" \
-        < /dev/null > "$ATTACH_LOG" 2>&1; then
-        CURRENT_DEV="$(awk '/^\/dev\/disk[0-9]+/ {print $1; exit}' "$ATTACH_LOG")"
+      : > "$ATTACH_STDOUT"
+      : > "$ATTACH_STDERR"
+      set +e
+      if [[ "$HAS_SLA" -eq 1 ]] && command -v expect >/dev/null 2>&1; then
+        PAGER=/bin/cat expect -c "
+          set timeout 60
+          spawn hdiutil attach \"$dmg\" -nobrowse -noautoopen -readonly -noverify -mountpoint \"$REAL_MOUNT_DIR\"
+          expect {
+            -re \"(?i)(press return|return to continue)\" { send \"\\r\"; exp_continue }
+            -re \"(?i)(agree|y/n)\" { send \"y\\r\"; exp_continue }
+            eof
+          }
+          catch wait result
+          exit [lindex \$result 3]
+        " > "$ATTACH_STDOUT" 2> "$ATTACH_STDERR"
+        ATTACH_EC=$?
+      else
+        PAGER=/bin/cat hdiutil attach "$dmg" \
+          -nobrowse \
+          -noautoopen \
+          -readonly \
+          -noverify \
+          -mountpoint "$REAL_MOUNT_DIR" \
+          < /dev/null > "$ATTACH_STDOUT" 2> "$ATTACH_STDERR"
+        ATTACH_EC=$?
+      fi
+      set -e
+
+      if [[ "$ATTACH_EC" -eq 0 ]] && mount | grep -Fq " on ${REAL_MOUNT_DIR} "; then
+        CURRENT_DEV="$(awk '/^\/dev\/disk[0-9]+/ {print $1; exit}' "$ATTACH_STDOUT")"
         ATTACHED_OK=1
         break
       fi
-      echo "[WARN] hdiutil attach attempt $attempt failed for $name; retrying after cleanup..." >&2
-      cat "$ATTACH_LOG" >&2 || true
+
+      echo "[WARN] hdiutil attach attempt $attempt failed for $name (exit=$ATTACH_EC)." >&2
+      echo "  stdout: $(tr '\n' ' ' < "$ATTACH_STDOUT")" >&2
+      echo "  stderr: $(tr '\n' ' ' < "$ATTACH_STDERR")" >&2
       cleanup_existing_dmg_mounts "$dmg" "$REAL_MOUNT_DIR"
       sleep 3
     done
 
     if [[ "$ATTACHED_OK" -ne 1 ]]; then
-      echo "[ERROR] hdiutil attach failed after retries for $name ($human)." >&2
-      cat "$ATTACH_LOG" >&2 || true
+      echo "[ERROR] hdiutil attach failed after 3 attempts for valid DMG $name ($human, SLA=$HAS_SLA)." >&2
+      cat "$ATTACH_STDOUT" >&2 || true
+      cat "$ATTACH_STDERR" >&2 || true
       hdiutil info >&2 || true
       exit 1
     fi

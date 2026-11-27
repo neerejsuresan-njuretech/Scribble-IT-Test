@@ -34,7 +34,6 @@
     "targets": ["nsis", "msi"],
     "publisher": "Njure Tech",
     "license": "AGPL-3.0-only",
-    "licenseFile": "../LICENSE",
     "copyright": "Copyright (c) Njure Tech (formally Njure Group)",
     "category": "Business",
     "shortDescription": "Enterprise IT Management. Open to Everyone.",
