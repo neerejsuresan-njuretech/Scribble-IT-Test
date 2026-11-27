@@ -106,7 +106,8 @@ export async function sendDesktopNotification(
   if (!isTauriDesktop()) {
     return { sent: false, reason: 'Not running in SCRIBBLE-IT desktop client.' };
   }
-  const osLabel = cachedRuntimeInfo?.client_platform === 'macos' ? 'macOS' : 'Windows';
+  const platform = cachedRuntimeInfo?.client_platform;
+  const osLabel = platform === 'macos' ? 'macOS' : platform === 'linux' ? 'Linux' : 'Windows';
   try {
     let granted = await isPermissionGranted();
     if (!granted) {

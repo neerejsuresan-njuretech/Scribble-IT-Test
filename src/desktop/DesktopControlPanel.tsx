@@ -42,12 +42,17 @@ export const DesktopControlPanel: React.FC<DesktopControlPanelProps> = ({ isOpen
   const runtimeInfo = getCachedDesktopRuntimeInfo();
   const desktopPlatform = runtimeInfo?.client_platform || detectFallbackDesktopPlatform();
   const isMacOs = desktopPlatform === 'macos';
-  const platformLabel = isMacOs ? 'macOS' : 'Windows';
+  const isLinux = desktopPlatform === 'linux';
+  const platformLabel = isMacOs ? 'macOS' : isLinux ? 'Linux' : 'Windows';
   const defaultVaultLabel = isMacOs
     ? 'Apple Keychain (Security.framework)'
+    : isLinux
+    ? 'Linux Secret Service (GNOME Keyring / KWallet)'
     : 'Windows Credential Manager (DPAPI)';
   const securityDocPath = isMacOs
     ? 'docs/desktop/macos-security.md'
+    : isLinux
+    ? 'docs/desktop/linux-security.md'
     : 'docs/desktop/windows-security.md';
 
   const [serverUrl, setServerUrl] = useState<string>(() => getCachedDesktopBaseUrl());
@@ -170,7 +175,9 @@ export const DesktopControlPanel: React.FC<DesktopControlPanelProps> = ({ isOpen
         variant: 'info',
         title: `${platformLabel} Startup Preference Updated`,
         description: next
-          ? `SCRIBBLE-IT will launch on ${isMacOs ? 'macOS Login' : 'Windows sign-in'}.`
+          ? `SCRIBBLE-IT will launch on ${
+              isMacOs ? 'macOS Login' : isLinux ? 'Linux desktop login' : 'Windows sign-in'
+            }.`
           : `${platformLabel} auto-launch disabled.`,
       });
     } catch (err) {
@@ -179,7 +186,13 @@ export const DesktopControlPanel: React.FC<DesktopControlPanelProps> = ({ isOpen
         title: 'Autostart Update Failed',
         description: err instanceof Error
           ? err.message
-          : `Unable to update ${isMacOs ? 'macOS Login Item' : 'Windows startup key'}.`,
+          : `Unable to update ${
+              isMacOs
+                ? 'macOS Login Item'
+                : isLinux
+                ? 'XDG desktop autostart entry'
+                : 'Windows startup key'
+            }.`,
       });
     } finally {
       setAutostartBusy(false);
@@ -195,7 +208,11 @@ export const DesktopControlPanel: React.FC<DesktopControlPanelProps> = ({ isOpen
       variant: res.sent ? 'success' : 'error',
       title: res.sent ? `${platformLabel} Notification Sent` : 'Notification Unavailable',
       description: res.sent
-        ? (isMacOs ? 'Check macOS Notification Center.' : 'Check Windows Action Center.')
+        ? (isMacOs
+            ? 'Check macOS Notification Center.'
+            : isLinux
+            ? 'Check your Linux desktop notification tray.'
+            : 'Check Windows Action Center.')
         : (res.reason || 'Permission blocked.'),
     });
   };
@@ -365,6 +382,8 @@ export const DesktopControlPanel: React.FC<DesktopControlPanelProps> = ({ isOpen
                 <span>
                   {isMacOs
                     ? (autostartEnabled ? 'Launch at macOS Login: ON' : 'Launch at macOS Login: OFF')
+                    : isLinux
+                    ? (autostartEnabled ? 'Launch on Linux Login: ON' : 'Launch on Linux Login: OFF')
                     : (autostartEnabled ? 'Launch on Windows Sign-In: ON' : 'Launch on Windows Sign-In: OFF')}
                 </span>
               </button>

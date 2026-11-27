@@ -30,7 +30,8 @@ const defaultTauriVaultBridge: WindowsVaultBridge = {
 
 /**
  * OS native keyring-backed TokenStorageAdapter via Tauri Rust `keyring`
- * (Windows Credential Manager on Windows, Apple Keychain on macOS).
+ * (Windows Credential Manager on Windows, Apple Keychain on macOS,
+ * and Freedesktop Secret Service / GNOME Keyring / KWallet on Linux).
  * Maintains a read cache in memory while storing persistent secrets strictly inside
  * the OS keychain/vault (never in localStorage or plain files).
  */

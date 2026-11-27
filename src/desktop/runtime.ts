@@ -178,12 +178,20 @@ export function validateExternalHttpsUrl(
   return { ok: false, error: 'Blocked non-HTTPS external link for security.' };
 }
 
-export function detectFallbackDesktopPlatform(): 'windows' | 'macos' {
-  if (typeof navigator !== 'undefined') {
-    const ua = `${navigator.userAgent || ''} ${navigator.platform || ''}`.toLowerCase();
-    if (ua.includes('mac os') || ua.includes('macintosh') || ua.includes('macintel')) {
-      return 'macos';
-    }
+export function detectFallbackDesktopPlatform(
+  platformOverride?: string,
+  userAgentOverride?: string
+): DesktopClientPlatform {
+  const navPlatform =
+    platformOverride ?? (typeof navigator !== 'undefined' ? navigator.platform || '' : '');
+  const navUa =
+    userAgentOverride ?? (typeof navigator !== 'undefined' ? navigator.userAgent || '' : '');
+  const ua = `${navUa} ${navPlatform}`.toLowerCase();
+  if (ua.includes('mac os') || ua.includes('macintosh') || ua.includes('macintel')) {
+    return 'macos';
+  }
+  if (ua.includes('linux') && !ua.includes('android')) {
+    return 'linux';
   }
   return 'windows';
 }

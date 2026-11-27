@@ -1,0 +1,193 @@
+name: Build & Verify Linux Desktop Application
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+    tags:
+      - 'v*'
+      - 'linux-v*'
+    paths:
+      - 'src/**'
+      - 'src-tauri/**'
+      - 'packages/**'
+      - 'assets/brand/**'
+      - 'tests/frontend/**'
+      - 'scripts/build-linux-release.sh'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/linux-desktop-ci.yml'
+  pull_request:
+    branches:
+      - main
+      - master
+      - develop
+    paths:
+      - 'src/**'
+      - 'src-tauri/**'
+      - 'packages/**'
+      - 'assets/brand/**'
+      - 'tests/frontend/**'
+      - 'scripts/build-linux-release.sh'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/linux-desktop-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  linux-desktop:
+    name: Linux x86_64 Tauri Build & DEB/RPM/AppImage Verification
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Tauri 2 & Linux packaging system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            rpm \
+            desktop-file-utils \
+            xvfb \
+            libfuse2
+
+      - name: Set up Node.js 24 (>=24.12.0)
+        uses: actions/setup-node@v4
+        with:
+          node-version: ">=24.12.0 <25"
+          cache: npm
+
+      - name: Set up Rust stable toolchain (x86_64-unknown-linux-gnu)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build, verify, stage, and smoke-test Linux .deb, .rpm & .AppImage packages
+        env:
+          CI: "true"
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+          VITE_BASE_PATH: "./"
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_USE_BACKEND_API: ${{ vars.VITE_USE_BACKEND_API }}
+        run: bash scripts/build-linux-release.sh --verify-install
+
+      - name: Verify non-empty Linux .deb, .rpm, .AppImage installers and checksums in release/linux
+        run: |
+          DEB_PKG="$(find release/linux -maxdepth 1 -type f -name '*.deb' | head -n 1)"
+          RPM_PKG="$(find release/linux -maxdepth 1 -type f -name '*.rpm' | head -n 1)"
+          APPIMG_PKG="$(find release/linux -maxdepth 1 -type f -name '*.AppImage' | head -n 1)"
+          if [[ -z "$DEB_PKG" || ! -s "$DEB_PKG" ]]; then
+            echo "Expected non-empty .deb installer in release/linux/." >&2
+            exit 1
+          fi
+          if [[ -z "$RPM_PKG" || ! -s "$RPM_PKG" ]]; then
+            echo "Expected non-empty .rpm installer in release/linux/." >&2
+            exit 1
+          fi
+          if [[ -z "$APPIMG_PKG" || ! -s "$APPIMG_PKG" ]]; then
+            echo "Expected non-empty .AppImage installer in release/linux/." >&2
+            exit 1
+          fi
+          test -s release/linux/SHA256SUMS-linux.txt
+          test -s release/linux/installation-verification.txt
+          echo "Verified DEB: $DEB_PKG ($(stat -c%s "$DEB_PKG") bytes)"
+          echo "Verified RPM: $RPM_PKG ($(stat -c%s "$RPM_PKG") bytes)"
+          echo "Verified AppImage: $APPIMG_PKG ($(stat -c%s "$APPIMG_PKG") bytes)"
+          cat release/linux/SHA256SUMS-linux.txt
+          cat release/linux/installation-verification.txt
+
+      - name: Publish verified Linux installers & checksums to GitHub Releases
+        if: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/linux-v') || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="$(node -e "console.log(JSON.parse(require('fs').readFileSync('src-tauri/tauri.conf.json','utf8')).version)")"
+          APP_ID="$(node -e "console.log(JSON.parse(require('fs').readFileSync('src-tauri/tauri.conf.json','utf8')).identifier)")"
+          TAG="linux-v${VERSION}"
+          if [[ "${GITHUB_REF}" == refs/tags/linux-v* ]]; then
+            TAG="${GITHUB_REF_NAME}"
+          fi
+
+          DEB_PKG="$(find release/linux -maxdepth 1 -type f -name '*.deb' | head -n 1)"
+          RPM_PKG="$(find release/linux -maxdepth 1 -type f -name '*.rpm' | head -n 1)"
+          APPIMG_PKG="$(find release/linux -maxdepth 1 -type f -name '*.AppImage' | head -n 1)"
+          DEB_BYTES="$(stat -c%s "$DEB_PKG")"
+          RPM_BYTES="$(stat -c%s "$RPM_PKG")"
+          APPIMG_BYTES="$(stat -c%s "$APPIMG_PKG")"
+          SHA_SUMS="$(cat release/linux/SHA256SUMS-linux.txt)"
+          VERIFY_LOG="$(cat release/linux/installation-verification.txt)"
+
+          NOTES_PATH="$RUNNER_TEMP/linux-release-notes.md"
+          cat > "$NOTES_PATH" <<EOF
+          # SCRIBBLE-IT for Linux v${VERSION}
+
+          **Organization:** Njure Tech (formally Njure Group)
+          **Compatibility:** Linux x86_64 (Ubuntu 22.04+ / Debian 12+ / Fedora / RHEL / Universal AppImage)
+          **Application ID:** \`${APP_ID}\`
+
+          ## Installers & Sizes
+          - **Debian / Ubuntu (.deb):** \`$(basename "$DEB_PKG")\` (${DEB_BYTES} bytes)
+          - **Fedora / RHEL (.rpm):** \`$(basename "$RPM_PKG")\` (${RPM_BYTES} bytes)
+          - **Universal Linux (.AppImage):** \`$(basename "$APPIMG_PKG")\` (${APPIMG_BYTES} bytes)
+
+          ## SHA-256 Checksums
+          \`\`\`text
+          ${SHA_SUMS}
+          \`\`\`
+
+          ## Automated Package & Launch Verification
+          \`\`\`text
+          ${VERIFY_LOG}
+          \`\`\`
+
+          > Always verify downloaded packages via \`sha256sum <package-file>\` against \`SHA256SUMS-linux.txt\` before installing.
+          EOF
+
+          ASSETS=(
+            "$DEB_PKG"
+            "$RPM_PKG"
+            "$APPIMG_PKG"
+            "release/linux/SHA256SUMS-linux.txt"
+            "${DEB_PKG}.sha256"
+            "${RPM_PKG}.sha256"
+            "${APPIMG_PKG}.sha256"
+            "release/linux/BUILD_INFO.txt"
+            "release/linux/installation-verification.txt"
+          )
+
+          if gh release view "$TAG" --json url >/dev/null 2>&1; then
+            gh release upload "$TAG" "${ASSETS[@]}" --clobber
+            gh release edit "$TAG" --title "SCRIBBLE-IT v${VERSION} for Linux" --notes-file "$NOTES_PATH"
+          else
+            gh release create "$TAG" "${ASSETS[@]}" --target "$GITHUB_SHA" --title "SCRIBBLE-IT v${VERSION} for Linux" --notes-file "$NOTES_PATH"
+          fi
+
+      - name: Upload Linux installer release bundle & verification logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: scribble-it-linux-x86_64-release
+          path: release/linux/**
+          retention-days: 30

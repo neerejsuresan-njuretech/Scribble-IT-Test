@@ -61,9 +61,13 @@ export const ServiceNowHeader: React.FC<ServiceNowHeaderProps> = ({
   const [showDesktopPanel, setShowDesktopPanel] = useState(false);
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const desktopMode = isTauriDesktop();
+  const desktopPlatform =
+    getCachedDesktopRuntimeInfo()?.client_platform || detectFallbackDesktopPlatform();
   const desktopPlatformLabel =
-    (getCachedDesktopRuntimeInfo()?.client_platform || detectFallbackDesktopPlatform()) === 'macos'
+    desktopPlatform === 'macos'
       ? 'macOS'
+      : desktopPlatform === 'linux'
+      ? 'Linux'
       : 'Windows';
 
   const activePortalKey =

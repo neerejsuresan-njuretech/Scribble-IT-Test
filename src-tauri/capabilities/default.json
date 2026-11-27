@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Least-privilege desktop capability (Windows & macOS) for SCRIBBLE-IT",
+  "description": "Least-privilege desktop capability (Windows, macOS & Linux) for SCRIBBLE-IT",
   "windows": ["main"],
   "permissions": [
     "core:default",

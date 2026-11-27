@@ -9,6 +9,7 @@ on:
     workflows:
       - "Build & Verify Windows Desktop Application"
       - "Build & Verify macOS Desktop Application"
+      - "Build & Verify Linux Desktop Application"
     types:
       - completed
   workflow_dispatch:
@@ -159,6 +160,51 @@ jobs:
                   print(f"Resolved macOS release v{version}: arm64={bool(arm_dmg and arm_sha)}, x64={bool(x64_dmg and x64_sha)}")
           else:
               print("No published non-draft macOS .dmg GitHub Release found; keeping macOS In Development.")
+
+          # --- 3. Resolve Linux Release (.deb, .rpm, .AppImage) ---
+          linux_selected = None
+          for rel in releases:
+              if rel.get("draft"):
+                  continue
+              assets = rel.get("assets") or []
+              deb = next((a for a in assets if str(a.get("name", "")).lower().endswith(".deb") and int(a.get("size", 0)) > 0), None)
+              rpm = next((a for a in assets if str(a.get("name", "")).lower().endswith(".rpm") and int(a.get("size", 0)) > 0), None)
+              appimg = next((a for a in assets if str(a.get("name", "")).lower().endswith(".appimage") and int(a.get("size", 0)) > 0), None)
+              if deb or rpm or appimg:
+                  linux_selected = (rel, deb, rpm, appimg, assets)
+                  break
+
+          if linux_selected:
+              rel, deb, rpm, appimg, assets = linux_selected
+              sums = next((a for a in assets if str(a.get("name", "")) in ("SHA256SUMS-linux.txt", "SHA256SUMS.txt")), None)
+
+              deb_sha = resolve_asset_sha256(deb, assets, [sums]) if deb else ""
+              rpm_sha = resolve_asset_sha256(rpm, assets, [sums]) if rpm else ""
+              appimg_sha = resolve_asset_sha256(appimg, assets, [sums]) if appimg else ""
+
+              if (deb and deb_sha) or (rpm and rpm_sha) or (appimg and appimg_sha):
+                  raw_tag = str(rel.get("tag_name") or "")
+                  version = re.sub(r"^(linux-)?v", "", raw_tag, flags=re.I) or "1.0.0"
+                  with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as envf:
+                      envf.write(f"VITE_LINUX_RELEASE_VERSION={version}\n")
+                      envf.write(f"VITE_LINUX_RELEASE_URL={rel.get('html_url', '')}\n")
+                      if deb and deb_sha:
+                          envf.write(f"VITE_LINUX_DEB_URL={deb['browser_download_url']}\n")
+                          envf.write(f"VITE_LINUX_DEB_SHA256={deb_sha}\n")
+                          envf.write(f"VITE_LINUX_DEB_SIZE_BYTES={deb['size']}\n")
+                      if rpm and rpm_sha:
+                          envf.write(f"VITE_LINUX_RPM_URL={rpm['browser_download_url']}\n")
+                          envf.write(f"VITE_LINUX_RPM_SHA256={rpm_sha}\n")
+                          envf.write(f"VITE_LINUX_RPM_SIZE_BYTES={rpm['size']}\n")
+                      if appimg and appimg_sha:
+                          envf.write(f"VITE_LINUX_APPIMAGE_URL={appimg['browser_download_url']}\n")
+                          envf.write(f"VITE_LINUX_APPIMAGE_SHA256={appimg_sha}\n")
+                          envf.write(f"VITE_LINUX_APPIMAGE_SIZE_BYTES={appimg['size']}\n")
+                      if sums:
+                          envf.write(f"VITE_LINUX_SHA256SUMS_URL={sums['browser_download_url']}\n")
+                  print(f"Resolved Linux release v{version}: deb={bool(deb and deb_sha)}, rpm={bool(rpm and rpm_sha)}, appimage={bool(appimg and appimg_sha)}")
+          else:
+              print("No published non-draft Linux GitHub Release found; keeping Linux In Development.")
           PYEOF
 
       - name: Build static bundle for GitHub Pages

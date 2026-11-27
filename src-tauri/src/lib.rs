@@ -14,14 +14,18 @@ use zeroize::Zeroizing;
 const KEYRING_SERVICE: &str = "in.njuretech.scribbleit.windows";
 #[cfg(target_os = "macos")]
 const KEYRING_SERVICE: &str = "in.njuretech.scribbleit.macos";
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+#[cfg(target_os = "linux")]
+const KEYRING_SERVICE: &str = "in.njuretech.scribbleit.linux";
+#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
 const KEYRING_SERVICE: &str = "in.njuretech.scribbleit";
 
 #[cfg(target_os = "windows")]
 const CREDENTIAL_BACKEND_LABEL: &str = "Windows Credential Manager (DPAPI / keyring)";
 #[cfg(target_os = "macos")]
 const CREDENTIAL_BACKEND_LABEL: &str = "Apple Keychain (Security.framework / keyring)";
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+#[cfg(target_os = "linux")]
+const CREDENTIAL_BACKEND_LABEL: &str = "Linux Secret Service (GNOME Keyring / KWallet via keyring)";
+#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
 const CREDENTIAL_BACKEND_LABEL: &str = "OS Secret Keyring";
 
 #[cfg(target_os = "windows")]
@@ -356,10 +360,28 @@ fn default_device_name_fallback() -> String {
     {
         "WINDOWS-WORKSTATION".to_string()
     }
-    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    #[cfg(target_os = "linux")]
+    {
+        "LINUX-WORKSTATION".to_string()
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
     {
         "DESKTOP-WORKSTATION".to_string()
     }
+}
+
+#[cfg(target_os = "linux")]
+fn parse_linux_os_release_name(contents: &str) -> Option<String> {
+    for line in contents.lines() {
+        let trimmed = line.trim();
+        if let Some(rest) = trimmed.strip_prefix("PRETTY_NAME=") {
+            let unquoted = rest.trim().trim_matches('"').trim_matches('\'').trim();
+            if !unquoted.is_empty() {
+                return Some(unquoted.to_string());
+            }
+        }
+    }
+    None
 }
 
 fn detect_os_version_label() -> String {
@@ -382,7 +404,16 @@ fn detect_os_version_label() -> String {
     {
         return format!("Windows ({})", std::env::consts::ARCH);
     }
-    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(os_release) = fs::read_to_string("/etc/os-release") {
+            if let Some(pretty) = parse_linux_os_release_name(&os_release) {
+                return format!("{} ({})", pretty, std::env::consts::ARCH);
+            }
+        }
+        return format!("Linux ({})", std::env::consts::ARCH);
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
     {
         format!("{} ({})", std::env::consts::OS, std::env::consts::ARCH)
     }
@@ -608,5 +639,16 @@ mod tests {
         assert!(matches!(CLIENT_PLATFORM, "windows" | "macos" | "linux"));
         let os_label = detect_os_version_label();
         assert!(!os_label.is_empty());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_parse_linux_os_release_name() {
+        let sample = "NAME=\"Ubuntu\"\nVERSION_ID=\"22.04\"\nPRETTY_NAME=\"Ubuntu 22.04.5 LTS\"\n";
+        assert_eq!(
+            parse_linux_os_release_name(sample).as_deref(),
+            Some("Ubuntu 22.04.5 LTS")
+        );
+        assert_eq!(parse_linux_os_release_name("PRETTY_NAME=\"\"\n"), None);
     }
 }

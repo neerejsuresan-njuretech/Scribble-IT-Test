@@ -33,10 +33,12 @@
     "active": true,
     "targets": ["nsis", "msi"],
     "publisher": "Njure Tech",
+    "license": "AGPL-3.0-only",
+    "licenseFile": "../LICENSE",
     "copyright": "Copyright (c) Njure Tech (formally Njure Group)",
     "category": "Business",
     "shortDescription": "Enterprise IT Management. Open to Everyone.",
-    "longDescription": "SCRIBBLE-IT Desktop Application (Windows & macOS) by Njure Tech for incident management, service requests, CMDB, change advisory board, and identity governance.",
+    "longDescription": "SCRIBBLE-IT Desktop Application (Windows, macOS & Linux) by Njure Tech for incident management, service requests, CMDB, change advisory board, and identity governance.",
     "icon": [
       "../assets/brand/icons/windows/32x32.png",
       "../assets/brand/icons/windows/128x128.png",
@@ -45,6 +47,29 @@
       "../assets/brand/icons/windows/icon.png",
       "../assets/brand/icons/macos/icon.icns"
     ],
+    "linux": {
+      "deb": {
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libgtk-3-0"
+        ],
+        "files": {
+          "/usr/share/metainfo/in.njuregroup.scribbleit.metainfo.xml": "../assets/brand/icons/linux/packaging/in.njuregroup.scribbleit.metainfo.xml"
+        }
+      },
+      "rpm": {
+        "depends": [
+          "webkit2gtk4.1",
+          "gtk3"
+        ],
+        "files": {
+          "/usr/share/metainfo/in.njuregroup.scribbleit.metainfo.xml": "../assets/brand/icons/linux/packaging/in.njuregroup.scribbleit.metainfo.xml"
+        }
+      },
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    },
     "macOS": {
       "minimumSystemVersion": "12.0",
       "hardenedRuntime": true,

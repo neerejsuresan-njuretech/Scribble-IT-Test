@@ -64,6 +64,9 @@ import {
   MACOS_DESKTOP_CONFIG,
   type MacosDesktopReleaseConfig,
   parseGitHubMacosRelease,
+  LINUX_DESKTOP_CONFIG,
+  type LinuxDesktopReleaseConfig,
+  parseGitHubLinuxRelease,
   isConfiguredUrl,
 } from '../../config/openSourceConfig';
 import { ArchitectureDiagram } from '../../components/public/ArchitectureDiagram';
@@ -302,12 +305,21 @@ const ECOSYSTEM_PLATFORMS = [
     sectionTarget: 'macos-desktop' as const,
   },
   {
-    name: 'Linux & Mobile Clients',
-    platforms: 'Linux · Android · iOS',
+    name: 'Linux Desktop (Tauri 2)',
+    platforms: 'Linux x86_64 · DEB · RPM · AppImage',
+    status: LINUX_DESKTOP_CONFIG.availabilityStatus,
+    icon: Terminal,
+    summary:
+      'Tauri 2 Linux client with Freedesktop Secret Service keyring storage, native desktop notifications, file attachments, XDG scribbleit:// deep links, and .deb / .rpm / .AppImage packaging.',
+    sectionTarget: 'linux-desktop' as const,
+  },
+  {
+    name: 'Mobile Clients',
+    platforms: 'Android · iOS',
     status: 'Coming Soon' as const,
     icon: Smartphone,
     summary:
-      'Shared @scribble-it/* TypeScript foundation prepared for upcoming Linux, Android, and iOS clients under our AGPL-3.0 Section 7 exception.',
+      'Shared @scribble-it/* TypeScript foundation prepared for upcoming Android and iOS mobile clients under our AGPL-3.0 Section 7 exception.',
     sectionTarget: undefined,
   },
 ];
@@ -364,15 +376,15 @@ const ROADMAP_MILESTONES: RoadmapMilestone[] = [
   },
   {
     phase: '08',
-    title: 'Desktop Applications — Windows & macOS (Tauri 2)',
+    title: 'Desktop Applications — Windows, macOS & Linux (Tauri 2)',
     status: 'In Progress',
-    summary: 'Tauri 2 Rust/React desktop builds with OS Credential Manager & Apple Keychain vaults, native notifications, scribbleit:// deep links, Windows NSIS/MSI (.exe/.msi), and macOS .dmg packaging.',
+    summary: 'Tauri 2 Rust/React desktop builds with OS Credential Manager, Apple Keychain & Linux Secret Service vaults, native notifications, scribbleit:// deep links, NSIS/MSI (.exe/.msi), macOS .dmg, and Linux .deb/.rpm/.AppImage packaging.',
   },
   {
     phase: '09',
-    title: 'Linux & Mobile Applications (Android, iOS)',
+    title: 'Mobile Applications (Android & iOS)',
     status: 'Coming Soon',
-    summary: 'Upcoming native clients sharing core TypeScript API/RBAC/design-token packages across Linux, Android, and iOS under AGPL-3.0 Section 7.',
+    summary: 'Upcoming native mobile clients sharing core TypeScript API/RBAC/design-token packages across Android and iOS under AGPL-3.0 Section 7.',
   },
   {
     phase: '10',
@@ -454,7 +466,7 @@ const FAQ_ITEMS = [
   {
     question: 'Are desktop and mobile apps available?',
     answer:
-      'The Web Application is production-ready today. SCRIBBLE-IT for Windows (.exe / .msi) is published via GitHub Releases, and SCRIBBLE-IT for macOS (Tauri 2 with Apple Keychain and .dmg packaging) activates direct .dmg downloads once verified macOS CI release assets are published. Linux, Android, and iOS applications remain Coming Soon.',
+      'The Web Application is production-ready today. SCRIBBLE-IT for Windows (.exe / .msi) is published via GitHub Releases, while SCRIBBLE-IT for macOS (.dmg) and SCRIBBLE-IT for Linux (.deb, .rpm, .AppImage) activate direct downloads once their verified CI release assets are published. Android and iOS applications remain Coming Soon.',
   },
   {
     question: 'How does AI work in Scribble-IT?',
@@ -533,15 +545,19 @@ export const LandingWebsitePage: React.FC = () => {
     useState<WindowsDesktopReleaseConfig>(WINDOWS_DESKTOP_CONFIG);
   const [macosRelease, setMacosRelease] =
     useState<MacosDesktopReleaseConfig>(MACOS_DESKTOP_CONFIG);
+  const [linuxRelease, setLinuxRelease] =
+    useState<LinuxDesktopReleaseConfig>(LINUX_DESKTOP_CONFIG);
   const [copiedSha256, setCopiedSha256] = useState(false);
   const [copiedMacSha, setCopiedMacSha] = useState<'arm64' | 'x64' | null>(null);
+  const [copiedLinuxSha, setCopiedLinuxSha] = useState<'deb' | 'rpm' | 'appimage' | null>(null);
 
   const currentYear = new Date().getFullYear();
 
   useEffect(() => {
     const needWindows = WINDOWS_DESKTOP_CONFIG.availabilityStatus !== 'Available';
     const needMacos = MACOS_DESKTOP_CONFIG.availabilityStatus !== 'Available';
-    if (!needWindows && !needMacos) return;
+    const needLinux = LINUX_DESKTOP_CONFIG.availabilityStatus !== 'Available';
+    if (!needWindows && !needMacos && !needLinux) return;
 
     const match = /github\.com\/([^/]+\/[^/]+?)(?:\.git|\/)?$/i.exec(GITHUB_REPOSITORY_URL);
     if (!match) return;
@@ -624,6 +640,45 @@ export const LandingWebsitePage: React.FC = () => {
             }
           }
         }
+
+        if (needLinux) {
+          const parsedLinux = parseGitHubLinuxRelease(payload, GITHUB_REPOSITORY_URL);
+          if (parsedLinux) {
+            let nextDebSha = parsedLinux.debSha256;
+            let nextRpmSha = parsedLinux.rpmSha256;
+            let nextAppImageSha = parsedLinux.appImageSha256;
+            if (!nextDebSha && parsedLinux.debInstallerName && parsedLinux.sha256SumsUrl) {
+              nextDebSha = await resolveDigestFromSums(
+                parsedLinux.sha256SumsUrl,
+                parsedLinux.debInstallerName
+              );
+            }
+            if (!nextRpmSha && parsedLinux.rpmInstallerName && parsedLinux.sha256SumsUrl) {
+              nextRpmSha = await resolveDigestFromSums(
+                parsedLinux.sha256SumsUrl,
+                parsedLinux.rpmInstallerName
+              );
+            }
+            if (!nextAppImageSha && parsedLinux.appImageInstallerName && parsedLinux.sha256SumsUrl) {
+              nextAppImageSha = await resolveDigestFromSums(
+                parsedLinux.sha256SumsUrl,
+                parsedLinux.appImageInstallerName
+              );
+            }
+            if (nextDebSha || nextRpmSha || nextAppImageSha) {
+              setLinuxRelease({
+                ...parsedLinux,
+                availabilityStatus: 'Available',
+                debSha256: nextDebSha,
+                debInstallerUrl: nextDebSha ? parsedLinux.debInstallerUrl : '',
+                rpmSha256: nextRpmSha,
+                rpmInstallerUrl: nextRpmSha ? parsedLinux.rpmInstallerUrl : '',
+                appImageSha256: nextAppImageSha,
+                appImageInstallerUrl: nextAppImageSha ? parsedLinux.appImageInstallerUrl : '',
+              });
+            }
+          }
+        }
       })
       .catch(() => {
         // Ignore network/abort errors; stay cleanly in In Development
@@ -650,6 +705,23 @@ export const LandingWebsitePage: React.FC = () => {
       await navigator.clipboard.writeText(hash);
       setCopiedMacSha(arch);
       setTimeout(() => setCopiedMacSha(null), 2500);
+    } catch {
+      // Clipboard API unavailable
+    }
+  };
+
+  const handleCopyLinuxSha256 = async (pkg: 'deb' | 'rpm' | 'appimage') => {
+    const hash =
+      pkg === 'deb'
+        ? linuxRelease.debSha256
+        : pkg === 'rpm'
+        ? linuxRelease.rpmSha256
+        : linuxRelease.appImageSha256;
+    if (!hash) return;
+    try {
+      await navigator.clipboard.writeText(hash);
+      setCopiedLinuxSha(pkg);
+      setTimeout(() => setCopiedLinuxSha(null), 2500);
     } catch {
       // Clipboard API unavailable
     }
@@ -702,6 +774,13 @@ export const LandingWebsitePage: React.FC = () => {
       title: 'macOS Desktop Guide',
       description: 'Tauri 2 macOS Apple Silicon & Intel installation, .dmg verification, Gatekeeper notes, and Apple Keychain security.',
       href: `${GITHUB_REPOSITORY_URL}/blob/main/docs/desktop/macos-installation-guide.md`,
+      configured: isConfiguredUrl(GITHUB_REPOSITORY_URL),
+      external: true,
+    },
+    {
+      title: 'Linux Desktop Guide',
+      description: 'Tauri 2 Linux x86_64 .deb, .rpm, and .AppImage installation, WebKitGTK 4.1 dependencies, and Secret Service vault.',
+      href: `${GITHUB_REPOSITORY_URL}/blob/main/docs/desktop/linux-installation-guide.md`,
       configured: isConfiguredUrl(GITHUB_REPOSITORY_URL),
       external: true,
     },
@@ -786,6 +865,7 @@ export const LandingWebsitePage: React.FC = () => {
               { id: 'features', label: 'Capabilities' },
               { id: 'windows-desktop', label: 'Windows' },
               { id: 'macos-desktop', label: 'macOS' },
+              { id: 'linux-desktop', label: 'Linux' },
               { id: 'architecture', label: 'Architecture' },
               { id: 'opensource', label: 'Open Source' },
               { id: 'roadmap', label: 'Roadmap' },
@@ -834,6 +914,7 @@ export const LandingWebsitePage: React.FC = () => {
               { id: 'ecosystem', label: 'Cross-Platform Ecosystem' },
               { id: 'windows-desktop', label: 'Scribble-IT for Windows' },
               { id: 'macos-desktop', label: 'Scribble-IT for macOS' },
+              { id: 'linux-desktop', label: 'Scribble-IT for Linux' },
               { id: 'architecture', label: 'Technology & Architecture' },
               { id: 'opensource', label: 'Open-Source Commitment' },
               { id: 'sponsor', label: 'Support & Sponsorship' },
@@ -964,6 +1045,20 @@ export const LandingWebsitePage: React.FC = () => {
                     >
                       <Download className="w-4 h-4 text-[#22D3EE] shrink-0" />
                       <span>Download for macOS (.dmg)</span>
+                    </button>
+                  )}
+
+                  {linuxRelease.availabilityStatus === 'Available' &&
+                  ((linuxRelease.debInstallerUrl && linuxRelease.debSha256) ||
+                    (linuxRelease.rpmInstallerUrl && linuxRelease.rpmSha256) ||
+                    (linuxRelease.appImageInstallerUrl && linuxRelease.appImageSha256)) && (
+                    <button
+                      type="button"
+                      onClick={() => scrollToSection('linux-desktop')}
+                      className="px-5 py-3 min-h-[44px] border border-[#22D3EE]/60 bg-[#0B1F3B]/80 hover:bg-[#0B1F3B] text-[#F5F8FF] text-sm font-semibold rounded-md transition-colors inline-flex items-center gap-2 whitespace-nowrap"
+                    >
+                      <Download className="w-4 h-4 text-[#22D3EE] shrink-0" />
+                      <span>Download for Linux</span>
                     </button>
                   )}
 
@@ -1257,7 +1352,7 @@ export const LandingWebsitePage: React.FC = () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {ECOSYSTEM_PLATFORMS.map(item => {
                 const Icon = item.icon;
                 const resolvedStatus =
@@ -1265,6 +1360,8 @@ export const LandingWebsitePage: React.FC = () => {
                     ? desktopRelease.availabilityStatus
                     : item.sectionTarget === 'macos-desktop'
                     ? macosRelease.availabilityStatus
+                    : item.sectionTarget === 'linux-desktop'
+                    ? linuxRelease.availabilityStatus
                     : item.status;
                 const resolvedSummary =
                   item.sectionTarget === 'windows-desktop' &&
@@ -1277,6 +1374,9 @@ export const LandingWebsitePage: React.FC = () => {
                     : item.sectionTarget === 'macos-desktop' &&
                       macosRelease.availabilityStatus === 'Available'
                     ? `Native Tauri 2 macOS .dmg installer (v${macosRelease.version}) for ${macosRelease.supportedArchitectures} with Apple Keychain storage, Notification Center alerts, file attachments, and scribbleit:// Apple Events.`
+                    : item.sectionTarget === 'linux-desktop' &&
+                      linuxRelease.availabilityStatus === 'Available'
+                    ? `Native Tauri 2 Linux client (v${linuxRelease.version}) for ${linuxRelease.supportedArchitectures} in .deb, .rpm, and .AppImage formats with Linux Secret Service storage, desktop notifications, and XDG scribbleit:// deep links.`
                     : item.summary;
                 return (
                   <div
@@ -1325,6 +1425,19 @@ export const LandingWebsitePage: React.FC = () => {
                             {resolvedStatus === 'Available'
                               ? 'Download macOS Installer (.dmg)'
                               : 'View macOS Desktop Details'}
+                          </span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      ) : item.sectionTarget === 'linux-desktop' ? (
+                        <button
+                          type="button"
+                          onClick={() => scrollToSection('linux-desktop')}
+                          className="text-xs font-semibold text-[#22D3EE] hover:text-[#F5F8FF] inline-flex items-center gap-1.5 transition-colors"
+                        >
+                          <span>
+                            {resolvedStatus === 'Available'
+                              ? 'Download Linux Packages (.deb / .rpm / .AppImage)'
+                              : 'View Linux Desktop Details'}
                           </span>
                           <ArrowRight className="w-3.5 h-3.5" />
                         </button>
@@ -1624,7 +1737,7 @@ export const LandingWebsitePage: React.FC = () => {
                     <li>· <strong className="text-neutral-200">Runtime:</strong> {desktopRelease.runtimeRequirement}</li>
                     <li>· <strong className="text-neutral-200">Hardware:</strong> 64-bit CPU, 4 GB RAM min (8 GB recommended), 200 MB free disk</li>
                     <li>· <strong className="text-neutral-200">Trust Boundary:</strong> Local device fingerprint aids session identification and is not treated as independent MDM attestation; IAM enrollment remains admin-controlled.</li>
-                    <li>· <strong className="text-neutral-200">Scope Notice:</strong> macOS (Tauri 2) is documented below; Linux, Android, and iOS builds remain Coming Soon.</li>
+                    <li>· <strong className="text-neutral-200">Scope Notice:</strong> macOS and Linux (Tauri 2) are documented below; Android and iOS builds remain Coming Soon.</li>
                   </ul>
                 </div>
               </div>
@@ -1939,7 +2052,379 @@ export const LandingWebsitePage: React.FC = () => {
                     <li>· <strong className="text-neutral-200">Architectures:</strong> {macosRelease.supportedArchitectures}</li>
                     <li>· <strong className="text-neutral-200">WebView Runtime:</strong> {macosRelease.runtimeRequirement}</li>
                     <li>· <strong className="text-neutral-200">Trust Boundary:</strong> Local host fingerprint assists session visibility and never claims independent MDM attestation; IAM enrollment remains admin-controlled.</li>
-                    <li>· <strong className="text-neutral-200">Scope Notice:</strong> Linux, Android, and iOS clients remain Coming Soon.</li>
+                    <li>· <strong className="text-neutral-200">Scope Notice:</strong> Linux (Tauri 2) is documented below; Android and iOS clients remain Coming Soon.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* =================================================================== */}
+        {/* D4. SCRIBBLE-IT FOR LINUX (DEDICATED DESKTOP SECTION)               */}
+        {/* =================================================================== */}
+        <section
+          id="linux-desktop"
+          className="border-b border-neutral-800 bg-[#0B1F3B]/15"
+        >
+          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 space-y-10">
+            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+              <div className="space-y-3 max-w-3xl">
+                <div className="text-xs font-mono text-[#22D3EE] uppercase tracking-wider">
+                  Linux Desktop Application · Tauri 2 Architecture
+                </div>
+                <h2
+                  className="text-2xl sm:text-3xl font-bold text-[#F5F8FF] tracking-tight"
+                  style={{ fontFamily: 'Manrope, Inter, sans-serif', textWrap: 'balance' }}
+                >
+                  Scribble-IT for Linux
+                </h2>
+                <p className="text-sm sm:text-base text-neutral-300 leading-relaxed">
+                  Open-source enterprise IT management built natively for Linux workstations via Tauri 2 and WebKitGTK 4.1. Install via Debian/Ubuntu (.deb), Fedora/RHEL (.rpm), or Universal AppImage and connect securely to Scribble-IT Cloud or your self-hosted FastAPI backend.
+                </p>
+              </div>
+
+              <div className="border border-[#0A84FF]/40 bg-[#0B1F3B]/60 rounded-lg px-4 py-3 shrink-0 space-y-1">
+                <div className="text-[11px] font-mono text-neutral-400">Release Status</div>
+                <div className="text-sm font-bold text-[#22D3EE]">
+                  {linuxRelease.availabilityStatus === 'Available'
+                    ? `Available · v${linuxRelease.version}`
+                    : `In Development · v${linuxRelease.version} Source Ready`}
+                </div>
+                <div className="text-[11px] text-neutral-400">
+                  {linuxRelease.supportedArchitectures}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="lg:col-span-7 border border-[#0A84FF]/30 bg-neutral-950/90 rounded-lg p-6 space-y-5">
+                <div className="flex items-center justify-between gap-2 pb-3 border-b border-neutral-800">
+                  <h3 className="text-base font-bold text-[#F5F8FF]">
+                    Implemented Linux Desktop Capabilities
+                  </h3>
+                  <span className="text-xs font-mono text-[#0A84FF]">Tauri 2 + Rust + Secret Service</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  {[
+                    {
+                      title: 'Linux Secret Service Token Vault',
+                      detail: 'JWT access tokens, rotating refresh tokens, and organization IDs are stored via the Freedesktop Secret Service API (GNOME Keyring / KWallet via Rust keyring)—never in plaintext files.',
+                    },
+                    {
+                      title: 'Cloud & Self-Hosted Endpoints',
+                      detail: 'Configure enterprise HTTPS FastAPI servers (or http://localhost:8000 for local development) in Desktop Settings and validate live config via /api/v1/client/config.',
+                    },
+                    {
+                      title: 'Distro Metadata & Session Control',
+                      detail: 'Reads /etc/os-release distribution metadata cleanly, displays active desktop/web sessions, and revokes individual sessions or signs out all other devices immediately.',
+                    },
+                    {
+                      title: 'Desktop Notifications & Native Picker',
+                      detail: 'Forwards unread FastAPI incident and SLA alerts via Freedesktop notifications and provides a bounded 10 MiB native file picker with SHA-256 verification.',
+                    },
+                    {
+                      title: 'XDG scribbleit:// Protocol Links',
+                      detail: 'Single-instance handler dispatches scribbleit:// incident and Watchtower deep links while stripping untrusted query parameters and enforcing login checks.',
+                    },
+                    {
+                      title: 'Multi-Distro Native Packaging',
+                      detail: 'Packaged cleanly for Debian/Ubuntu (.deb), Fedora/RHEL/openSUSE (.rpm), and portable AppImage with desktop launcher metadata and Freedesktop hicolor icons.',
+                    },
+                  ].map(feat => (
+                    <div
+                      key={feat.title}
+                      className="p-3.5 border border-neutral-800 bg-[#0B1F3B]/20 rounded-md space-y-1.5"
+                    >
+                      <div className="font-bold text-[#F5F8FF]">{feat.title}</div>
+                      <p className="text-neutral-400 leading-relaxed">{feat.detail}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="lg:col-span-5 flex flex-col gap-5">
+                <div className="border border-neutral-800 bg-neutral-950 rounded-lg p-6 space-y-4">
+                  <div className="flex items-center justify-between gap-2 pb-3 border-b border-neutral-800">
+                    <h3 className="text-sm font-bold text-[#F5F8FF]">
+                      Linux Installer Availability (.deb / .rpm / .AppImage)
+                    </h3>
+                    <span
+                      className={`text-xs font-mono ${
+                        linuxRelease.availabilityStatus === 'Available'
+                          ? 'text-emerald-400'
+                          : 'text-amber-400'
+                      }`}
+                    >
+                      {linuxRelease.availabilityStatus}
+                    </span>
+                  </div>
+
+                  {linuxRelease.availabilityStatus === 'Available' &&
+                  ((linuxRelease.debInstallerUrl && linuxRelease.debSha256) ||
+                    (linuxRelease.rpmInstallerUrl && linuxRelease.rpmSha256) ||
+                    (linuxRelease.appImageInstallerUrl && linuxRelease.appImageSha256)) ? (
+                    <div className="space-y-3">
+                      {linuxRelease.debInstallerUrl && linuxRelease.debSha256 && (
+                        <a
+                          href={linuxRelease.debInstallerUrl}
+                          download={linuxRelease.debInstallerName}
+                          className="w-full px-4 py-3 min-h-[44px] bg-[#0A84FF] hover:bg-[#0A84FF]/90 text-white text-xs sm:text-sm font-semibold rounded-md transition-colors inline-flex items-center justify-center gap-2"
+                        >
+                          <Download className="w-4 h-4 shrink-0" />
+                          <span>
+                            Debian / Ubuntu (.deb)
+                            {linuxRelease.debSizeLabel ? ` · ${linuxRelease.debSizeLabel}` : ''}
+                          </span>
+                        </a>
+                      )}
+
+                      {linuxRelease.rpmInstallerUrl && linuxRelease.rpmSha256 && (
+                        <a
+                          href={linuxRelease.rpmInstallerUrl}
+                          download={linuxRelease.rpmInstallerName}
+                          className="w-full px-3.5 py-2.5 min-h-[42px] border border-neutral-700 hover:border-[#22D3EE]/60 text-neutral-100 text-xs font-semibold rounded-md transition-colors inline-flex items-center justify-center gap-2"
+                        >
+                          <Download className="w-3.5 h-3.5 shrink-0" />
+                          <span>
+                            Fedora / RHEL (.rpm)
+                            {linuxRelease.rpmSizeLabel ? ` · ${linuxRelease.rpmSizeLabel}` : ''}
+                          </span>
+                        </a>
+                      )}
+
+                      {linuxRelease.appImageInstallerUrl && linuxRelease.appImageSha256 && (
+                        <a
+                          href={linuxRelease.appImageInstallerUrl}
+                          download={linuxRelease.appImageInstallerName}
+                          className="w-full px-3.5 py-2.5 min-h-[42px] border border-neutral-700 hover:border-[#22D3EE]/60 text-neutral-100 text-xs font-semibold rounded-md transition-colors inline-flex items-center justify-center gap-2"
+                        >
+                          <Download className="w-3.5 h-3.5 shrink-0" />
+                          <span>
+                            Universal Linux (.AppImage)
+                            {linuxRelease.appImageSizeLabel
+                              ? ` · ${linuxRelease.appImageSizeLabel}`
+                              : ''}
+                          </span>
+                        </a>
+                      )}
+
+                      <div className="grid grid-cols-3 gap-2 text-[11px] bg-neutral-900/70 border border-neutral-800 rounded-md p-2.5">
+                        <div>
+                          <div className="text-neutral-500">Version</div>
+                          <div className="font-mono font-semibold text-neutral-100">
+                            v{linuxRelease.version}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-neutral-500">Arch</div>
+                          <div className="font-mono font-semibold text-neutral-100">x86_64</div>
+                        </div>
+                        <div>
+                          <div className="text-neutral-500">Formats</div>
+                          <div className="font-mono font-semibold text-neutral-100">
+                            {[
+                              linuxRelease.debInstallerUrl ? '.deb' : '',
+                              linuxRelease.rpmInstallerUrl ? '.rpm' : '',
+                              linuxRelease.appImageInstallerUrl ? '.AppImage' : '',
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </div>
+                        </div>
+                      </div>
+
+                      {linuxRelease.debSha256 && (
+                        <div className="p-3 border border-neutral-800 bg-neutral-900/50 rounded-md space-y-1.5">
+                          <div className="flex items-center justify-between gap-2 text-[11px]">
+                            <span className="font-semibold text-neutral-300 truncate">
+                              SHA-256 ({linuxRelease.debInstallerName})
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => void handleCopyLinuxSha256('deb')}
+                              className="inline-flex items-center gap-1 text-[#22D3EE] hover:underline font-medium shrink-0"
+                            >
+                              {copiedLinuxSha === 'deb' ? (
+                                <>
+                                  <Check className="w-3 h-3" />
+                                  <span>Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3 h-3" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                          <div className="text-[11px] font-mono text-neutral-300 break-all select-all">
+                            {linuxRelease.debSha256}
+                          </div>
+                        </div>
+                      )}
+
+                      {linuxRelease.rpmSha256 && (
+                        <div className="p-3 border border-neutral-800 bg-neutral-900/50 rounded-md space-y-1.5">
+                          <div className="flex items-center justify-between gap-2 text-[11px]">
+                            <span className="font-semibold text-neutral-300 truncate">
+                              SHA-256 ({linuxRelease.rpmInstallerName})
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => void handleCopyLinuxSha256('rpm')}
+                              className="inline-flex items-center gap-1 text-[#22D3EE] hover:underline font-medium shrink-0"
+                            >
+                              {copiedLinuxSha === 'rpm' ? (
+                                <>
+                                  <Check className="w-3 h-3" />
+                                  <span>Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3 h-3" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                          <div className="text-[11px] font-mono text-neutral-300 break-all select-all">
+                            {linuxRelease.rpmSha256}
+                          </div>
+                        </div>
+                      )}
+
+                      {linuxRelease.appImageSha256 && (
+                        <div className="p-3 border border-neutral-800 bg-neutral-900/50 rounded-md space-y-1.5">
+                          <div className="flex items-center justify-between gap-2 text-[11px]">
+                            <span className="font-semibold text-neutral-300 truncate">
+                              SHA-256 ({linuxRelease.appImageInstallerName})
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => void handleCopyLinuxSha256('appimage')}
+                              className="inline-flex items-center gap-1 text-[#22D3EE] hover:underline font-medium shrink-0"
+                            >
+                              {copiedLinuxSha === 'appimage' ? (
+                                <>
+                                  <Check className="w-3 h-3" />
+                                  <span>Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3 h-3" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                          <div className="text-[11px] font-mono text-neutral-300 break-all select-all">
+                            {linuxRelease.appImageSha256}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono text-neutral-400">
+                        <span>Verify: sha256sum ~/Downloads/SCRIBBLE-IT*</span>
+                        {linuxRelease.sha256SumsUrl && (
+                          <a
+                            href={linuxRelease.sha256SumsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-neutral-300 hover:text-white underline"
+                          >
+                            SHA256SUMS-linux.txt
+                          </a>
+                        )}
+                      </div>
+
+                      <div className="p-3 border border-neutral-800 bg-neutral-900/40 rounded-md space-y-1.5 text-[11px]">
+                        <div className="font-semibold text-neutral-200">Quick Install Commands</div>
+                        <div className="font-mono text-neutral-300 break-all">
+                          · Debian/Ubuntu: sudo apt install ./{linuxRelease.debInstallerName || 'SCRIBBLE-IT_1.0.0_amd64.deb'}
+                        </div>
+                        <div className="font-mono text-neutral-300 break-all">
+                          · Fedora/RHEL: sudo dnf install ./{linuxRelease.rpmInstallerName || 'SCRIBBLE-IT-1.0.0-1.x86_64.rpm'}
+                        </div>
+                        <div className="font-mono text-neutral-300 break-all">
+                          · AppImage: chmod +x ./{linuxRelease.appImageInstallerName || 'SCRIBBLE-IT_1.0.0_amd64.AppImage'} &amp;&amp; ./{linuxRelease.appImageInstallerName || 'SCRIBBLE-IT_1.0.0_amd64.AppImage'}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 text-xs text-neutral-300 leading-relaxed">
+                      <p>
+                        <strong className="text-[#F5F8FF]">GitHub Release Linux packages (.deb / .rpm / .AppImage) are not yet published.</strong> The Tauri 2 Linux configuration, Secret Service keyring bridge, and <code className="text-[#22D3EE]">.github/workflows/linux-desktop-ci.yml</code> pipeline are ready; direct <code className="text-neutral-200">.deb</code>, <code className="text-neutral-200">.rpm</code>, and <code className="text-neutral-200">.AppImage</code> buttons activate automatically once verified Ubuntu LTS release assets are published.
+                      </p>
+                      <div className="p-2.5 border border-neutral-800 bg-neutral-900/50 rounded-md font-mono text-[11px] text-neutral-300 space-y-1">
+                        <div># Build &amp; verify locally on Ubuntu 22.04 LTS+:</div>
+                        <div>bash scripts/build-linux-release.sh --verify-install</div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="pt-2 border-t border-neutral-800 flex flex-wrap gap-x-4 gap-y-2 text-xs font-semibold">
+                    {linuxRelease.releasePageUrl && (
+                      <a
+                        href={linuxRelease.releasePageUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-emerald-400 hover:underline inline-flex items-center gap-1"
+                      >
+                        <span>GitHub Release</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
+                    <a
+                      href={linuxRelease.installGuideUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#22D3EE] hover:underline inline-flex items-center gap-1"
+                    >
+                      <span>Linux Install Guide</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                    <a
+                      href={linuxRelease.buildGuideUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#0A84FF] hover:underline inline-flex items-center gap-1"
+                    >
+                      <span>Linux Build Guide</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                    <a
+                      href={linuxRelease.securityGuideUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-neutral-200 hover:underline inline-flex items-center gap-1"
+                    >
+                      <span>Security Spec</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                    <a
+                      href={linuxRelease.releaseNotesUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-neutral-300 hover:underline inline-flex items-center gap-1"
+                    >
+                      <span>v1.0.0 Release Notes</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+
+                <div className="border border-neutral-800 bg-neutral-950 rounded-lg p-6 space-y-3 text-xs">
+                  <h3 className="text-sm font-bold text-[#F5F8FF]">
+                    Linux System Requirements &amp; Dependencies
+                  </h3>
+                  <ul className="space-y-1.5 text-neutral-400">
+                    <li>· <strong className="text-neutral-200">Distributions:</strong> {linuxRelease.supportedDistributions}</li>
+                    <li>· <strong className="text-neutral-200">Architecture:</strong> {linuxRelease.supportedArchitectures}</li>
+                    <li>· <strong className="text-neutral-200">Libraries:</strong> {linuxRelease.runtimeRequirement}</li>
+                    <li>· <strong className="text-neutral-200">Credential Vault:</strong> Freedesktop Secret Service daemon (gnome-keyring or kwallet)</li>
+                    <li>· <strong className="text-neutral-200">Scope Notice:</strong> Android and iOS mobile builds remain Coming Soon.</li>
                   </ul>
                 </div>
               </div>
@@ -1976,7 +2461,7 @@ export const LandingWebsitePage: React.FC = () => {
                     { name: 'Vite 8 Build Pipeline', state: 'Implemented' },
                     { name: 'Tailwind CSS v4 Design System', state: 'Implemented' },
                     { name: 'React Router v7 Multi-Portal Routing', state: 'Implemented' },
-                    { name: 'Tauri 2 Desktop Runtime (Windows & macOS)', state: 'Implemented' },
+                    { name: 'Tauri 2 Desktop Runtime (Windows, macOS & Linux)', state: 'Implemented' },
                   ],
                 },
                 {
@@ -1998,7 +2483,7 @@ export const LandingWebsitePage: React.FC = () => {
                     { name: 'Nginx Reverse Proxy + SPA Bundle', state: 'Implemented' },
                     { name: 'Async Background Workers & Retries', state: 'Implemented' },
                     { name: 'GitHub Actions CI/CD Workflows', state: 'Implemented' },
-                    { name: 'Desktop Release CI (Windows & macOS)', state: 'Implemented' },
+                    { name: 'Desktop Release CI (Windows, macOS & Linux)', state: 'Implemented' },
                   ],
                 },
               ].map(column => {

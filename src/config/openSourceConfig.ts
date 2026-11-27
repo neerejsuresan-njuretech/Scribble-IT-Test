@@ -154,7 +154,7 @@ export function formatInstallerSize(bytes?: number | null): string {
 export function isDirectGitHubReleaseAssetUrl(
   url: string | undefined | null,
   repoUrl: string,
-  expectedExtension: '.exe' | '.msi' | '.dmg' | '.txt'
+  expectedExtension: '.exe' | '.msi' | '.dmg' | '.deb' | '.rpm' | '.appimage' | '.txt'
 ): boolean {
   if (!url) return false;
   const trimmed = url.trim();
@@ -489,5 +489,222 @@ export const MACOS_DESKTOP_CONFIG: MacosDesktopReleaseConfig = {
   securityGuideUrl: `${GITHUB_REPOSITORY_URL}/blob/main/docs/desktop/macos-security.md`,
   releaseNotesUrl: `${GITHUB_REPOSITORY_URL}/blob/main/docs/releases/macos-v1.0.0-release-notes.md`,
 };
+
+export interface LinuxDesktopReleaseConfig {
+  version: string;
+  availabilityStatus: 'Available' | 'In Development';
+  debInstallerUrl: string;
+  debInstallerName: string;
+  debSizeBytes: number | null;
+  debSizeLabel: string;
+  debSha256: string;
+  rpmInstallerUrl: string;
+  rpmInstallerName: string;
+  rpmSizeBytes: number | null;
+  rpmSizeLabel: string;
+  rpmSha256: string;
+  appImageInstallerUrl: string;
+  appImageInstallerName: string;
+  appImageSizeBytes: number | null;
+  appImageSizeLabel: string;
+  appImageSha256: string;
+  sha256SumsUrl: string;
+  releasePageUrl: string;
+  supportedArchitectures: string;
+  supportedDistributions: string;
+  minimumOs: string;
+  runtimeRequirement: string;
+  codeSigningStatus: string;
+  installGuideUrl: string;
+  buildGuideUrl: string;
+  securityGuideUrl: string;
+  releaseNotesUrl: string;
+}
+
+export function parseGitHubLinuxRelease(
+  releasesPayload: unknown,
+  repoUrl: string = GITHUB_REPOSITORY_URL
+): LinuxDesktopReleaseConfig | null {
+  if (!Array.isArray(releasesPayload)) return null;
+
+  for (const rawRel of releasesPayload as GitHubReleaseLike[]) {
+    if (!rawRel || rawRel.draft === true || !Array.isArray(rawRel.assets)) continue;
+    const assets = rawRel.assets as GitHubReleaseAssetLike[];
+
+    const debAsset = assets.find(
+      a =>
+        typeof a?.name === 'string' &&
+        typeof a?.browser_download_url === 'string' &&
+        typeof a?.size === 'number' &&
+        a.size > 0 &&
+        isDirectGitHubReleaseAssetUrl(a.browser_download_url, repoUrl, '.deb')
+    );
+    const rpmAsset = assets.find(
+      a =>
+        typeof a?.name === 'string' &&
+        typeof a?.browser_download_url === 'string' &&
+        typeof a?.size === 'number' &&
+        a.size > 0 &&
+        isDirectGitHubReleaseAssetUrl(a.browser_download_url, repoUrl, '.rpm')
+    );
+    const appImageAsset = assets.find(
+      a =>
+        typeof a?.name === 'string' &&
+        typeof a?.browser_download_url === 'string' &&
+        typeof a?.size === 'number' &&
+        a.size > 0 &&
+        isDirectGitHubReleaseAssetUrl(a.browser_download_url, repoUrl, '.appimage')
+    );
+
+    if (!debAsset && !rpmAsset && !appImageAsset) continue;
+
+    const debSha = extractAssetSha256Digest(debAsset);
+    const rpmSha = extractAssetSha256Digest(rpmAsset);
+    const appImageSha = extractAssetSha256Digest(appImageAsset);
+
+    const sumsAsset = assets.find(
+      a =>
+        typeof a?.name === 'string' &&
+        (a.name === 'SHA256SUMS-linux.txt' || a.name === 'SHA256SUMS.txt') &&
+        typeof a?.browser_download_url === 'string' &&
+        isDirectGitHubReleaseAssetUrl(a.browser_download_url, repoUrl, '.txt')
+    );
+
+    const rawTag = typeof rawRel.tag_name === 'string' ? rawRel.tag_name.trim() : '';
+    const version = rawTag.replace(/^(linux-)?v/i, '') || LINUX_DESKTOP_CONFIG.version;
+
+    const debSize = debAsset && typeof debAsset.size === 'number' ? debAsset.size : null;
+    const rpmSize = rpmAsset && typeof rpmAsset.size === 'number' ? rpmAsset.size : null;
+    const appImageSize =
+      appImageAsset && typeof appImageAsset.size === 'number' ? appImageAsset.size : null;
+
+    const debVerified = Boolean(debAsset && debSha);
+    const rpmVerified = Boolean(rpmAsset && rpmSha);
+    const appImageVerified = Boolean(appImageAsset && appImageSha);
+
+    const hasArm64 = [debAsset, rpmAsset, appImageAsset].some(
+      a => typeof a?.name === 'string' && /(arm64|aarch64)/i.test(a.name)
+    );
+    const hasX64 = [debAsset, rpmAsset, appImageAsset].some(
+      a => typeof a?.name === 'string' && /(amd64|x86_64|x64)/i.test(a.name)
+    );
+
+    const supportedArchitectures =
+      hasArm64 && hasX64
+        ? 'Linux x86_64 (amd64) & ARM64 (aarch64)'
+        : hasArm64
+        ? 'Linux ARM64 (aarch64)'
+        : 'Linux x86_64 (64-bit amd64)';
+
+    return {
+      ...LINUX_DESKTOP_CONFIG,
+      version,
+      availabilityStatus:
+        debVerified || rpmVerified || appImageVerified ? 'Available' : 'In Development',
+      debInstallerUrl: debAsset ? (debAsset.browser_download_url as string) : '',
+      debInstallerName: debAsset ? (debAsset.name as string) : '',
+      debSizeBytes: debSize,
+      debSizeLabel: formatInstallerSize(debSize),
+      debSha256: debSha,
+      rpmInstallerUrl: rpmAsset ? (rpmAsset.browser_download_url as string) : '',
+      rpmInstallerName: rpmAsset ? (rpmAsset.name as string) : '',
+      rpmSizeBytes: rpmSize,
+      rpmSizeLabel: formatInstallerSize(rpmSize),
+      rpmSha256: rpmSha,
+      appImageInstallerUrl: appImageAsset ? (appImageAsset.browser_download_url as string) : '',
+      appImageInstallerName: appImageAsset ? (appImageAsset.name as string) : '',
+      appImageSizeBytes: appImageSize,
+      appImageSizeLabel: formatInstallerSize(appImageSize),
+      appImageSha256: appImageSha,
+      sha256SumsUrl: sumsAsset ? (sumsAsset.browser_download_url as string) : '',
+      releasePageUrl: typeof rawRel.html_url === 'string' ? rawRel.html_url : '',
+      supportedArchitectures,
+    };
+  }
+
+  return null;
+}
+
+const configuredLinuxVersion = readEnv('VITE_LINUX_RELEASE_VERSION') || '1.0.0';
+const configuredLinuxDebUrl = readEnv('VITE_LINUX_DEB_URL');
+const configuredLinuxDebSha = readEnv('VITE_LINUX_DEB_SHA256');
+const parsedLinuxDebSize = Number.parseInt(readEnv('VITE_LINUX_DEB_SIZE_BYTES'), 10);
+const configuredLinuxDebSizeBytes =
+  Number.isFinite(parsedLinuxDebSize) && parsedLinuxDebSize > 0 ? parsedLinuxDebSize : null;
+
+const configuredLinuxRpmUrl = readEnv('VITE_LINUX_RPM_URL');
+const configuredLinuxRpmSha = readEnv('VITE_LINUX_RPM_SHA256');
+const parsedLinuxRpmSize = Number.parseInt(readEnv('VITE_LINUX_RPM_SIZE_BYTES'), 10);
+const configuredLinuxRpmSizeBytes =
+  Number.isFinite(parsedLinuxRpmSize) && parsedLinuxRpmSize > 0 ? parsedLinuxRpmSize : null;
+
+const configuredLinuxAppImageUrl = readEnv('VITE_LINUX_APPIMAGE_URL');
+const configuredLinuxAppImageSha = readEnv('VITE_LINUX_APPIMAGE_SHA256');
+const parsedLinuxAppImageSize = Number.parseInt(readEnv('VITE_LINUX_APPIMAGE_SIZE_BYTES'), 10);
+const configuredLinuxAppImageSizeBytes =
+  Number.isFinite(parsedLinuxAppImageSize) && parsedLinuxAppImageSize > 0
+    ? parsedLinuxAppImageSize
+    : null;
+
+const configuredLinuxSumsUrl = readEnv('VITE_LINUX_SHA256SUMS_URL');
+const configuredLinuxReleaseUrl = readEnv('VITE_LINUX_RELEASE_URL');
+
+const hasVerifiedLinuxDeb =
+  isDirectGitHubReleaseAssetUrl(configuredLinuxDebUrl, GITHUB_REPOSITORY_URL, '.deb') &&
+  /^[a-f0-9]{64}$/i.test(configuredLinuxDebSha);
+const hasVerifiedLinuxRpm =
+  isDirectGitHubReleaseAssetUrl(configuredLinuxRpmUrl, GITHUB_REPOSITORY_URL, '.rpm') &&
+  /^[a-f0-9]{64}$/i.test(configuredLinuxRpmSha);
+const hasVerifiedLinuxAppImage =
+  isDirectGitHubReleaseAssetUrl(configuredLinuxAppImageUrl, GITHUB_REPOSITORY_URL, '.appimage') &&
+  /^[a-f0-9]{64}$/i.test(configuredLinuxAppImageSha);
+const hasVerifiedLinuxBinary =
+  hasVerifiedLinuxDeb || hasVerifiedLinuxRpm || hasVerifiedLinuxAppImage;
+
+export const LINUX_DESKTOP_CONFIG: LinuxDesktopReleaseConfig = {
+  version: configuredLinuxVersion,
+  availabilityStatus: hasVerifiedLinuxBinary ? 'Available' : 'In Development',
+  debInstallerUrl: hasVerifiedLinuxDeb ? configuredLinuxDebUrl : '',
+  debInstallerName: hasVerifiedLinuxDeb
+    ? configuredLinuxDebUrl.split('/').pop() || `SCRIBBLE-IT_${configuredLinuxVersion}_amd64.deb`
+    : '',
+  debSizeBytes: hasVerifiedLinuxDeb ? configuredLinuxDebSizeBytes : null,
+  debSizeLabel: hasVerifiedLinuxDeb ? formatInstallerSize(configuredLinuxDebSizeBytes) : '',
+  debSha256: hasVerifiedLinuxDeb ? configuredLinuxDebSha.toLowerCase() : '',
+  rpmInstallerUrl: hasVerifiedLinuxRpm ? configuredLinuxRpmUrl : '',
+  rpmInstallerName: hasVerifiedLinuxRpm
+    ? configuredLinuxRpmUrl.split('/').pop() || `SCRIBBLE-IT-${configuredLinuxVersion}-1.x86_64.rpm`
+    : '',
+  rpmSizeBytes: hasVerifiedLinuxRpm ? configuredLinuxRpmSizeBytes : null,
+  rpmSizeLabel: hasVerifiedLinuxRpm ? formatInstallerSize(configuredLinuxRpmSizeBytes) : '',
+  rpmSha256: hasVerifiedLinuxRpm ? configuredLinuxRpmSha.toLowerCase() : '',
+  appImageInstallerUrl: hasVerifiedLinuxAppImage ? configuredLinuxAppImageUrl : '',
+  appImageInstallerName: hasVerifiedLinuxAppImage
+    ? configuredLinuxAppImageUrl.split('/').pop() || `SCRIBBLE-IT_${configuredLinuxVersion}_amd64.AppImage`
+    : '',
+  appImageSizeBytes: hasVerifiedLinuxAppImage ? configuredLinuxAppImageSizeBytes : null,
+  appImageSizeLabel: hasVerifiedLinuxAppImage
+    ? formatInstallerSize(configuredLinuxAppImageSizeBytes)
+    : '',
+  appImageSha256: hasVerifiedLinuxAppImage ? configuredLinuxAppImageSha.toLowerCase() : '',
+  sha256SumsUrl:
+    hasVerifiedLinuxBinary && isConfiguredUrl(configuredLinuxSumsUrl)
+      ? configuredLinuxSumsUrl
+      : '',
+  releasePageUrl:
+    hasVerifiedLinuxBinary && isConfiguredUrl(configuredLinuxReleaseUrl)
+      ? configuredLinuxReleaseUrl
+      : '',
+  supportedArchitectures: 'Linux x86_64 (64-bit amd64)',
+  supportedDistributions: 'Ubuntu 22.04+ · Debian 12+ · Fedora · RHEL 9+ · AppImage',
+  minimumOs: 'Ubuntu 22.04 LTS+ / Debian 12+ / Fedora / RHEL 9+ (x86_64, glibc 2.35+)',
+  runtimeRequirement: 'WebKitGTK 4.1 (libwebkit2gtk-4.1-0) & GTK 3 (or Universal AppImage)',
+  codeSigningStatus: 'SHA-256 checksum verified packages (GPG repository signing pending)',
+  installGuideUrl: `${GITHUB_REPOSITORY_URL}/blob/main/docs/desktop/linux-installation-guide.md`,
+  buildGuideUrl: `${GITHUB_REPOSITORY_URL}/blob/main/docs/desktop/linux-build-and-dev-guide.md`,
+  securityGuideUrl: `${GITHUB_REPOSITORY_URL}/blob/main/docs/desktop/linux-security.md`,
+  releaseNotesUrl: `${GITHUB_REPOSITORY_URL}/blob/main/docs/releases/linux-v1.0.0-release-notes.md`,
+};
+
 
 
