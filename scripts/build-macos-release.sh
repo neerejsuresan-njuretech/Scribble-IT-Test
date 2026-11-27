@@ -52,6 +52,16 @@ APP_ID="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$REPO_ROOT
 MAIN_BINARY="$(node -e "const c=JSON.parse(require('fs').readFileSync('$REPO_ROOT/src-tauri/tauri.conf.json','utf8')); console.log(c.mainBinaryName || c.productName)")"
 
 SIGNING_IDENTITY="${APPLE_SIGNING_IDENTITY:-}"
+if [[ -z "$SIGNING_IDENTITY" ]]; then
+  unset APPLE_SIGNING_IDENTITY
+fi
+if [[ -z "${APPLE_ID:-}" ]]; then unset APPLE_ID; fi
+if [[ -z "${APPLE_APP_PASSWORD:-}" ]]; then unset APPLE_APP_PASSWORD; fi
+if [[ -z "${APPLE_TEAM_ID:-}" ]]; then unset APPLE_TEAM_ID; fi
+if [[ -z "${APPLE_API_KEY:-}" ]]; then unset APPLE_API_KEY; fi
+if [[ -z "${APPLE_API_ISSUER:-}" ]]; then unset APPLE_API_ISSUER; fi
+export CI="${CI:-true}"
+
 HAS_NOTARY_CREDS=0
 if [[ -n "$SIGNING_IDENTITY" ]] && ([[ -n "${APPLE_ID:-}" && -n "${APPLE_APP_PASSWORD:-}" && -n "${APPLE_TEAM_ID:-}" ]] || [[ -n "${APPLE_API_KEY:-}" && -n "${APPLE_API_ISSUER:-}" ]]); then
   HAS_NOTARY_CREDS=1

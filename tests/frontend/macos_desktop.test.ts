@@ -232,7 +232,25 @@ test('Tauri macOS configuration, Hardened Runtime entitlements, Cargo Keychain d
   assert.match(macCiYaml, /runs-on:\s*macos-latest/);
   assert.match(macCiYaml, /aarch64-apple-darwin/);
   assert.match(macCiYaml, /x86_64-apple-darwin/);
+  assert.doesNotMatch(
+    macCiYaml,
+    /^\s*if:.*secrets\./m,
+    'GitHub Actions prohibits referencing secrets inside step/job if: expressions'
+  );
+  assert.match(macCiYaml, /CI:\s*"true"/);
+  assert.match(buildSh, /unset APPLE_SIGNING_IDENTITY/);
   assert.match(buildSh, /hdiutil attach/);
   assert.match(buildSh, /Security\.framework/);
   assert.match(buildSh, /SHA256SUMS-macos\.txt/);
+
+  // Website LandingWebsitePage gates both Hero and #macos-desktop DMG download CTAs strictly on Available state
+  const landingTsx = fs.readFileSync(
+    path.join(REPO_ROOT, 'src', 'pages', 'public', 'LandingWebsitePage.tsx'),
+    'utf8'
+  );
+  assert.match(landingTsx, /Download for macOS \(\.dmg\)/);
+  assert.match(landingTsx, /Download for Mac — Apple Silicon \(\.dmg\)/);
+  assert.match(landingTsx, /Download for Mac — Intel x86_64 \(\.dmg\)/);
+  assert.match(landingTsx, /macosRelease\.availabilityStatus === 'Available'/);
 });
+

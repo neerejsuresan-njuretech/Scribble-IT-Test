@@ -954,6 +954,19 @@ export const LandingWebsitePage: React.FC = () => {
                     </a>
                   )}
 
+                  {macosRelease.availabilityStatus === 'Available' &&
+                  ((macosRelease.arm64InstallerUrl && macosRelease.arm64Sha256) ||
+                    (macosRelease.x64InstallerUrl && macosRelease.x64Sha256)) && (
+                    <button
+                      type="button"
+                      onClick={() => scrollToSection('macos-desktop')}
+                      className="px-5 py-3 min-h-[44px] border border-[#22D3EE]/60 bg-[#0B1F3B]/80 hover:bg-[#0B1F3B] text-[#F5F8FF] text-sm font-semibold rounded-md transition-colors inline-flex items-center gap-2 whitespace-nowrap"
+                    >
+                      <Download className="w-4 h-4 text-[#22D3EE] shrink-0" />
+                      <span>Download for macOS (.dmg)</span>
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     onClick={() => scrollToSection('sponsor')}
