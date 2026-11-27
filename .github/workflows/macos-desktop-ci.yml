@@ -100,7 +100,7 @@ jobs:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         run: bash scripts/build-macos-release.sh --verify-install
 
-      - name: Verify non-empty macOS .dmg installers and checksums in release/macos
+      - name: Verify non-empty macOS .dmg installers, verification report, and checksums in release/macos
         run: |
           ARM64_DMG="$(find release/macos -maxdepth 1 -type f -name '*_arm64.dmg' | head -n 1)"
           X64_DMG="$(find release/macos -maxdepth 1 -type f -name '*_x64.dmg' | head -n 1)"
@@ -114,13 +114,28 @@ jobs:
           fi
           test -s release/macos/SHA256SUMS-macos.txt
           test -s release/macos/installation-verification.txt
+
+          if ! grep -q "\[PASS\] DMG verified & mounted cleanly: .*_arm64\.dmg" release/macos/installation-verification.txt; then
+            echo "Missing verified Apple Silicon DMG mount PASS record in installation-verification.txt." >&2
+            exit 1
+          fi
+          if ! grep -q "\[PASS\] DMG verified & mounted cleanly: .*_x64\.dmg" release/macos/installation-verification.txt; then
+            echo "Missing verified Intel DMG mount PASS record in installation-verification.txt." >&2
+            exit 1
+          fi
+          if grep -qE "^\[(ERROR|FAIL)\]" release/macos/installation-verification.txt; then
+            echo "Verification report contains failure entries; aborting publication." >&2
+            cat release/macos/installation-verification.txt >&2
+            exit 1
+          fi
+
           echo "Verified Apple Silicon DMG: $ARM64_DMG ($(stat -f%z "$ARM64_DMG") bytes)"
           echo "Verified Intel DMG: $X64_DMG ($(stat -f%z "$X64_DMG") bytes)"
           cat release/macos/SHA256SUMS-macos.txt
           cat release/macos/installation-verification.txt
 
       - name: Publish verified macOS installers & checksums to GitHub Releases
-        if: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/macos-v') || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') }}
+        if: ${{ success() && github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/macos-v') || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -181,8 +196,20 @@ jobs:
           fi
 
       - name: Upload macOS installer release bundle & verification logs
+        if: ${{ success() }}
         uses: actions/upload-artifact@v4
         with:
           name: scribble-it-macos-release
           path: release/macos/**
           retention-days: 30
+
+      - name: Upload macOS verification diagnostics on failure
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: scribble-it-macos-failure-logs
+          path: |
+            release/macos/logs/**
+            release/macos/installation-verification.txt
+          if-no-files-found: ignore
+          retention-days: 14

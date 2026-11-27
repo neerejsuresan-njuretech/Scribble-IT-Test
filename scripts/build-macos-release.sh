@@ -33,7 +33,7 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   exit 1
 fi
 
-for cmd in node npm rustc cargo hdiutil shasum codesign otool lipo; do
+for cmd in node npm rustc cargo hdiutil shasum codesign otool lipo plutil xattr; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
     echo "[ERROR] Required macOS toolchain command '$cmd' was not found on PATH." >&2
     exit 1
@@ -109,6 +109,7 @@ export VITE_BASE_PATH="${VITE_BASE_PATH:-./}"
 STAGED_DMGS=()
 STAGED_LABELS=()
 STAGED_ARCHS=()
+STAGED_MACHO_ARCHS=()
 
 echo "[3/5] Building Tauri 2 macOS .app & .dmg bundles for: ${TARGET_ARCHS[*]}..."
 for target in "${TARGET_ARCHS[@]}"; do
@@ -187,6 +188,7 @@ for target in "${TARGET_ARCHS[@]}"; do
   STAGED_DMGS+=("$STAGED_DMG")
   STAGED_LABELS+=("$ARCH_LABEL")
   STAGED_ARCHS+=("$HUMAN_ARCH")
+  STAGED_MACHO_ARCHS+=("$EXPECTED_MACHO")
 done
 
 echo "[4/5] Generating SHA-256 checksums and release metadata..."
@@ -216,16 +218,68 @@ cp -f "$REPO_ROOT/docs/releases/macos-v1.0.0-release-notes.md" "$RELEASE_DIR/mac
 cp -f "$REPO_ROOT/docs/desktop/macos-installation-guide.md" "$RELEASE_DIR/macos-installation-guide.md"
 
 if [[ "$VERIFY_INSTALL" -eq 1 ]]; then
-  echo "[5/5] Verifying .dmg mount, Applications install copy, Info.plist, Security.framework & launch..."
+  echo "[5/5] Verifying .dmg integrity, safe mount, bundle metadata, Mach-O arch, Security.framework & launch..."
   VERIFY_REPORT="$RELEASE_DIR/installation-verification.txt"
-  TMP_WORK="$(mktemp -d)"
+  TMP_WORK="$(mktemp -d /tmp/scribbleit_dmg_verify.XXXXXX)"
+  REAL_TMP_WORK="$(cd "$TMP_WORK" && pwd -P)"
   CURRENT_MOUNT=""
+  CURRENT_DEV=""
+
+  detach_dmg_target() {
+    local dev_node="${1:-}"
+    local mount_path="${2:-}"
+    local attempt target
+    for attempt in 1 2 3; do
+      for target in "$mount_path" "$dev_node"; do
+        [[ -z "$target" ]] && continue
+        if hdiutil detach "$target" -quiet >/dev/null 2>&1; then
+          return 0
+        fi
+      done
+      sleep 1
+    done
+    for target in "$mount_path" "$dev_node"; do
+      [[ -z "$target" ]] && continue
+      hdiutil detach "$target" -force -quiet >/dev/null 2>&1 || true
+    done
+    return 0
+  }
+
+  cleanup_existing_dmg_mounts() {
+    local dmg_path="$1"
+    local mount_path="$2"
+    local vol_prefix="/Volumes/${PRODUCT_NAME}"
+    local info_out dev_candidates dev
+    info_out="$(hdiutil info 2>/dev/null || true)"
+    dev_candidates="$(printf '%s\n' "$info_out" | awk -v dmg="$dmg_path" -v mnt="$mount_path" -v vpref="$vol_prefix" '
+      /^image-path[[:space:]]*:/ { match_img = (index($0, dmg) > 0) }
+      /^\/dev\/disk/ {
+        if (match_img || index($0, mnt) > 0 || index($0, vpref) > 0) {
+          print $1
+        }
+      }
+      /^================================================/ { match_img = 0 }
+    ' | sort -u)"
+    for dev in $dev_candidates; do
+      detach_dmg_target "$dev" ""
+    done
+    if [[ -n "$mount_path" ]] && mount | grep -Fq " on ${mount_path} "; then
+      detach_dmg_target "" "$mount_path"
+    fi
+  }
 
   cleanup_verify() {
-    if [[ -n "${CURRENT_MOUNT:-}" ]] && mount | grep -q "$CURRENT_MOUNT"; then
-      hdiutil detach "$CURRENT_MOUNT" -quiet || hdiutil detach "$CURRENT_MOUNT" -force -quiet || true
+    local exit_code=$?
+    set +e
+    if [[ -n "${CURRENT_MOUNT:-}" || -n "${CURRENT_DEV:-}" ]]; then
+      detach_dmg_target "${CURRENT_DEV:-}" "${CURRENT_MOUNT:-}"
+      CURRENT_MOUNT=""
+      CURRENT_DEV=""
     fi
-    rm -rf "$TMP_WORK"
+    if [[ -n "${REAL_TMP_WORK:-}" && -d "${REAL_TMP_WORK:-}" ]]; then
+      rm -rf "$REAL_TMP_WORK"
+    fi
+    exit "$exit_code"
   }
   trap cleanup_verify EXIT
 
@@ -242,45 +296,141 @@ if [[ "$VERIFY_INSTALL" -eq 1 ]]; then
     dmg="${STAGED_DMGS[$i]}"
     label="${STAGED_LABELS[$i]}"
     human="${STAGED_ARCHS[$i]}"
+    expected_macho="${STAGED_MACHO_ARCHS[$i]}"
     name="$(basename "$dmg")"
-    bytes="$(stat -f%z "$dmg")"
-    MOUNT_DIR="$TMP_WORK/mnt_${label}"
-    APP_DEST_DIR="$TMP_WORK/apps_${label}"
-    mkdir -p "$MOUNT_DIR" "$APP_DEST_DIR"
 
-    CURRENT_MOUNT="$MOUNT_DIR"
-    hdiutil attach "$dmg" -nobrowse -readonly -mountpoint "$MOUNT_DIR" >/dev/null
+    if [[ ! -f "$dmg" || ! -s "$dmg" ]]; then
+      echo "[ERROR] Staged DMG missing or empty: $dmg" >&2
+      exit 1
+    fi
+    chmod 0644 "$dmg"
+    bytes="$(stat -f%z "$dmg")"
 
     {
       echo "--- DMG Verification: $name ($human, $bytes bytes) ---"
     } >> "$VERIFY_REPORT"
 
-    MOUNTED_APP="$MOUNT_DIR/$PRODUCT_NAME.app"
-    if [[ ! -d "$MOUNTED_APP" ]]; then
-      echo "[ERROR] Mounted DMG $name does not contain $PRODUCT_NAME.app" >&2
+    # Strip any macOS quarantine attribute inherited on CI runner to prevent headless dialog cancellation
+    xattr -d com.apple.quarantine "$dmg" >/dev/null 2>&1 || true
+
+    # Verify UDIF image metadata and internal block checksums BEFORE mounting
+    if ! hdiutil imageinfo "$dmg" > "$LOGS_DIR/hdiutil-imageinfo-${label}.log" 2>&1; then
+      echo "[ERROR] hdiutil imageinfo failed for $name" >&2
+      cat "$LOGS_DIR/hdiutil-imageinfo-${label}.log" >&2
       exit 1
     fi
-    if [[ ! -L "$MOUNT_DIR/Applications" ]]; then
+    if ! hdiutil verify "$dmg" > "$LOGS_DIR/hdiutil-verify-${label}.log" 2>&1; then
+      echo "[ERROR] hdiutil verify integrity check failed for $name" >&2
+      cat "$LOGS_DIR/hdiutil-verify-${label}.log" >&2
+      exit 1
+    fi
+    echo "[PASS] DMG UDIF structure and checksum verified via hdiutil verify ($name)." >> "$VERIFY_REPORT"
+
+    MOUNT_DIR="$(mktemp -d "${REAL_TMP_WORK}/mnt_${label}.XXXXXX")"
+    REAL_MOUNT_DIR="$(cd "$MOUNT_DIR" && pwd -P)"
+    APP_DEST_DIR="$(mktemp -d "${REAL_TMP_WORK}/apps_${label}.XXXXXX")"
+    chmod 0755 "$REAL_MOUNT_DIR" "$APP_DEST_DIR"
+
+    cleanup_existing_dmg_mounts "$dmg" "$REAL_MOUNT_DIR"
+
+    ATTACH_LOG="$LOGS_DIR/hdiutil-attach-${label}.log"
+    ATTACHED_OK=0
+    CURRENT_MOUNT="$REAL_MOUNT_DIR"
+    CURRENT_DEV=""
+
+    for attempt in 1 2 3; do
+      : > "$ATTACH_LOG"
+      if hdiutil attach "$dmg" \
+        -nobrowse \
+        -noautoopen \
+        -readonly \
+        -noverify \
+        -mountpoint "$REAL_MOUNT_DIR" \
+        < /dev/null > "$ATTACH_LOG" 2>&1; then
+        CURRENT_DEV="$(awk '/^\/dev\/disk[0-9]+/ {print $1; exit}' "$ATTACH_LOG")"
+        ATTACHED_OK=1
+        break
+      fi
+      echo "[WARN] hdiutil attach attempt $attempt failed for $name; retrying after cleanup..." >&2
+      cat "$ATTACH_LOG" >&2 || true
+      cleanup_existing_dmg_mounts "$dmg" "$REAL_MOUNT_DIR"
+      sleep 3
+    done
+
+    if [[ "$ATTACHED_OK" -ne 1 ]]; then
+      echo "[ERROR] hdiutil attach failed after retries for $name ($human)." >&2
+      cat "$ATTACH_LOG" >&2 || true
+      hdiutil info >&2 || true
+      exit 1
+    fi
+
+    MOUNTED_APP="$REAL_MOUNT_DIR/$PRODUCT_NAME.app"
+    if [[ ! -d "$MOUNTED_APP" ]]; then
+      echo "[ERROR] Mounted DMG $name does not contain $PRODUCT_NAME.app at $REAL_MOUNT_DIR" >&2
+      ls -la "$REAL_MOUNT_DIR" >&2 || true
+      exit 1
+    fi
+
+    MOUNTED_PLIST="$MOUNTED_APP/Contents/Info.plist"
+    if [[ ! -f "$MOUNTED_PLIST" ]]; then
+      echo "[ERROR] Mounted app bundle missing Contents/Info.plist ($MOUNTED_PLIST)" >&2
+      exit 1
+    fi
+    if ! plutil -lint "$MOUNTED_PLIST" > "$LOGS_DIR/plutil-${label}.log" 2>&1; then
+      echo "[ERROR] Invalid Info.plist in mounted $PRODUCT_NAME.app ($name)" >&2
+      cat "$LOGS_DIR/plutil-${label}.log" >&2
+      exit 1
+    fi
+
+    MOUNTED_BUNDLE_ID="$("$PLIST_BUDDY" -c "Print :CFBundleIdentifier" "$MOUNTED_PLIST")"
+    MOUNTED_EXEC_NAME="$("$PLIST_BUDDY" -c "Print :CFBundleExecutable" "$MOUNTED_PLIST" 2>/dev/null || echo "$MAIN_BINARY")"
+    if [[ "$MOUNTED_BUNDLE_ID" != "$APP_ID" ]]; then
+      echo "[ERROR] Mounted Info.plist CFBundleIdentifier mismatch: expected '$APP_ID', got '$MOUNTED_BUNDLE_ID'" >&2
+      exit 1
+    fi
+
+    MOUNTED_BIN="$MOUNTED_APP/Contents/MacOS/$MOUNTED_EXEC_NAME"
+    if [[ ! -s "$MOUNTED_BIN" || ! -x "$MOUNTED_BIN" ]]; then
+      echo "[ERROR] Mounted executable missing or not executable at $MOUNTED_BIN" >&2
+      exit 1
+    fi
+
+    MOUNTED_ARCH="$(lipo -archs "$MOUNTED_BIN")"
+    if [[ "$MOUNTED_ARCH" != *"$expected_macho"* ]]; then
+      echo "[ERROR] Mounted Mach-O architecture mismatch for $name: expected '$expected_macho', got '$MOUNTED_ARCH'" >&2
+      exit 1
+    fi
+
+    if ! otool -L "$MOUNTED_BIN" | grep -q "Security.framework"; then
+      echo "[ERROR] Mounted binary $MOUNTED_BIN does not link Apple Security.framework" >&2
+      exit 1
+    fi
+
+    if [[ ! -L "$REAL_MOUNT_DIR/Applications" ]]; then
       echo "[WARN] Mounted DMG $name missing Applications drag-drop symlink" >> "$VERIFY_REPORT"
     else
       echo "[PASS] DMG volume contains $PRODUCT_NAME.app and Applications drop target." >> "$VERIFY_REPORT"
     fi
 
+    echo "[PASS] DMG verified & mounted cleanly: $name (mount=$REAL_MOUNT_DIR, Info.plist valid, exec=$MOUNTED_EXEC_NAME, Arch=$MOUNTED_ARCH)" >> "$VERIFY_REPORT"
+
     ditto "$MOUNTED_APP" "$APP_DEST_DIR/$PRODUCT_NAME.app"
-    hdiutil detach "$MOUNT_DIR" -quiet
+    detach_dmg_target "$CURRENT_DEV" "$REAL_MOUNT_DIR"
     CURRENT_MOUNT=""
+    CURRENT_DEV=""
 
     INSTALLED_APP="$APP_DEST_DIR/$PRODUCT_NAME.app"
-    INSTALLED_BIN="$INSTALLED_APP/Contents/MacOS/$MAIN_BINARY"
-    if [[ ! -s "$INSTALLED_BIN" ]]; then
-      echo "[ERROR] Installed binary missing inside $INSTALLED_APP" >&2
+    INSTALLED_BIN="$INSTALLED_APP/Contents/MacOS/$MOUNTED_EXEC_NAME"
+    if [[ ! -s "$INSTALLED_BIN" || ! -x "$INSTALLED_BIN" ]]; then
+      echo "[ERROR] Installed binary missing or not executable inside $INSTALLED_APP" >&2
       exit 1
     fi
 
     VERIFIED_ID="$("$PLIST_BUDDY" -c "Print :CFBundleIdentifier" "$INSTALLED_APP/Contents/Info.plist")"
     VERIFIED_SCHEMES="$("$PLIST_BUDDY" -c "Print :CFBundleURLTypes:0:CFBundleURLSchemes:0" "$INSTALLED_APP/Contents/Info.plist" 2>/dev/null || echo 'missing')"
     VERIFIED_MIN_OS="$("$PLIST_BUDDY" -c "Print :LSMinimumSystemVersion" "$INSTALLED_APP/Contents/Info.plist" 2>/dev/null || echo 'unknown')"
-    echo "[PASS] Copied $PRODUCT_NAME.app cleanly; BundleID=$VERIFIED_ID, MinOS=$VERIFIED_MIN_OS, URLScheme=$VERIFIED_SCHEMES, Arch=$(lipo -archs "$INSTALLED_BIN")" >> "$VERIFY_REPORT"
+    INSTALLED_ARCH="$(lipo -archs "$INSTALLED_BIN")"
+    echo "[PASS] Copied $PRODUCT_NAME.app cleanly; BundleID=$VERIFIED_ID, MinOS=$VERIFIED_MIN_OS, URLScheme=$VERIFIED_SCHEMES, Arch=$INSTALLED_ARCH" >> "$VERIFY_REPORT"
 
     if [[ "$VERIFIED_SCHEMES" != "scribbleit" ]]; then
       echo "[ERROR] Deep-link scheme 'scribbleit' missing from Info.plist CFBundleURLTypes ($VERIFIED_SCHEMES)" >&2

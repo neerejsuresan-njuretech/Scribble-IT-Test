@@ -228,10 +228,13 @@ test('Tauri macOS configuration, Hardened Runtime entitlements, Cargo Keychain d
   assert.match(cargoToml, /features\s*=\s*\["apple-native"\]/);
   assert.match(cargoToml, /features\s*=\s*\["windows-native"\]/);
 
-  // macOS CI & release build script enforce dual-arch targets, Security.framework linkage, and DMG mount check
+  // macOS CI & release build script enforce dual-arch targets, Security.framework linkage, and conflict-safe DMG verification
   assert.match(macCiYaml, /runs-on:\s*macos-latest/);
   assert.match(macCiYaml, /aarch64-apple-darwin/);
   assert.match(macCiYaml, /x86_64-apple-darwin/);
+  assert.ok(macCiYaml.includes(String.raw`\[PASS\] DMG verified & mounted cleanly: .*_arm64\.dmg`));
+  assert.ok(macCiYaml.includes(String.raw`\[PASS\] DMG verified & mounted cleanly: .*_x64\.dmg`));
+  assert.match(macCiYaml, /if:\s*\$\{\{\s*success\(\)\s*&&/);
   assert.doesNotMatch(
     macCiYaml,
     /^\s*if:.*secrets\./m,
@@ -239,7 +242,14 @@ test('Tauri macOS configuration, Hardened Runtime entitlements, Cargo Keychain d
   );
   assert.match(macCiYaml, /CI:\s*"true"/);
   assert.match(buildSh, /unset APPLE_SIGNING_IDENTITY/);
-  assert.match(buildSh, /hdiutil attach/);
+  assert.match(buildSh, /hdiutil verify/);
+  assert.match(buildSh, /xattr -d com\.apple\.quarantine/);
+  assert.match(buildSh, /mktemp -d "\$\{REAL_TMP_WORK\}\/mnt_\$\{label\}\.XXXXXX"/);
+  assert.match(buildSh, /hdiutil attach "\$dmg"/);
+  assert.match(buildSh, /-nobrowse/);
+  assert.match(buildSh, /-noautoopen/);
+  assert.match(buildSh, /trap cleanup_verify EXIT/);
+  assert.match(buildSh, /plutil -lint/);
   assert.match(buildSh, /Security\.framework/);
   assert.match(buildSh, /SHA256SUMS-macos\.txt/);
 

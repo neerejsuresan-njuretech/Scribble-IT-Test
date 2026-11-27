@@ -13,8 +13,12 @@
 2. **Additional Headless CI Safeguards Added:**
    - Added `CI: "true"` to the build step in `.github/workflows/macos-desktop-ci.yml` and `export CI="${CI:-true}"` in `scripts/build-macos-release.sh` so Tauri's DMG bundler skips interactive Finder/AppleScript operations cleanly in headless runners.
    - Explicitly `unset` empty `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_APP_PASSWORD`, `APPLE_TEAM_ID`, `APPLE_API_KEY`, and `APPLE_API_ISSUER` environment variables in `scripts/build-macos-release.sh` so unsigned CI builds do not fail on empty-string secret expansion.
-3. **Why Website Showed `In Development`:**
-   - Because no `macos-v1.0.0` GitHub Release or `.dmg` asset exists yet, `deploy-pages.yml` and `parseGitHubMacosRelease()` faithfully kept **Scribble-IT for macOS** in `In Development` instead of rendering broken or fabricated download links.
+3. **Why Website Showed `In Development` Initially:**
+   - Before `macos-v1.0.0` was published, `deploy-pages.yml` and `parseGitHubMacosRelease()` faithfully kept **Scribble-IT for macOS** in `In Development` instead of rendering broken or fabricated download links. Once `run 45985744954` succeeded and published `macos-v1.0.0`, `https://scribbleit.njuregroup.in/` activated both macOS download buttons.
+4. **DMG Mount Cancellation Failure (`run 45992303240` — `hdiutil: attach canceled`):**
+   - Subsequent push `737b133c` failed during Step 5/5 of `scripts/build-macos-release.sh` with `"hdiutil: attach canceled"` on `macos-latest` (`macOS 26.7.2`) after building both DMGs.
+   - **Contributing Causes:** (a) invoking `hdiutil attach` without prior explicit `hdiutil verify` + `-noverify`/`-noautoopen`/`< /dev/null`, allowing macOS headless `diskimages-helper`/Gatekeeper quarantine checks (`com.apple.quarantine`) with no TTY to cancel the mount; (b) `mktemp -d` under `/var/folders` causing symlink path mismatch in `mount | grep "$CURRENT_MOUNT"`; (c) potential leftover `/Volumes/SCRIBBLE-IT` or device attachments from Tauri's `bundle_dmg.sh` and `XProtect`/`diskarbitrationd` lock races without retry or `hdiutil info` cleanup.
+   - **Implemented Hardening (`scripts/build-macos-release.sh` & `.github/workflows/macos-desktop-ci.yml`):** Stripped `com.apple.quarantine` via `xattr`, enforced explicit `hdiutil imageinfo` + `hdiutil verify` before mounting, cleaned stale/conflicting mounts via `hdiutil info`, isolated unique per-architecture `/tmp/scribbleit_dmg_verify.*/mnt_${label}.XXXXXX` directories resolved via `pwd -P`, mounted non-interactively with retries and full attach log capture, verified mounted `SCRIBBLE-IT.app`, `plutil -lint Info.plist`, executable bit, and per-arch `lipo -archs` (`arm64` / `x86_64`), guaranteed `trap cleanup_verify EXIT` detach by both mountpoint and `/dev/disk*`, and gated GitHub Release publishing strictly on `success()` + dual-arch `[PASS]` verification entries.
 
 ---
 
