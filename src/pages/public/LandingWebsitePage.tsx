@@ -61,6 +61,9 @@ import {
   WINDOWS_DESKTOP_CONFIG,
   type WindowsDesktopReleaseConfig,
   parseGitHubWindowsRelease,
+  MACOS_DESKTOP_CONFIG,
+  type MacosDesktopReleaseConfig,
+  parseGitHubMacosRelease,
   isConfiguredUrl,
 } from '../../config/openSourceConfig';
 import { ArchitectureDiagram } from '../../components/public/ArchitectureDiagram';
@@ -286,16 +289,25 @@ const ECOSYSTEM_PLATFORMS = [
     status: WINDOWS_DESKTOP_CONFIG.availabilityStatus,
     icon: Monitor,
     summary:
-      'Tauri 2 desktop foundation implemented with Windows Credential Manager token storage, native Windows alerts, file attachments, scribbleit:// deep links, and NSIS/MSI config. Signed installers are pending Windows CI build.',
-    sectionTarget: 'windows-desktop',
+      'Tauri 2 desktop foundation implemented with Windows Credential Manager token storage, native Windows alerts, file attachments, scribbleit:// deep links, and NSIS/MSI config.',
+    sectionTarget: 'windows-desktop' as const,
   },
   {
-    name: 'macOS, Linux & Mobile Clients',
-    platforms: 'macOS · Linux · Android · iOS',
+    name: 'macOS Desktop (Tauri 2)',
+    platforms: 'macOS 12+ · Apple Silicon & Intel',
+    status: MACOS_DESKTOP_CONFIG.availabilityStatus,
+    icon: Laptop,
+    summary:
+      'Tauri 2 macOS implementation with Apple Keychain token storage, macOS Notification Center alerts, hardened runtime, file attachments, scribbleit:// Apple Events, and .dmg packaging.',
+    sectionTarget: 'macos-desktop' as const,
+  },
+  {
+    name: 'Linux & Mobile Clients',
+    platforms: 'Linux · Android · iOS',
     status: 'Coming Soon' as const,
     icon: Smartphone,
     summary:
-      'Shared @scribble-it/* TypeScript foundation prepared for upcoming macOS, Linux, Android, and iOS clients under our AGPL-3.0 Section 7 exception. Builds begin after Windows release.',
+      'Shared @scribble-it/* TypeScript foundation prepared for upcoming Linux, Android, and iOS clients under our AGPL-3.0 Section 7 exception.',
     sectionTarget: undefined,
   },
 ];
@@ -352,15 +364,15 @@ const ROADMAP_MILESTONES: RoadmapMilestone[] = [
   },
   {
     phase: '08',
-    title: 'Windows Desktop Application (Tauri 2)',
+    title: 'Desktop Applications — Windows & macOS (Tauri 2)',
     status: 'In Progress',
-    summary: 'Tauri 2 Rust/React desktop implementation with Windows Credential Manager vault, native notifications, and NSIS/MSI bundler configuration; installer CI build & signing pending Windows runner.',
+    summary: 'Tauri 2 Rust/React desktop builds with OS Credential Manager & Apple Keychain vaults, native notifications, scribbleit:// deep links, Windows NSIS/MSI (.exe/.msi), and macOS .dmg packaging.',
   },
   {
     phase: '09',
-    title: 'macOS, Linux & Mobile Applications (Android, iOS)',
+    title: 'Linux & Mobile Applications (Android, iOS)',
     status: 'Coming Soon',
-    summary: 'Upcoming native clients sharing core TypeScript API/RBAC/design-token packages across macOS, Linux, Android, and iOS under AGPL-3.0 Section 7.',
+    summary: 'Upcoming native clients sharing core TypeScript API/RBAC/design-token packages across Linux, Android, and iOS under AGPL-3.0 Section 7.',
   },
   {
     phase: '10',
@@ -442,7 +454,7 @@ const FAQ_ITEMS = [
   {
     question: 'Are desktop and mobile apps available?',
     answer:
-      'The Web Application is production-ready today. The SCRIBBLE-IT for Windows Tauri 2 application source code, Credential Manager storage, and NSIS/MSI packaging config are implemented in the repository (In Development—unsigned installer binaries await Windows CI runner compilation). macOS, Linux, Android, and iOS applications remain Coming Soon.',
+      'The Web Application is production-ready today. SCRIBBLE-IT for Windows (.exe / .msi) is published via GitHub Releases, and SCRIBBLE-IT for macOS (Tauri 2 with Apple Keychain and .dmg packaging) activates direct .dmg downloads once verified macOS CI release assets are published. Linux, Android, and iOS applications remain Coming Soon.',
   },
   {
     question: 'How does AI work in Scribble-IT?',
@@ -519,48 +531,97 @@ export const LandingWebsitePage: React.FC = () => {
   const [legalModal, setLegalModal] = useState<'privacy' | 'terms' | null>(null);
   const [desktopRelease, setDesktopRelease] =
     useState<WindowsDesktopReleaseConfig>(WINDOWS_DESKTOP_CONFIG);
+  const [macosRelease, setMacosRelease] =
+    useState<MacosDesktopReleaseConfig>(MACOS_DESKTOP_CONFIG);
   const [copiedSha256, setCopiedSha256] = useState(false);
+  const [copiedMacSha, setCopiedMacSha] = useState<'arm64' | 'x64' | null>(null);
 
   const currentYear = new Date().getFullYear();
 
   useEffect(() => {
-    if (WINDOWS_DESKTOP_CONFIG.availabilityStatus === 'Available') return;
+    const needWindows = WINDOWS_DESKTOP_CONFIG.availabilityStatus !== 'Available';
+    const needMacos = MACOS_DESKTOP_CONFIG.availabilityStatus !== 'Available';
+    if (!needWindows && !needMacos) return;
+
     const match = /github\.com\/([^/]+\/[^/]+?)(?:\.git|\/)?$/i.exec(GITHUB_REPOSITORY_URL);
     if (!match) return;
     const controller = new AbortController();
 
-    fetch(`https://api.github.com/repos/${match[1]}/releases?per_page=5`, {
+    const resolveDigestFromSums = async (
+      sumsUrl: string,
+      assetName: string
+    ): Promise<string> => {
+      if (!sumsUrl || !assetName) return '';
+      try {
+        const sumRes = await fetch(sumsUrl, { signal: controller.signal });
+        if (!sumRes.ok) return '';
+        const text = await sumRes.text();
+        for (const line of text.split(/\r?\n/)) {
+          if (line.includes(assetName)) {
+            const hm = /\b([a-f0-9]{64})\b/i.exec(line);
+            if (hm) return hm[1].toLowerCase();
+          }
+        }
+      } catch {
+        // Ignore network/abort errors; stay cleanly In Development
+      }
+      return '';
+    };
+
+    fetch(`https://api.github.com/repos/${match[1]}/releases?per_page=15`, {
       headers: { Accept: 'application/vnd.github+json' },
       signal: controller.signal,
     })
       .then(res => (res.ok ? res.json() : null))
       .then(async payload => {
-        const parsed = parseGitHubWindowsRelease(payload, GITHUB_REPOSITORY_URL);
-        if (!parsed) return;
-        if (parsed.availabilityStatus === 'Available' && parsed.installerSha256) {
-          setDesktopRelease(parsed);
-          return;
-        }
-        if (parsed.sha256SumsUrl && parsed.installerName) {
-          try {
-            const sumRes = await fetch(parsed.sha256SumsUrl, { signal: controller.signal });
-            if (!sumRes.ok) return;
-            const text = await sumRes.text();
-            for (const line of text.split(/\r?\n/)) {
-              if (line.includes(parsed.installerName)) {
-                const hm = /\b([a-f0-9]{64})\b/i.exec(line);
-                if (hm) {
-                  setDesktopRelease({
-                    ...parsed,
-                    availabilityStatus: 'Available',
-                    installerSha256: hm[1].toLowerCase(),
-                  });
-                  return;
-                }
+        if (needWindows) {
+          const parsedWin = parseGitHubWindowsRelease(payload, GITHUB_REPOSITORY_URL);
+          if (parsedWin) {
+            if (parsedWin.availabilityStatus === 'Available' && parsedWin.installerSha256) {
+              setDesktopRelease(parsedWin);
+            } else if (parsedWin.sha256SumsUrl && parsedWin.installerName) {
+              const sha = await resolveDigestFromSums(
+                parsedWin.sha256SumsUrl,
+                parsedWin.installerName
+              );
+              if (sha) {
+                setDesktopRelease({
+                  ...parsedWin,
+                  availabilityStatus: 'Available',
+                  installerSha256: sha,
+                });
               }
             }
-          } catch {
-            // Keep In Development if checksum could not be verified
+          }
+        }
+
+        if (needMacos) {
+          const parsedMac = parseGitHubMacosRelease(payload, GITHUB_REPOSITORY_URL);
+          if (parsedMac) {
+            let nextArmSha = parsedMac.arm64Sha256;
+            let nextX64Sha = parsedMac.x64Sha256;
+            if (!nextArmSha && parsedMac.arm64InstallerName && parsedMac.sha256SumsUrl) {
+              nextArmSha = await resolveDigestFromSums(
+                parsedMac.sha256SumsUrl,
+                parsedMac.arm64InstallerName
+              );
+            }
+            if (!nextX64Sha && parsedMac.x64InstallerName && parsedMac.sha256SumsUrl) {
+              nextX64Sha = await resolveDigestFromSums(
+                parsedMac.sha256SumsUrl,
+                parsedMac.x64InstallerName
+              );
+            }
+            if (nextArmSha || nextX64Sha) {
+              setMacosRelease({
+                ...parsedMac,
+                availabilityStatus: 'Available',
+                arm64Sha256: nextArmSha,
+                arm64InstallerUrl: nextArmSha ? parsedMac.arm64InstallerUrl : '',
+                x64Sha256: nextX64Sha,
+                x64InstallerUrl: nextX64Sha ? parsedMac.x64InstallerUrl : '',
+              });
+            }
           }
         }
       })
@@ -577,6 +638,18 @@ export const LandingWebsitePage: React.FC = () => {
       await navigator.clipboard.writeText(desktopRelease.installerSha256);
       setCopiedSha256(true);
       setTimeout(() => setCopiedSha256(false), 2500);
+    } catch {
+      // Clipboard API unavailable
+    }
+  };
+
+  const handleCopyMacSha256 = async (arch: 'arm64' | 'x64') => {
+    const hash = arch === 'arm64' ? macosRelease.arm64Sha256 : macosRelease.x64Sha256;
+    if (!hash) return;
+    try {
+      await navigator.clipboard.writeText(hash);
+      setCopiedMacSha(arch);
+      setTimeout(() => setCopiedMacSha(null), 2500);
     } catch {
       // Clipboard API unavailable
     }
@@ -622,6 +695,13 @@ export const LandingWebsitePage: React.FC = () => {
       title: 'Windows Desktop Guide',
       description: 'Tauri 2 Windows installation, WebView2 prerequisites, NSIS/MSI bundling, and Credential Manager security.',
       href: `${GITHUB_REPOSITORY_URL}/blob/main/docs/desktop/windows-installation-guide.md`,
+      configured: isConfiguredUrl(GITHUB_REPOSITORY_URL),
+      external: true,
+    },
+    {
+      title: 'macOS Desktop Guide',
+      description: 'Tauri 2 macOS Apple Silicon & Intel installation, .dmg verification, Gatekeeper notes, and Apple Keychain security.',
+      href: `${GITHUB_REPOSITORY_URL}/blob/main/docs/desktop/macos-installation-guide.md`,
       configured: isConfiguredUrl(GITHUB_REPOSITORY_URL),
       external: true,
     },
@@ -704,7 +784,8 @@ export const LandingWebsitePage: React.FC = () => {
             {[
               { id: 'about', label: 'About' },
               { id: 'features', label: 'Capabilities' },
-              { id: 'windows-desktop', label: 'Windows App' },
+              { id: 'windows-desktop', label: 'Windows' },
+              { id: 'macos-desktop', label: 'macOS' },
               { id: 'architecture', label: 'Architecture' },
               { id: 'opensource', label: 'Open Source' },
               { id: 'roadmap', label: 'Roadmap' },
@@ -752,6 +833,7 @@ export const LandingWebsitePage: React.FC = () => {
               { id: 'features', label: 'Platform Capabilities' },
               { id: 'ecosystem', label: 'Cross-Platform Ecosystem' },
               { id: 'windows-desktop', label: 'Scribble-IT for Windows' },
+              { id: 'macos-desktop', label: 'Scribble-IT for macOS' },
               { id: 'architecture', label: 'Technology & Architecture' },
               { id: 'opensource', label: 'Open-Source Commitment' },
               { id: 'sponsor', label: 'Support & Sponsorship' },
@@ -1162,12 +1244,14 @@ export const LandingWebsitePage: React.FC = () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {ECOSYSTEM_PLATFORMS.map(item => {
                 const Icon = item.icon;
                 const resolvedStatus =
                   item.sectionTarget === 'windows-desktop'
                     ? desktopRelease.availabilityStatus
+                    : item.sectionTarget === 'macos-desktop'
+                    ? macosRelease.availabilityStatus
                     : item.status;
                 const resolvedSummary =
                   item.sectionTarget === 'windows-desktop' &&
@@ -1177,6 +1261,9 @@ export const LandingWebsitePage: React.FC = () => {
                           ? `, ${desktopRelease.installerSizeLabel}`
                           : ''
                       }) with Windows Credential Manager token storage, native Windows alerts, file attachments, and scribbleit:// deep links.`
+                    : item.sectionTarget === 'macos-desktop' &&
+                      macosRelease.availabilityStatus === 'Available'
+                    ? `Native Tauri 2 macOS .dmg installer (v${macosRelease.version}) for ${macosRelease.supportedArchitectures} with Apple Keychain storage, Notification Center alerts, file attachments, and scribbleit:// Apple Events.`
                     : item.summary;
                 return (
                   <div
@@ -1212,6 +1299,19 @@ export const LandingWebsitePage: React.FC = () => {
                             {resolvedStatus === 'Available'
                               ? 'Download Windows Installer (.exe)'
                               : 'View Windows Desktop Details'}
+                          </span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      ) : item.sectionTarget === 'macos-desktop' ? (
+                        <button
+                          type="button"
+                          onClick={() => scrollToSection('macos-desktop')}
+                          className="text-xs font-semibold text-[#22D3EE] hover:text-[#F5F8FF] inline-flex items-center gap-1.5 transition-colors"
+                        >
+                          <span>
+                            {resolvedStatus === 'Available'
+                              ? 'Download macOS Installer (.dmg)'
+                              : 'View macOS Desktop Details'}
                           </span>
                           <ArrowRight className="w-3.5 h-3.5" />
                         </button>
@@ -1511,7 +1611,322 @@ export const LandingWebsitePage: React.FC = () => {
                     <li>· <strong className="text-neutral-200">Runtime:</strong> {desktopRelease.runtimeRequirement}</li>
                     <li>· <strong className="text-neutral-200">Hardware:</strong> 64-bit CPU, 4 GB RAM min (8 GB recommended), 200 MB free disk</li>
                     <li>· <strong className="text-neutral-200">Trust Boundary:</strong> Local device fingerprint aids session identification and is not treated as independent MDM attestation; IAM enrollment remains admin-controlled.</li>
-                    <li>· <strong className="text-neutral-200">Scope Notice:</strong> macOS, Linux, Android, and iOS builds remain Coming Soon.</li>
+                    <li>· <strong className="text-neutral-200">Scope Notice:</strong> macOS (Tauri 2) is documented below; Linux, Android, and iOS builds remain Coming Soon.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* =================================================================== */}
+        {/* D3. SCRIBBLE-IT FOR MACOS (DEDICATED DESKTOP SECTION)               */}
+        {/* =================================================================== */}
+        <section
+          id="macos-desktop"
+          className="border-b border-neutral-800 bg-neutral-950"
+        >
+          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 space-y-10">
+            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+              <div className="space-y-3 max-w-3xl">
+                <div className="text-xs font-mono text-[#22D3EE] uppercase tracking-wider">
+                  macOS Desktop Application · Tauri 2 Architecture
+                </div>
+                <h2
+                  className="text-2xl sm:text-3xl font-bold text-[#F5F8FF] tracking-tight"
+                  style={{ fontFamily: 'Manrope, Inter, sans-serif', textWrap: 'balance' }}
+                >
+                  Scribble-IT for macOS
+                </h2>
+                <p className="text-sm sm:text-base text-neutral-300 leading-relaxed">
+                  Enterprise IT management, directly from your Mac. Access incidents, service requests, approvals and IT operations through the Scribble-IT desktop experience.
+                </p>
+              </div>
+
+              <div className="border border-[#0A84FF]/40 bg-[#0B1F3B]/60 rounded-lg px-4 py-3 shrink-0 space-y-1">
+                <div className="text-[11px] font-mono text-neutral-400">Release Status</div>
+                <div className="text-sm font-bold text-[#22D3EE]">
+                  {macosRelease.availabilityStatus === 'Available'
+                    ? `Available · v${macosRelease.version}`
+                    : `In Development · v${macosRelease.version} Source Ready`}
+                </div>
+                <div className="text-[11px] text-neutral-400">
+                  {macosRelease.supportedArchitectures}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="lg:col-span-7 border border-[#0A84FF]/30 bg-neutral-950/90 rounded-lg p-6 space-y-5">
+                <div className="flex items-center justify-between gap-2 pb-3 border-b border-neutral-800">
+                  <h3 className="text-base font-bold text-[#F5F8FF]">
+                    Implemented macOS Desktop Capabilities
+                  </h3>
+                  <span className="text-xs font-mono text-[#0A84FF]">Tauri 2 + Rust + Apple Keychain</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  {[
+                    {
+                      title: 'Apple Keychain Token Vault',
+                      detail: 'JWT access tokens, rotating refresh tokens, and active organization IDs are stored natively in Apple Keychain (Security.framework via Rust keyring)—never in plaintext files or localStorage.',
+                    },
+                    {
+                      title: 'Cloud & Self-Hosted Endpoints',
+                      detail: 'Connect to HTTPS enterprise FastAPI servers (or http://localhost:8000 for local development) with strict endpoint validation via /api/v1/client/config.',
+                    },
+                    {
+                      title: 'Session Inventory & Revocation',
+                      detail: 'Inspect active macOS and web sessions with accurate macOS host telemetry and revoke individual sessions or sign out all other devices immediately.',
+                    },
+                    {
+                      title: 'Notification Center & Native Files',
+                      detail: 'Delivers unread backend operational alerts to macOS Notification Center and provides a sandbox-safe 10 MiB native file picker with SHA-256 verification.',
+                    },
+                    {
+                      title: 'Safe scribbleit:// Apple Events',
+                      detail: 'Handles scribbleit:// protocol links across Finder and browsers cleanly while rejecting auth-bypass query parameters and requiring active authentication.',
+                    },
+                    {
+                      title: 'Hardened Runtime & Auto-Rotation',
+                      detail: 'Built with macOS Hardened Runtime (Entitlements.plist), single-flight 401 refresh rotation, reuse detection, and full Apple Keychain cleanup on sign-out.',
+                    },
+                  ].map(feat => (
+                    <div
+                      key={feat.title}
+                      className="p-3.5 border border-neutral-800 bg-[#0B1F3B]/20 rounded-md space-y-1.5"
+                    >
+                      <div className="font-bold text-[#F5F8FF]">{feat.title}</div>
+                      <p className="text-neutral-400 leading-relaxed">{feat.detail}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="lg:col-span-5 flex flex-col gap-5">
+                <div className="border border-neutral-800 bg-neutral-950 rounded-lg p-6 space-y-4">
+                  <div className="flex items-center justify-between gap-2 pb-3 border-b border-neutral-800">
+                    <h3 className="text-sm font-bold text-[#F5F8FF]">
+                      macOS Installer Availability (.dmg)
+                    </h3>
+                    <span
+                      className={`text-xs font-mono ${
+                        macosRelease.availabilityStatus === 'Available'
+                          ? 'text-emerald-400'
+                          : 'text-amber-400'
+                      }`}
+                    >
+                      {macosRelease.availabilityStatus}
+                    </span>
+                  </div>
+
+                  {macosRelease.availabilityStatus === 'Available' &&
+                  ((macosRelease.arm64InstallerUrl && macosRelease.arm64Sha256) ||
+                    (macosRelease.x64InstallerUrl && macosRelease.x64Sha256)) ? (
+                    <div className="space-y-3">
+                      {macosRelease.arm64InstallerUrl && macosRelease.arm64Sha256 && (
+                        <a
+                          href={macosRelease.arm64InstallerUrl}
+                          download={macosRelease.arm64InstallerName}
+                          className="w-full px-4 py-3 min-h-[44px] bg-[#0A84FF] hover:bg-[#0A84FF]/90 text-white text-xs sm:text-sm font-semibold rounded-md transition-colors inline-flex items-center justify-center gap-2"
+                        >
+                          <Download className="w-4 h-4 shrink-0" />
+                          <span>
+                            Download for Mac — Apple Silicon (.dmg)
+                            {macosRelease.arm64SizeLabel ? ` · ${macosRelease.arm64SizeLabel}` : ''}
+                          </span>
+                        </a>
+                      )}
+
+                      {macosRelease.x64InstallerUrl && macosRelease.x64Sha256 && (
+                        <a
+                          href={macosRelease.x64InstallerUrl}
+                          download={macosRelease.x64InstallerName}
+                          className="w-full px-3.5 py-2.5 min-h-[40px] border border-neutral-700 hover:border-[#22D3EE]/60 text-neutral-100 text-xs font-semibold rounded-md transition-colors inline-flex items-center justify-center gap-2"
+                        >
+                          <Download className="w-3.5 h-3.5 shrink-0" />
+                          <span>
+                            Download for Mac — Intel x86_64 (.dmg)
+                            {macosRelease.x64SizeLabel ? ` · ${macosRelease.x64SizeLabel}` : ''}
+                          </span>
+                        </a>
+                      )}
+
+                      <div className="grid grid-cols-3 gap-2 text-[11px] bg-neutral-900/70 border border-neutral-800 rounded-md p-2.5">
+                        <div>
+                          <div className="text-neutral-500">Version</div>
+                          <div className="font-mono font-semibold text-neutral-100">
+                            v{macosRelease.version}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-neutral-500">Minimum OS</div>
+                          <div className="font-mono font-semibold text-neutral-100">
+                            macOS 12+
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-neutral-500">Architectures</div>
+                          <div className="font-mono font-semibold text-neutral-100">
+                            {macosRelease.arm64InstallerUrl && macosRelease.x64InstallerUrl
+                              ? 'arm64 & x64'
+                              : macosRelease.arm64InstallerUrl
+                              ? 'Apple Silicon'
+                              : 'Intel x64'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {macosRelease.arm64Sha256 && (
+                        <div className="p-3 border border-neutral-800 bg-neutral-900/50 rounded-md space-y-1.5">
+                          <div className="flex items-center justify-between gap-2 text-[11px]">
+                            <span className="font-semibold text-neutral-300">
+                              SHA-256 ({macosRelease.arm64InstallerName})
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => void handleCopyMacSha256('arm64')}
+                              className="inline-flex items-center gap-1 text-[#22D3EE] hover:underline font-medium"
+                            >
+                              {copiedMacSha === 'arm64' ? (
+                                <>
+                                  <Check className="w-3 h-3" />
+                                  <span>Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3 h-3" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                          <div className="text-[11px] font-mono text-neutral-300 break-all select-all">
+                            {macosRelease.arm64Sha256}
+                          </div>
+                        </div>
+                      )}
+
+                      {macosRelease.x64Sha256 && (
+                        <div className="p-3 border border-neutral-800 bg-neutral-900/50 rounded-md space-y-1.5">
+                          <div className="flex items-center justify-between gap-2 text-[11px]">
+                            <span className="font-semibold text-neutral-300">
+                              SHA-256 ({macosRelease.x64InstallerName})
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => void handleCopyMacSha256('x64')}
+                              className="inline-flex items-center gap-1 text-[#22D3EE] hover:underline font-medium"
+                            >
+                              {copiedMacSha === 'x64' ? (
+                                <>
+                                  <Check className="w-3 h-3" />
+                                  <span>Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3 h-3" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                          <div className="text-[11px] font-mono text-neutral-300 break-all select-all">
+                            {macosRelease.x64Sha256}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono text-neutral-400">
+                        <span>Verify: shasum -a 256 ~/Downloads/SCRIBBLE-IT_*.dmg</span>
+                        {macosRelease.sha256SumsUrl && (
+                          <a
+                            href={macosRelease.sha256SumsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-neutral-300 hover:text-white underline"
+                          >
+                            SHA256SUMS-macos.txt
+                          </a>
+                        )}
+                      </div>
+
+                      <p className="text-[11px] text-amber-300/90 leading-relaxed">
+                        {macosRelease.codeSigningStatus}. Verify the SHA-256 checksum first; on unsigned builds, Control-click the app in Applications and choose Open to bypass Gatekeeper.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 text-xs text-neutral-300 leading-relaxed">
+                      <p>
+                        <strong className="text-[#F5F8FF]">GitHub Release macOS assets (.dmg) are not yet published.</strong> The Tauri 2 macOS implementation, Apple Keychain bridge, Hardened Runtime config, and <code className="text-[#22D3EE]">.github/workflows/macos-desktop-ci.yml</code> workflow are ready; direct <code className="text-neutral-200">.dmg</code> buttons activate automatically once verified CI release artifacts are published.
+                      </p>
+                      <p className="text-neutral-400">
+                        {macosRelease.codeSigningStatus}. Build and verify natively on macOS via <code className="text-neutral-200">bash scripts/build-macos-release.sh --verify-install</code>.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="pt-2 border-t border-neutral-800 flex flex-wrap gap-x-4 gap-y-2 text-xs font-semibold">
+                    {macosRelease.releasePageUrl && (
+                      <a
+                        href={macosRelease.releasePageUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-emerald-400 hover:underline inline-flex items-center gap-1"
+                      >
+                        <span>GitHub Release</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
+                    <a
+                      href={macosRelease.installGuideUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#22D3EE] hover:underline inline-flex items-center gap-1"
+                    >
+                      <span>macOS Install Guide</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                    <a
+                      href={macosRelease.buildGuideUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#0A84FF] hover:underline inline-flex items-center gap-1"
+                    >
+                      <span>macOS Build Guide</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                    <a
+                      href={macosRelease.securityGuideUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-neutral-200 hover:underline inline-flex items-center gap-1"
+                    >
+                      <span>Security Spec</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                    <a
+                      href={macosRelease.releaseNotesUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-neutral-300 hover:underline inline-flex items-center gap-1"
+                    >
+                      <span>v1.0.0 Release Notes</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+
+                <div className="border border-neutral-800 bg-neutral-950 rounded-lg p-6 space-y-3 text-xs">
+                  <h3 className="text-sm font-bold text-[#F5F8FF]">
+                    macOS System Requirements &amp; Trust Boundary
+                  </h3>
+                  <ul className="space-y-1.5 text-neutral-400">
+                    <li>· <strong className="text-neutral-200">OS:</strong> {macosRelease.minimumOs}</li>
+                    <li>· <strong className="text-neutral-200">Architectures:</strong> {macosRelease.supportedArchitectures}</li>
+                    <li>· <strong className="text-neutral-200">WebView Runtime:</strong> {macosRelease.runtimeRequirement}</li>
+                    <li>· <strong className="text-neutral-200">Trust Boundary:</strong> Local host fingerprint assists session visibility and never claims independent MDM attestation; IAM enrollment remains admin-controlled.</li>
+                    <li>· <strong className="text-neutral-200">Scope Notice:</strong> Linux, Android, and iOS clients remain Coming Soon.</li>
                   </ul>
                 </div>
               </div>
@@ -1548,7 +1963,7 @@ export const LandingWebsitePage: React.FC = () => {
                     { name: 'Vite 8 Build Pipeline', state: 'Implemented' },
                     { name: 'Tailwind CSS v4 Design System', state: 'Implemented' },
                     { name: 'React Router v7 Multi-Portal Routing', state: 'Implemented' },
-                    { name: 'Tauri 2 Windows Desktop Runtime', state: 'In Development' },
+                    { name: 'Tauri 2 Desktop Runtime (Windows & macOS)', state: 'Implemented' },
                   ],
                 },
                 {
@@ -1570,7 +1985,7 @@ export const LandingWebsitePage: React.FC = () => {
                     { name: 'Nginx Reverse Proxy + SPA Bundle', state: 'Implemented' },
                     { name: 'Async Background Workers & Retries', state: 'Implemented' },
                     { name: 'GitHub Actions CI/CD Workflows', state: 'Implemented' },
-                    { name: 'Windows NSIS / MSI CI Release Pipeline', state: 'In Development' },
+                    { name: 'Desktop Release CI (Windows & macOS)', state: 'Implemented' },
                   ],
                 },
               ].map(column => {

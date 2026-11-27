@@ -18,11 +18,12 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "typecheck:packages": "npm run typecheck --workspaces",
-    "test:frontend": "tsx --test tests/frontend/navigation_rbac.test.ts tests/frontend/api_client.test.ts tests/frontend/shared_packages.test.ts tests/frontend/windows_desktop.test.ts",
+    "test:frontend": "tsx --test tests/frontend/navigation_rbac.test.ts tests/frontend/api_client.test.ts tests/frontend/shared_packages.test.ts tests/frontend/windows_desktop.test.ts tests/frontend/macos_desktop.test.ts",
     "verify:brand": "node scripts/verify-brand-assets.mjs",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build:windows": "tauri build --bundles nsis,msi"
+    "tauri:build:windows": "tauri build --bundles nsis,msi",
+    "tauri:build:macos": "tauri build --bundles app,dmg"
   },
   "dependencies": {
     "@google/genai": "^3.4.0",

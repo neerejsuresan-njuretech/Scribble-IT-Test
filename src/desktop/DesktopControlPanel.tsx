@@ -23,12 +23,13 @@ import { useITSM } from '../context/ITSMContext';
 import {
   getCachedDesktopBaseUrl,
   getCachedDesktopRuntimeInfo,
-  getWindowsAutostartEnabled,
+  getDesktopAutostartEnabled,
   openDesktopExternalUrl,
   saveDesktopApiBaseUrl,
-  sendWindowsNotification,
-  setWindowsAutostartEnabled,
+  sendDesktopNotification,
+  setDesktopAutostartEnabled,
 } from './desktopBridge';
+import { detectFallbackDesktopPlatform } from './runtime';
 import { PROJECT_IDENTITY, GITHUB_REPOSITORY_URL } from '../config/openSourceConfig';
 
 interface DesktopControlPanelProps {
@@ -39,6 +40,15 @@ interface DesktopControlPanelProps {
 export const DesktopControlPanel: React.FC<DesktopControlPanelProps> = ({ isOpen, onClose }) => {
   const { isManagedDeviceVerified, managedDevice, logoutSession, showToast } = useITSM();
   const runtimeInfo = getCachedDesktopRuntimeInfo();
+  const desktopPlatform = runtimeInfo?.client_platform || detectFallbackDesktopPlatform();
+  const isMacOs = desktopPlatform === 'macos';
+  const platformLabel = isMacOs ? 'macOS' : 'Windows';
+  const defaultVaultLabel = isMacOs
+    ? 'Apple Keychain (Security.framework)'
+    : 'Windows Credential Manager (DPAPI)';
+  const securityDocPath = isMacOs
+    ? 'docs/desktop/macos-security.md'
+    : 'docs/desktop/windows-security.md';
 
   const [serverUrl, setServerUrl] = useState<string>(() => getCachedDesktopBaseUrl());
   const [serverConfig, setServerConfig] = useState<ClientConfigDto | null>(null);
@@ -96,7 +106,7 @@ export const DesktopControlPanel: React.FC<DesktopControlPanelProps> = ({ isOpen
     setServerUrl(getCachedDesktopBaseUrl());
     void loadServerConfig();
     void loadSessions();
-    void getWindowsAutostartEnabled().then(setAutostartEnabled);
+    void getDesktopAutostartEnabled().then(setAutostartEnabled);
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -154,18 +164,22 @@ export const DesktopControlPanel: React.FC<DesktopControlPanelProps> = ({ isOpen
   const handleToggleAutostart = async () => {
     setAutostartBusy(true);
     try {
-      const next = await setWindowsAutostartEnabled(!autostartEnabled);
+      const next = await setDesktopAutostartEnabled(!autostartEnabled);
       setAutostartEnabled(next);
       showToast({
         variant: 'info',
-        title: 'Windows Startup Preference Updated',
-        description: next ? 'SCRIBBLE-IT will launch on Windows sign-in.' : 'Windows auto-launch disabled.',
+        title: `${platformLabel} Startup Preference Updated`,
+        description: next
+          ? `SCRIBBLE-IT will launch on ${isMacOs ? 'macOS Login' : 'Windows sign-in'}.`
+          : `${platformLabel} auto-launch disabled.`,
       });
     } catch (err) {
       showToast({
         variant: 'error',
         title: 'Autostart Update Failed',
-        description: err instanceof Error ? err.message : 'Unable to update Windows startup key.',
+        description: err instanceof Error
+          ? err.message
+          : `Unable to update ${isMacOs ? 'macOS Login Item' : 'Windows startup key'}.`,
       });
     } finally {
       setAutostartBusy(false);
@@ -173,14 +187,16 @@ export const DesktopControlPanel: React.FC<DesktopControlPanelProps> = ({ isOpen
   };
 
   const handleTestNotification = async () => {
-    const res = await sendWindowsNotification(
-      'SCRIBBLE-IT Windows Desktop',
-      'Native Windows incident & SLA alerts are active.',
+    const res = await sendDesktopNotification(
+      `SCRIBBLE-IT ${platformLabel} Desktop`,
+      `Native ${platformLabel} incident & SLA alerts are active.`,
     );
     showToast({
       variant: res.sent ? 'success' : 'error',
-      title: res.sent ? 'Windows Notification Sent' : 'Notification Unavailable',
-      description: res.sent ? 'Check Windows Action Center.' : (res.reason || 'Permission blocked.'),
+      title: res.sent ? `${platformLabel} Notification Sent` : 'Notification Unavailable',
+      description: res.sent
+        ? (isMacOs ? 'Check macOS Notification Center.' : 'Check Windows Action Center.')
+        : (res.reason || 'Permission blocked.'),
     });
   };
 
@@ -188,7 +204,7 @@ export const DesktopControlPanel: React.FC<DesktopControlPanelProps> = ({ isOpen
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="SCRIBBLE-IT Windows Desktop Controls"
+      aria-label={`SCRIBBLE-IT ${platformLabel} Desktop Controls`}
       className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4"
       onClick={onClose}
     >
@@ -201,17 +217,17 @@ export const DesktopControlPanel: React.FC<DesktopControlPanelProps> = ({ isOpen
             <Laptop className="w-4 h-4 text-sky-400" />
             <div>
               <h2 className="text-sm font-bold text-neutral-100">
-                {PROJECT_IDENTITY.productName} for Windows — Desktop Settings &amp; Security
+                {PROJECT_IDENTITY.productName} for {platformLabel} — Desktop Settings &amp; Security
               </h2>
               <p className="text-[11px] text-neutral-400">
-                v{runtimeInfo?.app_version || '1.0.0'} · {runtimeInfo?.device_name || 'Windows Host'} · {runtimeInfo?.credential_backend || 'Windows Credential Manager'}
+                v{runtimeInfo?.app_version || '1.0.0'} · {runtimeInfo?.device_name || `${platformLabel} Host`} · {runtimeInfo?.credential_backend || defaultVaultLabel}
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close Windows Desktop Controls"
+            aria-label={`Close ${platformLabel} Desktop Controls`}
             className="p-1.5 text-neutral-400 hover:text-white rounded"
           >
             <X className="w-4 h-4" />
@@ -287,7 +303,7 @@ export const DesktopControlPanel: React.FC<DesktopControlPanelProps> = ({ isOpen
             )}
           </section>
 
-          {/* 2. Windows Security & Device Posture */}
+          {/* 2. Platform Security & Device Posture */}
           <section className="border border-neutral-800 bg-neutral-900/30 rounded-md p-4 space-y-3">
             <div className="flex items-center gap-2 font-bold text-neutral-100">
               {isManagedDeviceVerified ? (
@@ -295,14 +311,14 @@ export const DesktopControlPanel: React.FC<DesktopControlPanelProps> = ({ isOpen
               ) : (
                 <ShieldAlert className="w-4 h-4 text-amber-400" />
               )}
-              <span>Windows Security &amp; Device Trust Posture</span>
+              <span>{platformLabel} Security &amp; Device Trust Posture</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-[11px]">
               <div className="p-2.5 border border-neutral-800 bg-neutral-950">
                 <div className="text-neutral-500">Token Storage</div>
                 <div className="font-semibold text-emerald-300 mt-0.5">
-                  {runtimeInfo?.credential_backend || 'Windows Credential Manager (DPAPI)'}
+                  {runtimeInfo?.credential_backend || defaultVaultLabel}
                 </div>
               </div>
               <div className="p-2.5 border border-neutral-800 bg-neutral-950">
@@ -316,15 +332,15 @@ export const DesktopControlPanel: React.FC<DesktopControlPanelProps> = ({ isOpen
               <div className="p-2.5 border border-neutral-800 bg-neutral-950 sm:col-span-2">
                 <div className="text-neutral-500">Host Hardware Fingerprint (Non-MDM Client Identifier)</div>
                 <div className="font-mono text-[10px] text-neutral-300 break-all mt-0.5">
-                  {runtimeInfo?.device_fingerprint || 'Generated natively on Windows host'}
+                  {runtimeInfo?.device_fingerprint || `Generated natively on ${platformLabel} host`}
                 </div>
               </div>
             </div>
           </section>
 
-          {/* 3. Windows OS Integration Controls */}
+          {/* 3. Platform OS Integration Controls */}
           <section className="border border-neutral-800 bg-neutral-900/30 rounded-md p-4 space-y-3">
-            <div className="font-bold text-neutral-100">Windows OS Integrations</div>
+            <div className="font-bold text-neutral-100">{platformLabel} OS Integrations</div>
             <div className="flex flex-wrap items-center gap-2.5">
               <button
                 type="button"
@@ -332,7 +348,7 @@ export const DesktopControlPanel: React.FC<DesktopControlPanelProps> = ({ isOpen
                 className="px-3.5 py-2 border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-100 font-semibold flex items-center gap-2 rounded-sm"
               >
                 <Bell className="w-3.5 h-3.5 text-sky-400" />
-                <span>Send Test Windows Notification</span>
+                <span>Send Test {platformLabel} Notification</span>
               </button>
 
               <button
@@ -347,17 +363,19 @@ export const DesktopControlPanel: React.FC<DesktopControlPanelProps> = ({ isOpen
               >
                 <Power className="w-3.5 h-3.5" />
                 <span>
-                  {autostartEnabled ? 'Launch on Windows Sign-In: ON' : 'Launch on Windows Sign-In: OFF'}
+                  {isMacOs
+                    ? (autostartEnabled ? 'Launch at macOS Login: ON' : 'Launch at macOS Login: OFF')
+                    : (autostartEnabled ? 'Launch on Windows Sign-In: ON' : 'Launch on Windows Sign-In: OFF')}
                 </span>
               </button>
 
               <button
                 type="button"
-                onClick={() => openDesktopExternalUrl(`${GITHUB_REPOSITORY_URL}/blob/main/docs/desktop/windows-security.md`)}
+                onClick={() => openDesktopExternalUrl(`${GITHUB_REPOSITORY_URL}/blob/main/${securityDocPath}`)}
                 className="px-3.5 py-2 border border-neutral-800 bg-neutral-950 hover:bg-neutral-900 text-neutral-300 font-semibold flex items-center gap-2 rounded-sm"
               >
                 <Globe className="w-3.5 h-3.5 text-neutral-400" />
-                <span>Windows Security Docs</span>
+                <span>{platformLabel} Security Docs</span>
               </button>
             </div>
           </section>

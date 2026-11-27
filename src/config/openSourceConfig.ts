@@ -154,7 +154,7 @@ export function formatInstallerSize(bytes?: number | null): string {
 export function isDirectGitHubReleaseAssetUrl(
   url: string | undefined | null,
   repoUrl: string,
-  expectedExtension: '.exe' | '.msi' | '.txt'
+  expectedExtension: '.exe' | '.msi' | '.dmg' | '.txt'
 ): boolean {
   if (!url) return false;
   const trimmed = url.trim();
@@ -319,4 +319,175 @@ export const WINDOWS_DESKTOP_CONFIG: WindowsDesktopReleaseConfig = {
   securityGuideUrl: `${GITHUB_REPOSITORY_URL}/blob/main/docs/desktop/windows-security.md`,
   releaseNotesUrl: `${GITHUB_REPOSITORY_URL}/blob/main/docs/releases/windows-v1.0.0-release-notes.md`,
 };
+
+export interface MacosDesktopReleaseConfig {
+  version: string;
+  availabilityStatus: 'Available' | 'In Development';
+  arm64InstallerUrl: string;
+  arm64InstallerName: string;
+  arm64SizeBytes: number | null;
+  arm64SizeLabel: string;
+  arm64Sha256: string;
+  x64InstallerUrl: string;
+  x64InstallerName: string;
+  x64SizeBytes: number | null;
+  x64SizeLabel: string;
+  x64Sha256: string;
+  sha256SumsUrl: string;
+  releasePageUrl: string;
+  supportedArchitectures: string;
+  minimumOs: string;
+  runtimeRequirement: string;
+  codeSigningStatus: string;
+  installGuideUrl: string;
+  buildGuideUrl: string;
+  securityGuideUrl: string;
+  releaseNotesUrl: string;
+}
+
+function extractAssetSha256Digest(asset: GitHubReleaseAssetLike | undefined): string {
+  if (!asset || typeof asset.digest !== 'string') return '';
+  const match = /^sha256:([a-f0-9]{64})$/i.exec(asset.digest.trim());
+  return match ? match[1].toLowerCase() : '';
+}
+
+export function parseGitHubMacosRelease(
+  releasesPayload: unknown,
+  repoUrl: string = GITHUB_REPOSITORY_URL
+): MacosDesktopReleaseConfig | null {
+  if (!Array.isArray(releasesPayload)) return null;
+
+  for (const rawRel of releasesPayload as GitHubReleaseLike[]) {
+    if (!rawRel || rawRel.draft === true || !Array.isArray(rawRel.assets)) continue;
+    const assets = rawRel.assets as GitHubReleaseAssetLike[];
+
+    const dmgAssets = assets.filter(
+      a =>
+        typeof a?.name === 'string' &&
+        typeof a?.browser_download_url === 'string' &&
+        typeof a?.size === 'number' &&
+        a.size > 0 &&
+        isDirectGitHubReleaseAssetUrl(a.browser_download_url, repoUrl, '.dmg')
+    );
+    if (dmgAssets.length === 0) continue;
+
+    const armAsset = dmgAssets.find(a =>
+      /(arm64|aarch64|silicon)/i.test(String(a.name))
+    );
+    const x64Asset = dmgAssets.find(a =>
+      /(x64|x86_64|intel)/i.test(String(a.name))
+    );
+    if (!armAsset && !x64Asset) continue;
+
+    const armSha = extractAssetSha256Digest(armAsset);
+    const x64Sha = extractAssetSha256Digest(x64Asset);
+
+    const sumsAsset = assets.find(
+      a =>
+        typeof a?.name === 'string' &&
+        (a.name === 'SHA256SUMS-macos.txt' || a.name === 'SHA256SUMS.txt') &&
+        typeof a?.browser_download_url === 'string' &&
+        isDirectGitHubReleaseAssetUrl(a.browser_download_url, repoUrl, '.txt')
+    );
+
+    const rawTag = typeof rawRel.tag_name === 'string' ? rawRel.tag_name.trim() : '';
+    const version = rawTag.replace(/^(macos-)?v/i, '') || MACOS_DESKTOP_CONFIG.version;
+
+    const armSize = armAsset && typeof armAsset.size === 'number' ? armAsset.size : null;
+    const x64Size = x64Asset && typeof x64Asset.size === 'number' ? x64Asset.size : null;
+
+    const armVerified = Boolean(armAsset && armSha);
+    const x64Verified = Boolean(x64Asset && x64Sha);
+
+    const supportedArchitectures =
+      armAsset && x64Asset
+        ? 'Apple Silicon (arm64) & Intel (x86_64)'
+        : armAsset
+        ? 'Apple Silicon (arm64)'
+        : 'Intel (x86_64)';
+
+    return {
+      ...MACOS_DESKTOP_CONFIG,
+      version,
+      availabilityStatus: armVerified || x64Verified ? 'Available' : 'In Development',
+      arm64InstallerUrl: armAsset ? (armAsset.browser_download_url as string) : '',
+      arm64InstallerName: armAsset ? (armAsset.name as string) : '',
+      arm64SizeBytes: armSize,
+      arm64SizeLabel: formatInstallerSize(armSize),
+      arm64Sha256: armSha,
+      x64InstallerUrl: x64Asset ? (x64Asset.browser_download_url as string) : '',
+      x64InstallerName: x64Asset ? (x64Asset.name as string) : '',
+      x64SizeBytes: x64Size,
+      x64SizeLabel: formatInstallerSize(x64Size),
+      x64Sha256: x64Sha,
+      sha256SumsUrl: sumsAsset ? (sumsAsset.browser_download_url as string) : '',
+      releasePageUrl: typeof rawRel.html_url === 'string' ? rawRel.html_url : '',
+      supportedArchitectures,
+    };
+  }
+
+  return null;
+}
+
+const configuredMacVersion = readEnv('VITE_MACOS_RELEASE_VERSION') || '1.0.0';
+const configuredMacArm64Url = readEnv('VITE_MACOS_ARM64_DMG_URL');
+const configuredMacArm64Sha = readEnv('VITE_MACOS_ARM64_DMG_SHA256');
+const parsedMacArm64Size = Number.parseInt(readEnv('VITE_MACOS_ARM64_DMG_SIZE_BYTES'), 10);
+const configuredMacArm64SizeBytes =
+  Number.isFinite(parsedMacArm64Size) && parsedMacArm64Size > 0 ? parsedMacArm64Size : null;
+
+const configuredMacX64Url = readEnv('VITE_MACOS_X64_DMG_URL');
+const configuredMacX64Sha = readEnv('VITE_MACOS_X64_DMG_SHA256');
+const parsedMacX64Size = Number.parseInt(readEnv('VITE_MACOS_X64_DMG_SIZE_BYTES'), 10);
+const configuredMacX64SizeBytes =
+  Number.isFinite(parsedMacX64Size) && parsedMacX64Size > 0 ? parsedMacX64Size : null;
+
+const configuredMacSumsUrl = readEnv('VITE_MACOS_SHA256SUMS_URL');
+const configuredMacReleaseUrl = readEnv('VITE_MACOS_RELEASE_URL');
+
+const hasVerifiedMacArm64 =
+  isDirectGitHubReleaseAssetUrl(configuredMacArm64Url, GITHUB_REPOSITORY_URL, '.dmg') &&
+  /^[a-f0-9]{64}$/i.test(configuredMacArm64Sha);
+const hasVerifiedMacX64 =
+  isDirectGitHubReleaseAssetUrl(configuredMacX64Url, GITHUB_REPOSITORY_URL, '.dmg') &&
+  /^[a-f0-9]{64}$/i.test(configuredMacX64Sha);
+const hasVerifiedMacBinary = hasVerifiedMacArm64 || hasVerifiedMacX64;
+
+export const MACOS_DESKTOP_CONFIG: MacosDesktopReleaseConfig = {
+  version: configuredMacVersion,
+  availabilityStatus: hasVerifiedMacBinary ? 'Available' : 'In Development',
+  arm64InstallerUrl: hasVerifiedMacArm64 ? configuredMacArm64Url : '',
+  arm64InstallerName: hasVerifiedMacArm64
+    ? configuredMacArm64Url.split('/').pop() || `SCRIBBLE-IT_${configuredMacVersion}_arm64.dmg`
+    : '',
+  arm64SizeBytes: hasVerifiedMacArm64 ? configuredMacArm64SizeBytes : null,
+  arm64SizeLabel: hasVerifiedMacArm64 ? formatInstallerSize(configuredMacArm64SizeBytes) : '',
+  arm64Sha256: hasVerifiedMacArm64 ? configuredMacArm64Sha.toLowerCase() : '',
+  x64InstallerUrl: hasVerifiedMacX64 ? configuredMacX64Url : '',
+  x64InstallerName: hasVerifiedMacX64
+    ? configuredMacX64Url.split('/').pop() || `SCRIBBLE-IT_${configuredMacVersion}_x64.dmg`
+    : '',
+  x64SizeBytes: hasVerifiedMacX64 ? configuredMacX64SizeBytes : null,
+  x64SizeLabel: hasVerifiedMacX64 ? formatInstallerSize(configuredMacX64SizeBytes) : '',
+  x64Sha256: hasVerifiedMacX64 ? configuredMacX64Sha.toLowerCase() : '',
+  sha256SumsUrl:
+    hasVerifiedMacBinary && isConfiguredUrl(configuredMacSumsUrl) ? configuredMacSumsUrl : '',
+  releasePageUrl:
+    hasVerifiedMacBinary && isConfiguredUrl(configuredMacReleaseUrl) ? configuredMacReleaseUrl : '',
+  supportedArchitectures:
+    hasVerifiedMacArm64 && !hasVerifiedMacX64
+      ? 'Apple Silicon (arm64)'
+      : !hasVerifiedMacArm64 && hasVerifiedMacX64
+      ? 'Intel (x86_64)'
+      : 'Apple Silicon (arm64) & Intel (x86_64)',
+  minimumOs: 'macOS 12 Monterey or newer',
+  runtimeRequirement: 'Native Apple WebKit (WKWebView — included with macOS)',
+  codeSigningStatus:
+    'Unsigned / Not Notarized build (Apple Developer ID signing & notarization pending)',
+  installGuideUrl: `${GITHUB_REPOSITORY_URL}/blob/main/docs/desktop/macos-installation-guide.md`,
+  buildGuideUrl: `${GITHUB_REPOSITORY_URL}/blob/main/docs/desktop/macos-build-and-dev-guide.md`,
+  securityGuideUrl: `${GITHUB_REPOSITORY_URL}/blob/main/docs/desktop/macos-security.md`,
+  releaseNotesUrl: `${GITHUB_REPOSITORY_URL}/blob/main/docs/releases/macos-v1.0.0-release-notes.md`,
+};
+
 

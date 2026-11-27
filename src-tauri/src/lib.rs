@@ -10,7 +10,27 @@ use url::Url;
 use uuid::Uuid;
 use zeroize::Zeroizing;
 
+#[cfg(target_os = "windows")]
 const KEYRING_SERVICE: &str = "in.njuretech.scribbleit.windows";
+#[cfg(target_os = "macos")]
+const KEYRING_SERVICE: &str = "in.njuretech.scribbleit.macos";
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+const KEYRING_SERVICE: &str = "in.njuretech.scribbleit";
+
+#[cfg(target_os = "windows")]
+const CREDENTIAL_BACKEND_LABEL: &str = "Windows Credential Manager (DPAPI / keyring)";
+#[cfg(target_os = "macos")]
+const CREDENTIAL_BACKEND_LABEL: &str = "Apple Keychain (Security.framework / keyring)";
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+const CREDENTIAL_BACKEND_LABEL: &str = "OS Secret Keyring";
+
+#[cfg(target_os = "windows")]
+const CLIENT_PLATFORM: &str = "windows";
+#[cfg(target_os = "macos")]
+const CLIENT_PLATFORM: &str = "macos";
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+const CLIENT_PLATFORM: &str = "linux";
+
 const ALLOWED_SECRET_KEYS: [&str; 4] = [
     "access_token",
     "refresh_token",
@@ -264,7 +284,7 @@ fn get_or_create_installation_salt(app: &AppHandle) -> String {
 fn vault_set_secret(key: String, value: String) -> Result<(), String> {
     validate_secret_key(&key)?;
     let entry = keyring::Entry::new(KEYRING_SERVICE, &key)
-        .map_err(|e| format!("Windows Credential Manager init failed: {}", e))?;
+        .map_err(|e| format!("{} init failed: {}", CREDENTIAL_BACKEND_LABEL, e))?;
     let secret = Zeroizing::new(value);
     if secret.trim().is_empty() {
         let _ = entry.delete_credential();
@@ -272,18 +292,18 @@ fn vault_set_secret(key: String, value: String) -> Result<(), String> {
     }
     entry
         .set_password(secret.as_str())
-        .map_err(|e| format!("Failed storing secret in Windows Credential Manager: {}", e))
+        .map_err(|e| format!("Failed storing secret in {}: {}", CREDENTIAL_BACKEND_LABEL, e))
 }
 
 #[tauri::command]
 fn vault_get_secret(key: String) -> Result<Option<String>, String> {
     validate_secret_key(&key)?;
     let entry = keyring::Entry::new(KEYRING_SERVICE, &key)
-        .map_err(|e| format!("Windows Credential Manager init failed: {}", e))?;
+        .map_err(|e| format!("{} init failed: {}", CREDENTIAL_BACKEND_LABEL, e))?;
     match entry.get_password() {
         Ok(val) => Ok(Some(val)),
         Err(keyring::Error::NoEntry) => Ok(None),
-        Err(e) => Err(format!("Failed reading Windows Credential Manager: {}", e)),
+        Err(e) => Err(format!("Failed reading {}: {}", CREDENTIAL_BACKEND_LABEL, e)),
     }
 }
 
@@ -291,10 +311,10 @@ fn vault_get_secret(key: String) -> Result<Option<String>, String> {
 fn vault_delete_secret(key: String) -> Result<(), String> {
     validate_secret_key(&key)?;
     let entry = keyring::Entry::new(KEYRING_SERVICE, &key)
-        .map_err(|e| format!("Windows Credential Manager init failed: {}", e))?;
+        .map_err(|e| format!("{} init failed: {}", CREDENTIAL_BACKEND_LABEL, e))?;
     match entry.delete_credential() {
         Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(e) => Err(format!("Failed deleting credential from Windows Vault: {}", e)),
+        Err(e) => Err(format!("Failed deleting credential from {}: {}", CREDENTIAL_BACKEND_LABEL, e)),
     }
 }
 
@@ -327,13 +347,54 @@ fn set_api_base_url(app: AppHandle, url: String) -> Result<String, String> {
     Ok(normalized)
 }
 
+fn default_device_name_fallback() -> String {
+    #[cfg(target_os = "macos")]
+    {
+        "MAC-WORKSTATION".to_string()
+    }
+    #[cfg(target_os = "windows")]
+    {
+        "WINDOWS-WORKSTATION".to_string()
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        "DESKTOP-WORKSTATION".to_string()
+    }
+}
+
+fn detect_os_version_label() -> String {
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(out) = std::process::Command::new("/usr/bin/sw_vers")
+            .arg("-productVersion")
+            .output()
+        {
+            if out.status.success() {
+                let ver = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                if !ver.is_empty() {
+                    return format!("macOS {} ({})", ver, std::env::consts::ARCH);
+                }
+            }
+        }
+        return format!("macOS ({})", std::env::consts::ARCH);
+    }
+    #[cfg(target_os = "windows")]
+    {
+        return format!("Windows ({})", std::env::consts::ARCH);
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        format!("{} ({})", std::env::consts::OS, std::env::consts::ARCH)
+    }
+}
+
 #[tauri::command]
 fn get_desktop_runtime_info(app: AppHandle) -> DesktopRuntimeInfo {
     let host = hostname::get()
         .ok()
         .and_then(|s| s.into_string().ok())
         .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| "WINDOWS-WORKSTATION".to_string());
+        .unwrap_or_else(default_device_name_fallback);
     let salt = get_or_create_installation_salt(&app);
     let mut hasher = Sha256::new();
     hasher.update(host.as_bytes());
@@ -344,15 +405,15 @@ fn get_desktop_runtime_info(app: AppHandle) -> DesktopRuntimeInfo {
 
     DesktopRuntimeInfo {
         client_type: "desktop".to_string(),
-        client_platform: "windows".to_string(),
+        client_platform: CLIENT_PLATFORM.to_string(),
         app_version: env!("CARGO_PKG_VERSION").to_string(),
         app_id: "in.njuretech.scribbleit".to_string(),
         device_name: host,
-        os_version: format!("Windows ({})", std::env::consts::ARCH),
+        os_version: detect_os_version_label(),
         device_fingerprint: fingerprint,
         // Honest telemetry: local desktop fingerprint is NOT independent MDM verification.
         mdm_claimed: false,
-        credential_backend: "Windows Credential Manager (DPAPI / keyring)".to_string(),
+        credential_backend: CREDENTIAL_BACKEND_LABEL.to_string(),
     }
 }
 
@@ -486,7 +547,7 @@ pub fn run() {
             validate_and_sanitize_deep_link
         ])
         .run(tauri::generate_context!())
-        .expect("error while running SCRIBBLE-IT Windows desktop application");
+        .expect("error while running SCRIBBLE-IT desktop application");
 }
 
 #[cfg(test)]
@@ -537,5 +598,15 @@ mod tests {
             "____etc_passwd.txt"
         );
         assert_eq!(sanitize_attachment_filename("logs 2026.txt"), "logs_2026.txt");
+    }
+
+    #[test]
+    fn test_platform_runtime_constants() {
+        assert!(!KEYRING_SERVICE.is_empty());
+        assert!(KEYRING_SERVICE.starts_with("in.njuretech.scribbleit"));
+        assert!(!CREDENTIAL_BACKEND_LABEL.is_empty());
+        assert!(matches!(CLIENT_PLATFORM, "windows" | "macos" | "linux"));
+        let os_label = detect_os_version_label();
+        assert!(!os_label.is_empty());
     }
 }

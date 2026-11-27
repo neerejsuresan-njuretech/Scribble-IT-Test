@@ -14,11 +14,11 @@ import {
   validateDesktopDeepLink,
   validateExternalHttpsUrl,
 } from './runtime';
-import { WindowsCredentialTokenStorage } from './windowsTokenStorage';
+import { NativeVaultTokenStorage } from './windowsTokenStorage';
 
 let cachedRuntimeInfo: DesktopRuntimeInfo | null = null;
 let cachedDesktopBaseUrl = '';
-let tokenStorageSingleton: WindowsCredentialTokenStorage | null = null;
+let tokenStorageSingleton: NativeVaultTokenStorage | null = null;
 let initPromise: Promise<void> | null = null;
 
 function readEnvApiBaseUrl(): string {
@@ -47,7 +47,7 @@ export async function initializeDesktopBridge(options?: {
   }
 
   initPromise = (async () => {
-    const storage = new WindowsCredentialTokenStorage();
+    const storage = new NativeVaultTokenStorage();
     tokenStorageSingleton = storage;
 
     const [runtimeInfo, savedBaseUrl] = await Promise.all([
@@ -99,13 +99,14 @@ export async function saveDesktopApiBaseUrl(
   return { ok: true, normalized: checked.normalized };
 }
 
-export async function sendWindowsNotification(
+export async function sendDesktopNotification(
   title: string,
   body: string,
 ): Promise<{ sent: boolean; reason?: string }> {
   if (!isTauriDesktop()) {
-    return { sent: false, reason: 'Not running in Windows desktop client.' };
+    return { sent: false, reason: 'Not running in SCRIBBLE-IT desktop client.' };
   }
+  const osLabel = cachedRuntimeInfo?.client_platform === 'macos' ? 'macOS' : 'Windows';
   try {
     let granted = await isPermissionGranted();
     if (!granted) {
@@ -113,7 +114,7 @@ export async function sendWindowsNotification(
       granted = status === 'granted';
     }
     if (!granted) {
-      return { sent: false, reason: 'Windows notification permission was denied.' };
+      return { sent: false, reason: `${osLabel} notification permission was denied.` };
     }
     sendNotification({ title, body });
     return { sent: true };
@@ -124,6 +125,8 @@ export async function sendWindowsNotification(
     };
   }
 }
+
+export const sendWindowsNotification = sendDesktopNotification;
 
 export async function pickDesktopAttachment(): Promise<PickedAttachmentInfo | null> {
   if (!isTauriDesktop()) return null;
@@ -145,7 +148,7 @@ export async function openDesktopExternalUrl(rawUrl: string): Promise<boolean> {
   return false;
 }
 
-export async function getWindowsAutostartEnabled(): Promise<boolean> {
+export async function getDesktopAutostartEnabled(): Promise<boolean> {
   if (!isTauriDesktop()) return false;
   try {
     return await isAutostartEnabled();
@@ -154,7 +157,7 @@ export async function getWindowsAutostartEnabled(): Promise<boolean> {
   }
 }
 
-export async function setWindowsAutostartEnabled(enabled: boolean): Promise<boolean> {
+export async function setDesktopAutostartEnabled(enabled: boolean): Promise<boolean> {
   if (!isTauriDesktop()) return false;
   if (enabled) {
     await enableAutostart();
@@ -163,6 +166,9 @@ export async function setWindowsAutostartEnabled(enabled: boolean): Promise<bool
   }
   return isAutostartEnabled();
 }
+
+export const getWindowsAutostartEnabled = getDesktopAutostartEnabled;
+export const setWindowsAutostartEnabled = setDesktopAutostartEnabled;
 
 export async function subscribeDesktopDeepLinks(
   onNavigate: (route: string) => void,
@@ -177,6 +183,8 @@ export async function subscribeDesktopDeepLinks(
   });
 }
 
-export function getWindowsVaultStorageInstance(): WindowsCredentialTokenStorage | null {
+export function getDesktopVaultStorageInstance(): NativeVaultTokenStorage | null {
   return tokenStorageSingleton;
 }
+
+export const getWindowsVaultStorageInstance = getDesktopVaultStorageInstance;

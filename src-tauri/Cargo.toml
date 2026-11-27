@@ -1,7 +1,7 @@
 [package]
 name = "scribble-it-desktop"
 version = "1.0.0"
-description = "SCRIBBLE-IT Windows Desktop Client — Enterprise IT Management. Open to Everyone."
+description = "SCRIBBLE-IT Desktop Client (Windows & macOS) — Enterprise IT Management. Open to Everyone."
 authors = ["NEEREJ S SURESAN <tech@njuregroup.in>", "Njure Tech"]
 license = "AGPL-3.0-only"
 repository = "https://github.com/neerejsuresan-njuretech/Scribble-IT-Test"
@@ -23,7 +23,7 @@ tauri-plugin-deep-link = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-autostart = "2"
 tauri-plugin-single-instance = "2"
-keyring = { version = "3", features = ["windows-native"] }
+keyring = "3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 url = "2"
@@ -31,3 +31,9 @@ sha2 = "0.10"
 uuid = { version = "1", features = ["v4"] }
 zeroize = "1"
 hostname = "0.4"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+keyring = { version = "3", features = ["windows-native"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", features = ["apple-native"] }

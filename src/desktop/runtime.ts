@@ -1,8 +1,10 @@
 import type { ClientMetadataDto } from '@scribble-it/types';
 
+export type DesktopClientPlatform = 'windows' | 'macos' | 'linux';
+
 export interface DesktopRuntimeInfo {
   client_type: 'desktop';
-  client_platform: 'windows';
+  client_platform: DesktopClientPlatform;
   app_version: string;
   app_id: string;
   device_name: string;
@@ -176,13 +178,33 @@ export function validateExternalHttpsUrl(
   return { ok: false, error: 'Blocked non-HTTPS external link for security.' };
 }
 
+export function detectFallbackDesktopPlatform(): 'windows' | 'macos' {
+  if (typeof navigator !== 'undefined') {
+    const ua = `${navigator.userAgent || ''} ${navigator.platform || ''}`.toLowerCase();
+    if (ua.includes('mac os') || ua.includes('macintosh') || ua.includes('macintel')) {
+      return 'macos';
+    }
+  }
+  return 'windows';
+}
+
 export function buildDesktopClientMetadata(info: DesktopRuntimeInfo | null): ClientMetadataDto {
+  const platform = info?.client_platform || detectFallbackDesktopPlatform();
+  const defaultDeviceName =
+    platform === 'macos'
+      ? 'MAC-WORKSTATION'
+      : platform === 'linux'
+      ? 'LINUX-WORKSTATION'
+      : 'WINDOWS-WORKSTATION';
+  const defaultOs =
+    platform === 'macos' ? 'macOS' : platform === 'linux' ? 'Linux' : 'Windows';
+
   return {
     client_type: 'desktop',
-    client_platform: 'windows',
+    client_platform: platform,
     app_version: info?.app_version || '1.0.0',
     app_id: info?.app_id || 'in.njuretech.scribbleit',
-    device_name: info?.device_name || 'WINDOWS-WORKSTATION',
-    os_version: info?.os_version || 'Windows',
+    device_name: info?.device_name || defaultDeviceName,
+    os_version: info?.os_version || defaultOs,
   };
 }

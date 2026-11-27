@@ -3,12 +3,14 @@ import { invoke } from '@tauri-apps/api/core';
 
 export type VaultSecretKey = 'access_token' | 'refresh_token' | 'organization_id';
 
-export interface WindowsVaultBridge {
+export interface DesktopVaultBridge {
   getSecret(key: VaultSecretKey): Promise<string | null>;
   setSecret(key: VaultSecretKey, value: string): Promise<void>;
   deleteSecret(key: VaultSecretKey): Promise<void>;
   clearSessionTokens(): Promise<void>;
 }
+
+export type WindowsVaultBridge = DesktopVaultBridge;
 
 const defaultTauriVaultBridge: WindowsVaultBridge = {
   async getSecret(key) {
@@ -27,18 +29,19 @@ const defaultTauriVaultBridge: WindowsVaultBridge = {
 };
 
 /**
- * Windows Credential Manager-backed TokenStorageAdapter via Tauri Rust `keyring`.
+ * OS native keyring-backed TokenStorageAdapter via Tauri Rust `keyring`
+ * (Windows Credential Manager on Windows, Apple Keychain on macOS).
  * Maintains a read cache in memory while storing persistent secrets strictly inside
- * Windows Credential Manager (never in localStorage or plain files).
+ * the OS keychain/vault (never in localStorage or plain files).
  */
-export class WindowsCredentialTokenStorage implements TokenStorageAdapter {
-  private readonly bridge: WindowsVaultBridge;
+export class NativeVaultTokenStorage implements TokenStorageAdapter {
+  private readonly bridge: DesktopVaultBridge;
   private accessToken: string | null = null;
   private refreshToken: string | null = null;
   private organizationId: string | null = null;
   private hydrated = false;
 
-  constructor(bridge: WindowsVaultBridge = defaultTauriVaultBridge) {
+  constructor(bridge: DesktopVaultBridge = defaultTauriVaultBridge) {
     this.bridge = bridge;
   }
 
@@ -117,3 +120,5 @@ export class WindowsCredentialTokenStorage implements TokenStorageAdapter {
     await this.bridge.clearSessionTokens();
   }
 }
+
+export const WindowsCredentialTokenStorage = NativeVaultTokenStorage;

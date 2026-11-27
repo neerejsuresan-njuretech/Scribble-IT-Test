@@ -55,7 +55,7 @@ import {
 } from '../services/api';
 import { BackendSyncState, useBackendSyncBridge } from '../hooks/useBackendSyncBridge';
 import { isTauriDesktop } from '../desktop/runtime';
-import { sendWindowsNotification } from '../desktop/desktopBridge';
+import { sendDesktopNotification } from '../desktop/desktopBridge';
 
 export type CloudSyncStatus = 'disconnected' | 'connecting' | 'synced' | 'syncing' | 'error';
 
@@ -1822,7 +1822,7 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [activeTenant.id, hydrateFromBackend, applyHydratedBackendSnapshot]
   );
 
-  // Native Windows notification bridge when authenticated with FastAPI backend inside Tauri
+  // Native Desktop (Windows & macOS) notification bridge when authenticated with FastAPI backend inside Tauri
   useEffect(() => {
     if (!isTauriDesktop() || !authSession?.isAuthenticated || !isBackendApiConfigured() || !getAccessToken()) {
       return;
@@ -1835,7 +1835,7 @@ export const ITSMProvider: React.FC<{ children: React.ReactNode }> = ({ children
         for (const item of items.slice(0, 5)) {
           if (!notifiedIdsRef.current.has(item.id)) {
             notifiedIdsRef.current.add(item.id);
-            await sendWindowsNotification(item.title, item.message);
+            await sendDesktopNotification(item.title, item.message);
           }
         }
       } catch {

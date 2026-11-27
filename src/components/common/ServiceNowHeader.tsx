@@ -19,7 +19,8 @@ import {
   ShieldCheck,
   Laptop,
 } from 'lucide-react';
-import { isTauriDesktop } from '../../desktop/runtime';
+import { detectFallbackDesktopPlatform, isTauriDesktop } from '../../desktop/runtime';
+import { getCachedDesktopRuntimeInfo } from '../../desktop/desktopBridge';
 import { DesktopControlPanel } from '../../desktop/DesktopControlPanel';
 
 interface ServiceNowHeaderProps {
@@ -60,6 +61,10 @@ export const ServiceNowHeader: React.FC<ServiceNowHeaderProps> = ({
   const [showDesktopPanel, setShowDesktopPanel] = useState(false);
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const desktopMode = isTauriDesktop();
+  const desktopPlatformLabel =
+    (getCachedDesktopRuntimeInfo()?.client_platform || detectFallbackDesktopPlatform()) === 'macos'
+      ? 'macOS'
+      : 'Windows';
 
   const activePortalKey =
     location.pathname.startsWith('/iam') || authSession?.portalType === 'iam'
@@ -290,8 +295,8 @@ export const ServiceNowHeader: React.FC<ServiceNowHeaderProps> = ({
             <button
               type="button"
               onClick={() => setShowDesktopPanel(true)}
-              aria-label="Open Windows Desktop Settings and Sessions"
-              title="Windows Desktop Settings, Server Endpoint & Sessions"
+              aria-label={`Open ${desktopPlatformLabel} Desktop Settings and Sessions`}
+              title={`${desktopPlatformLabel} Desktop Settings, Server Endpoint & Sessions`}
               className="min-h-[40px] min-w-[40px] lg:min-h-[34px] lg:min-w-0 px-2 sm:px-2.5 py-1.5 border border-sky-700/80 bg-sky-950/30 text-sky-300 hover:bg-sky-900/50 transition-colors flex items-center justify-center gap-1.5 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap"
             >
               <Laptop className="w-3.5 h-3.5 shrink-0" />

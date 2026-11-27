@@ -14,3 +14,11 @@ release/windows/SHA256SUMS.txt
 release/windows/BUILD_INFO.txt
 release/windows/installation-verification.txt
 release/windows/logs/
+release/macos/*.dmg
+release/macos/*.app/
+release/macos/*.sha256
+release/macos/SHA256SUMS-macos.txt
+release/macos/BUILD_INFO.txt
+release/macos/installation-verification.txt
+release/macos/logs/
+

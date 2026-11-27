@@ -1,0 +1,184 @@
+name: Build & Verify macOS Desktop Application
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+    tags:
+      - 'v*'
+      - 'macos-v*'
+    paths:
+      - 'src/**'
+      - 'src-tauri/**'
+      - 'packages/**'
+      - 'assets/brand/**'
+      - 'tests/frontend/**'
+      - 'scripts/build-macos-release.sh'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/macos-desktop-ci.yml'
+  pull_request:
+    branches:
+      - main
+      - master
+      - develop
+    paths:
+      - 'src/**'
+      - 'src-tauri/**'
+      - 'packages/**'
+      - 'assets/brand/**'
+      - 'tests/frontend/**'
+      - 'scripts/build-macos-release.sh'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/macos-desktop-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  macos-desktop:
+    name: macOS Apple Silicon & Intel Tauri Build & DMG Verification
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24 (>=24.12.0)
+        uses: actions/setup-node@v4
+        with:
+          node-version: ">=24.12.0 <25"
+          cache: npm
+
+      - name: Set up Rust stable toolchain with Apple Silicon and Intel targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Import Apple Developer ID certificate if configured
+        if: ${{ secrets.APPLE_CERTIFICATE != '' && secrets.APPLE_CERTIFICATE_PASSWORD != '' }}
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
+          KEYCHAIN_PASS="scribble-ci-temp"
+          CERT_PATH="$RUNNER_TEMP/certificate.p12"
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$CERT_PATH"
+          security create-keychain -p "$KEYCHAIN_PASS" "$KEYCHAIN_PATH"
+          security default-keychain -s "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASS" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -k "$KEYCHAIN_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASS" "$KEYCHAIN_PATH"
+          rm -f "$CERT_PATH"
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build, verify, stage, and smoke-test macOS .dmg installers (arm64 & x64)
+        env:
+          VITE_BASE_PATH: "./"
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_USE_BACKEND_API: ${{ vars.VITE_USE_BACKEND_API }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: bash scripts/build-macos-release.sh --verify-install
+
+      - name: Verify non-empty macOS .dmg installers and checksums in release/macos
+        run: |
+          ARM64_DMG="$(find release/macos -maxdepth 1 -type f -name '*_arm64.dmg' | head -n 1)"
+          X64_DMG="$(find release/macos -maxdepth 1 -type f -name '*_x64.dmg' | head -n 1)"
+          if [[ -z "$ARM64_DMG" || ! -s "$ARM64_DMG" ]]; then
+            echo "Expected non-empty Apple Silicon .dmg installer in release/macos/." >&2
+            exit 1
+          fi
+          if [[ -z "$X64_DMG" || ! -s "$X64_DMG" ]]; then
+            echo "Expected non-empty Intel .dmg installer in release/macos/." >&2
+            exit 1
+          fi
+          test -s release/macos/SHA256SUMS-macos.txt
+          test -s release/macos/installation-verification.txt
+          echo "Verified Apple Silicon DMG: $ARM64_DMG ($(stat -f%z "$ARM64_DMG") bytes)"
+          echo "Verified Intel DMG: $X64_DMG ($(stat -f%z "$X64_DMG") bytes)"
+          cat release/macos/SHA256SUMS-macos.txt
+          cat release/macos/installation-verification.txt
+
+      - name: Publish verified macOS installers & checksums to GitHub Releases
+        if: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/macos-v') || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="$(node -e "console.log(JSON.parse(require('fs').readFileSync('src-tauri/tauri.conf.json','utf8')).version)")"
+          APP_ID="$(node -e "console.log(JSON.parse(require('fs').readFileSync('src-tauri/tauri.conf.json','utf8')).identifier)")"
+          TAG="macos-v${VERSION}"
+          if [[ "${GITHUB_REF}" == refs/tags/macos-v* ]]; then
+            TAG="${GITHUB_REF_NAME}"
+          fi
+
+          ARM64_DMG="$(find release/macos -maxdepth 1 -type f -name '*_arm64.dmg' | head -n 1)"
+          X64_DMG="$(find release/macos -maxdepth 1 -type f -name '*_x64.dmg' | head -n 1)"
+          ARM64_BYTES="$(stat -f%z "$ARM64_DMG")"
+          X64_BYTES="$(stat -f%z "$X64_DMG")"
+          SHA_SUMS="$(cat release/macos/SHA256SUMS-macos.txt)"
+          VERIFY_LOG="$(cat release/macos/installation-verification.txt)"
+
+          NOTES_PATH="$RUNNER_TEMP/macos-release-notes.md"
+          cat > "$NOTES_PATH" <<EOF
+          # SCRIBBLE-IT for macOS v${VERSION}
+
+          **Organization:** Njure Tech (formally Njure Group)
+          **Compatibility:** macOS 12 Monterey or newer (Apple Silicon \`arm64\` and Intel \`x86_64\`)
+          **Application ID:** \`${APP_ID}\`
+
+          ## Installers & Sizes
+          - **Apple Silicon Installer (.dmg):** \`$(basename "$ARM64_DMG")\` (${ARM64_BYTES} bytes)
+          - **Intel Installer (.dmg):** \`$(basename "$X64_DMG")\` (${X64_BYTES} bytes)
+
+          ## SHA-256 Checksums
+          \`\`\`text
+          ${SHA_SUMS}
+          \`\`\`
+
+          ## Automated DMG Mount & Launch Verification
+          \`\`\`text
+          ${VERIFY_LOG}
+          \`\`\`
+
+          > **Code Signing & Notarization Note:** Check the verification log above for Developer ID signing/notarization state. Always verify the downloaded file's SHA-256 digest using \`shasum -a 256 <installer.dmg>\` before opening.
+          EOF
+
+          ASSETS=(
+            "$ARM64_DMG"
+            "$X64_DMG"
+            "release/macos/SHA256SUMS-macos.txt"
+            "${ARM64_DMG}.sha256"
+            "${X64_DMG}.sha256"
+            "release/macos/BUILD_INFO.txt"
+            "release/macos/installation-verification.txt"
+          )
+
+          if gh release view "$TAG" --json url >/dev/null 2>&1; then
+            gh release upload "$TAG" "${ASSETS[@]}" --clobber
+            gh release edit "$TAG" --title "SCRIBBLE-IT v${VERSION} for macOS" --notes-file "$NOTES_PATH"
+          else
+            gh release create "$TAG" "${ASSETS[@]}" --target "$GITHUB_SHA" --title "SCRIBBLE-IT v${VERSION} for macOS" --notes-file "$NOTES_PATH"
+          fi
+
+      - name: Upload macOS installer release bundle & verification logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: scribble-it-macos-release
+          path: release/macos/**
+          retention-days: 30
